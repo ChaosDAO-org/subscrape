@@ -3,10 +3,8 @@ import io
 import json
 import logging
 
-# A fat model of a Parachain
-# Knows how to interpret Subscan data
-# Knows about serialization to disk
-class Parachain:
+# A generic scraper for parachains
+class ParachainScraper:
 
     def __init__(self, db_path, endpoint, subscan):
         self.logger = logging.getLogger("Parachain")
