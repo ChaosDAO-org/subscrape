@@ -67,7 +67,7 @@ class Parachain:
             )
 
         file_path = self.db_path + f"extrinsics_{module}_{call}.json"
-        payload = json.dumps(self.addresses)
+        payload = json.dumps(self.extrinsics[module_call])
         file = io.open(file_path, "w")
         file.write(payload)
         file.close()

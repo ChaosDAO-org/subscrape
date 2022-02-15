@@ -7,10 +7,9 @@ from subscrape.parachains.parachain import Parachain
 
 log_level = logging.INFO
 
-
-def kusama_factory(subscan):
-    db_path = "data/parachains/kusama/"
-    endpoint = "https://kusama.api.subscan.io"
+def parachain_factory(subscan, name):
+    db_path = f"data/parachains/{name}_"
+    endpoint = f"https://{name}.api.subscan.io"
     parachain = Parachain(db_path, endpoint, subscan)
     return parachain
 
@@ -25,9 +24,10 @@ async def main():
 
     # context
     subscan = SubscanWrapper(api_key)
-    kusama = kusama_factory(subscan)
+    kusama = parachain_factory(subscan, "kusama")
 
     # execution
+    #await kusama.fetch_extrinsics("system", "remark")
     await kusama.fetch_extrinsics("system", "remark")
     
     

@@ -25,7 +25,7 @@ class SubscanWrapper:
         # that the server is sending no content-length header. I tried adding the timeout param and it
         # forces a faster timeout and successful conclusion of the request.
         # Possibly related discussion: https://github.com/psf/requests/issues/4023
-        response = requests.post(url, headers = headers, data = body, timeout=2)
+        response = requests.post(url, headers = headers, data = body, timeout=20)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
 
@@ -61,6 +61,8 @@ class SubscanWrapper:
             if limit == 0: 
                 limit = data["count"]
                 self.logger.info(f"About to fetch {limit} entries.")
+                if limit == 0:
+                    break
             elements = data[list_key]
 
             # process the elements
