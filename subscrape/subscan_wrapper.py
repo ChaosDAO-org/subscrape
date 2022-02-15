@@ -3,6 +3,12 @@ import requests
 from datetime import datetime
 import logging
 
+#import http.client
+#http.client.HTTPConnection.debuglevel = 1
+#requests_log = logging.getLogger("requests.packages.urllib3")
+#requests_log.setLevel(logging.DEBUG)
+#requests_log.propagate = True
+
 class SubscanWrapper:
 
     def __init__(self, api_key):
@@ -19,7 +25,7 @@ class SubscanWrapper:
         # that the server is sending no content-length header. I tried adding the timeout param and it
         # forces a faster timeout and successful conclusion of the request.
         # Possibly related discussion: https://github.com/psf/requests/issues/4023
-        response = requests.post(url, headers = headers, data = body, timeout=1)
+        response = requests.post(url, headers = headers, data = body, timeout=2)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
         self.logger.debug(response.headers)
@@ -28,13 +34,13 @@ class SubscanWrapper:
     async def iterate_pages(self, url, element_processor):
         done = False        # keep crunching until we are done
         page = 0            # iterator for the page we want to query
-        rows_per_page = 10   # constant for the rows per page to query
+        rows_per_page = 100 # constant for the rows per page to query
         count = 0           # counter for how many items we queried already
-        limit = 30           # max amount of items to be queried. to be determined after the first call
+        limit = 0           # max amount of items to be queried. to be determined after the first call
 
         while not done:
             response = self.query(url, body= {"row": rows_per_page, "page": page})
-            self.logger.info(response)
+            self.logger.debug(response)
 
             # unpackage the payload
             obj = json.loads(response)
@@ -42,6 +48,7 @@ class SubscanWrapper:
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]
+                self.logger.info(f"About to fetch {limit} accounts.")
             elements = data["list"]
 
             # process the elements
@@ -50,5 +57,7 @@ class SubscanWrapper:
 
             # update counters and check if we should exit
             count += len(elements)
+            self.logger.info(count)
+
             if count >= limit:
                 done = True
