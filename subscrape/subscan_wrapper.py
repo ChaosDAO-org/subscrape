@@ -28,18 +28,30 @@ class SubscanWrapper:
         response = requests.post(url, headers = headers, data = body, timeout=2)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
-        self.logger.debug(response.headers)
+
+        if response.status_code != 200:
+            self.logger.info(f"Status Code: {response.status_code}")
+            self.logger.info(response.headers)
+            raise Exception()
+        else:
+            self.logger.debug(response.headers)
+
         return response.text
 
-    async def iterate_pages(self, url, element_processor):
+    async def iterate_pages(self, url, element_processor, list_key=None, body={}):
+        assert(list_key is not None)
+
         done = False        # keep crunching until we are done
         page = 0            # iterator for the page we want to query
         rows_per_page = 100 # constant for the rows per page to query
         count = 0           # counter for how many items we queried already
         limit = 0           # max amount of items to be queried. to be determined after the first call
 
+        body["row"] = rows_per_page
+
         while not done:
-            response = self.query(url, body= {"row": rows_per_page, "page": page})
+            body["page"] = page
+            response = self.query(url, body=body)
             self.logger.debug(response)
 
             # unpackage the payload
@@ -48,8 +60,8 @@ class SubscanWrapper:
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]
-                self.logger.info(f"About to fetch {limit} accounts.")
-            elements = data["list"]
+                self.logger.info(f"About to fetch {limit} entries.")
+            elements = data[list_key]
 
             # process the elements
             for element in elements:
@@ -61,3 +73,5 @@ class SubscanWrapper:
 
             if count >= limit:
                 done = True
+
+            page += 1

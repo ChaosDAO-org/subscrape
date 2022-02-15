@@ -1,3 +1,4 @@
+from concurrent.futures import process
 import io
 import json
 import logging
@@ -7,22 +8,25 @@ import logging
 # Knows about serialization to disk
 class Parachain:
 
-    def __init__(self, db_path, endpoint):
+    def __init__(self, db_path, endpoint, subscan):
         self.logger = logging.getLogger("Parachain")
 
         self.db_path = db_path
         self.endpoint = endpoint
+        self.subscan = subscan
 
         self.addresses = []
+        self.extrinsics = {}
 
-    async def fetch_addresses(self, subscan):
+    async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
         self.logger.info("Fetching accounts from " + self.endpoint)
 
         method = "/api/v2/scan/accounts"
         url = self.endpoint + method
 
-        await subscan.iterate_pages(url, self.process_account)
+        await self.subscan.iterate_pages(url, self.process_account,
+            list_key = "list")
 
         file_path = self.db_path + "adresses.json"
         payload = json.dumps(self.addresses)
@@ -40,7 +44,40 @@ class Parachain:
             #  }
         account_display = account["account_display"]
         address = account_display["address"]
-        # we could put them in a list now or return them.
-
         self.addresses.append(address)
 
+    async def fetch_extrinsics(self, module, call):
+        module_call = f"{module}_{call}"
+        assert(module_call not in self.extrinsics)
+        self.logger.info(f"Fetching extrinsics {module_call} from {self.endpoint}")
+
+        self.extrinsics[module_call] = {}
+
+        method = "/api/scan/extrinsics"
+        url = self.endpoint + method
+
+        body = {"module": module, "call": call}
+        processor = self.process_extrinsic_factory(module_call)
+
+        await self.subscan.iterate_pages(
+            url,
+            processor,
+            list_key="extrinsics",
+            body=body
+            )
+
+        file_path = self.db_path + f"extrinsics_{module}_{call}.json"
+        payload = json.dumps(self.addresses)
+        file = io.open(file_path, "w")
+        file.write(payload)
+        file.close()
+
+    def process_extrinsic_factory(self, module_call):
+        def process_extrinsic(extrinsic):
+            address = extrinsic["account_id"]
+            if address not in self.extrinsics[module_call]:
+                self.extrinsics[module_call][address] = 1
+            else:
+                self.extrinsics[module_call][address] += 1
+        
+        return process_extrinsic
