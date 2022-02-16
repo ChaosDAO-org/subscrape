@@ -1,1 +1,1 @@
-from . import parachain
+from . import parachain_scraper

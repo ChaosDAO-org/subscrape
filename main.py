@@ -1,5 +1,6 @@
 from audioop import add
 import logging
+import json
 import os
 import asyncio
 from subscrape.subscan_wrapper import SubscanWrapper
@@ -16,18 +17,29 @@ def scraper_factory(subscan, name):
 async def main():
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    ## Load Subscan API Key
+    # Load Subscan API Key
     api_key = None
-    if os.path.exists("subscan-key"):
-        f = open("subscan-key")
+    if os.path.exists("config/subscan-key"):
+        f = open("config/subscan-key")
         api_key = f.read()
-
-    # context
     subscan = SubscanWrapper(api_key)
-    kusama_scraper = scraper_factory(subscan, "kusama")
 
-    # execution
-    await kusama_scraper.fetch_extrinsics("system", "remark")
+    # load config
+    config_path = "config/scrape_config.json"
+    if not os.path.exists(config_path):
+        logging.error("missing scrape config. Exiting")
+        exit
+    f = open(config_path)
+    raw_config = f.read()
+    config = json.loads(raw_config)
+
+    for parachain_name in config:
+        parachain_scraper = scraper_factory(subscan, parachain_name)
+        operations = config[parachain_name]
+        for operation in operations:
+            payload = operations[operation]
+            await parachain_scraper.perform_operation(operation, payload)
+
     
     
 

@@ -1,0 +1,9 @@
+{
+    "kusama": {
+        "extrinsics": {
+            "system": [
+                "remark"
+            ]
+        }
+    }
+}

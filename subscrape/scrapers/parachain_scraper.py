@@ -16,6 +16,12 @@ class ParachainScraper:
         self.addresses = []
         self.extrinsics = {}
 
+    async def perform_operation(self, operation, payload):
+        for module in payload:
+            calls = payload[module]
+            for call in calls:
+                await self.fetch_extrinsics(module, call)
+
     async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
         self.logger.info("Fetching accounts from " + self.endpoint)
