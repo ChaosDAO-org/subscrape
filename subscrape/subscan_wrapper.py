@@ -11,9 +11,10 @@ import logging
 
 class SubscanWrapper:
 
-    def __init__(self, api_key):
+    def __init__(self, api_key, endpoint):
         self.logger = logging.getLogger("SubscanWrapper")
         self.api_key = api_key
+        self.endpoint = endpoint
 
     def query(self, url, headers = {}, body = {}):
         headers["Content-Type"] = "application/json"

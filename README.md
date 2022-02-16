@@ -9,6 +9,13 @@ A Python scraper for substrate chains that uses Subscan.
 
 If a file already exists in data/, that operation will be skipped in subsequent runs.
 
+### Configuration
+
+To query extrinsics from Substrate chains, only the module and call is needed.
+
+To query transactions from Moonbeam chains, the contract address and the hex-formatted method id is needed. This can be found by scrolling to the input of a transaction on moonbeam and copying the method id. Example: https://moonriver.moonscan.io/tx/0x35c7d7bdd33c77c756e7a9b41b587a6b6193b5a94956d2c8e4ea77af1df2b9c3
+
+
 ## Architecture
 On overview is given in this Twitter thread: https://twitter.com/alice_und_bob/status/1493714489014956037
 

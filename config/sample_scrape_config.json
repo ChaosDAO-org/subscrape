@@ -5,5 +5,12 @@
                 "remark"
             ]
         }
+    },
+    "moonriver": {
+        "transactions": {
+            "0xaa30ef758139ae4a7f798112902bf6d65612045f": [
+                "0xe8e33700"
+            ]
+        }
     }
 }

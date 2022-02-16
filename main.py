@@ -3,26 +3,41 @@ import logging
 import json
 import os
 import asyncio
+from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
+from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 
 log_level = logging.INFO
 
-def scraper_factory(subscan, name):
-    db_path = f"data/parachains/{name}_"
-    endpoint = f"https://{name}.api.subscan.io"
-    scraper = ParachainScraper(db_path, endpoint, subscan)
-    return scraper
+def moonscan_factory(chain):
+    endpoint = f"https://api-{chain}.moonscan.io/api"
+    return MoonscanWrapper(endpoint)
+
+def subscan_factory(chain):
+    subscan_key = None
+    if os.path.exists("config/subscan-key"):
+        f = open("config/subscan-key")
+        subscan_key = f.read()
+
+    endpoint = f"https://{chain}.api.subscan.io"
+    return SubscanWrapper(subscan_key, endpoint)
+
+
+def scraper_factory(name):
+    if name == "moonriver" or name == "moonbeam":
+        db_path = f"data/parachains/{name}_"
+        api = moonscan_factory(name)
+        scraper = MoonbeamScraper(db_path, api)
+        return scraper
+    else:
+        db_path = f"data/parachains/{name}_"
+        api = subscan_factory(name)
+        scraper = ParachainScraper(db_path, api)
+        return scraper
 
 async def main():
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    # Load Subscan API Key
-    api_key = None
-    if os.path.exists("config/subscan-key"):
-        f = open("config/subscan-key")
-        api_key = f.read()
-    subscan = SubscanWrapper(api_key)
 
     # load config
     config_path = "config/scrape_config.json"
@@ -34,7 +49,7 @@ async def main():
     config = json.loads(raw_config)
 
     for parachain_name in config:
-        parachain_scraper = scraper_factory(subscan, parachain_name)
+        parachain_scraper = scraper_factory(parachain_name)
         operations = config[parachain_name]
         for operation in operations:
             payload = operations[operation]

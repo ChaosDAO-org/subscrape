@@ -7,12 +7,11 @@ import logging
 # A generic scraper for parachains
 class ParachainScraper:
 
-    def __init__(self, db_path, endpoint, subscan):
-        self.logger = logging.getLogger("Parachain")
+    def __init__(self, db_path, api):
+        self.logger = logging.getLogger("ParachainScraper")
 
         self.db_path = db_path
-        self.endpoint = endpoint
-        self.subscan = subscan
+        self.api = api
 
         self.addresses = []
         self.extrinsics = {}
@@ -42,7 +41,7 @@ class ParachainScraper:
         method = "/api/v2/scan/accounts"
         url = self.endpoint + method
 
-        await self.subscan.iterate_pages(url, self.process_account,
+        await self.api.iterate_pages(url, self.process_account,
             list_key = "list")
 
         file_path = self.db_path + "adresses.json"
@@ -82,7 +81,7 @@ class ParachainScraper:
         body = {"module": module, "call": call}
         processor = self.process_extrinsic_factory(module_call)
 
-        await self.subscan.iterate_pages(
+        await self.api.iterate_pages(
             url,
             processor,
             list_key="extrinsics",
