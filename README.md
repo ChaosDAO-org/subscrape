@@ -5,6 +5,9 @@ A Python scraper for substrate chains that uses Subscan.
 - copy config/sample_scrape_config.json to config/scrape_config.json and configure to your desire.
 - make sure there is a data/parachains folder
 - run
+- corresponding files will be created in data/
+
+If a file already exists in data/, that operation will be skipped in subsequent runs.
 
 ## Architecture
 On overview is given in this Twitter thread: https://twitter.com/alice_und_bob/status/1493714489014956037

@@ -1,5 +1,6 @@
 from concurrent.futures import process
 import io
+import os
 import json
 import logging
 
@@ -17,13 +18,25 @@ class ParachainScraper:
         self.extrinsics = {}
 
     async def perform_operation(self, operation, payload):
-        for module in payload:
-            calls = payload[module]
-            for call in calls:
-                await self.fetch_extrinsics(module, call)
+        if operation == "extrinsics":
+            for module in payload:
+                calls = payload[module]
+                for call in calls:
+                    await self.fetch_extrinsics(module, call)
+        elif operation == "addresses":
+            await self.fetch_addresses()
+        else:
+            self.logger.error(f"config contained an operation that does not exist: {operation}")            
+            exit
 
     async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
+
+        file_path = self.db_path + "adresses.json"
+        if os.path.exists(file_path):
+            self.logger.warn(f"{file_path} already exists. Skipping.")
+            return
+
         self.logger.info("Fetching accounts from " + self.endpoint)
 
         method = "/api/v2/scan/accounts"
@@ -53,6 +66,12 @@ class ParachainScraper:
     async def fetch_extrinsics(self, module, call):
         module_call = f"{module}_{call}"
         assert(module_call not in self.extrinsics)
+
+        file_path = self.db_path + f"extrinsics_{module}_{call}.json"
+        if os.path.exists(file_path):
+            self.logger.warn(f"{file_path} already exists. Skipping.")
+            return
+
         self.logger.info(f"Fetching extrinsics {module_call} from {self.endpoint}")
 
         self.extrinsics[module_call] = {}
