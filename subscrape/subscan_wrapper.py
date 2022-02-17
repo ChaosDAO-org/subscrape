@@ -16,16 +16,12 @@ class SubscanWrapper:
         self.api_key = api_key
         self.endpoint = endpoint
 
-    def query(self, url, headers = {}, body = {}):
+    def query(self, method, headers = {}, body = {}):
         headers["Content-Type"] = "application/json"
         headers["x-api-key"] = self.api_key
         body = json.dumps(body)
         before = datetime.now()
-        # TE: there seems to be an issue with the way the requests library handles the server response
-        # the request will only conclude successfully after it timed out. one possible reason could be
-        # that the server is sending no content-length header. I tried adding the timeout param and it
-        # forces a faster timeout and successful conclusion of the request.
-        # Possibly related discussion: https://github.com/psf/requests/issues/4023
+        url = self.endpoint + method
         response = requests.post(url, headers = headers, data = body, timeout=20)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
@@ -39,7 +35,7 @@ class SubscanWrapper:
 
         return response.text
 
-    async def iterate_pages(self, url, element_processor, list_key=None, body={}):
+    async def iterate_pages(self, method, element_processor, list_key=None, body={}):
         assert(list_key is not None)
 
         done = False        # keep crunching until we are done
@@ -52,7 +48,7 @@ class SubscanWrapper:
 
         while not done:
             body["page"] = page
-            response = self.query(url, body=body)
+            response = self.query(method, body=body)
             self.logger.debug(response)
 
             # unpackage the payload

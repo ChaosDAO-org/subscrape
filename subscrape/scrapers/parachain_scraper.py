@@ -71,18 +71,17 @@ class ParachainScraper:
             self.logger.warn(f"{file_path} already exists. Skipping.")
             return
 
-        self.logger.info(f"Fetching extrinsics {module_call} from {self.endpoint}")
+        self.logger.info(f"Fetching extrinsics {module_call} from {self.api.endpoint}")
 
         self.extrinsics[module_call] = {}
 
         method = "/api/scan/extrinsics"
-        url = self.endpoint + method
 
         body = {"module": module, "call": call}
         processor = self.process_extrinsic_factory(module_call)
 
         await self.api.iterate_pages(
-            url,
+            method,
             processor,
             list_key="extrinsics",
             body=body
