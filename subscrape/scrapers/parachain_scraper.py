@@ -1,54 +1,82 @@
 from ast import Dict
 from concurrent.futures import process
-import io
 import os
 import json
 import logging
 from tkinter import NONE
+from typing import List
+from subscrape.scrapers.parachain_scrape_config import ParachainScrapeConfig
 
 # A generic scraper for parachains
 class ParachainScraper:
 
-    def __init__(self, db_path, api):
+    def __init__(self, db, api):
         self.logger = logging.getLogger("ParachainScraper")
-
-        self.db_path = db_path
+        self.db = db
         self.api = api
 
-        self.addresses = []
-        self.extrinsics = {}
+    async def scrape(self, operations):
+        chain_config = ParachainScrapeConfig(operations)
+        for key in operations:
+            if key == "extrinsics":
+                modules = operations[key]
+                extrinsic_config = chain_config.create_inner_config(modules)
 
-    async def perform_operation(self, operation, payload):
-        if operation == "extrinsics":
-            filter = payload.pop("_filter", None)
-            for module in payload:
-                calls = payload[module]
-                for call in calls:
-                    await self.fetch_extrinsics(module, call, filter)
-        elif operation == "addresses":
-            await self.fetch_addresses()
-        else:
-            self.logger.error(f"config contained an operation that does not exist: {operation}")            
-            exit
+                for module in modules:
+                    # ignore metadata
+                    if module.startswith("_"):
+                        continue
 
-    # returns true if the extrinsic should be skipped because it hits a filter condition
-    def filter_factory(self, conditions):
-        def filter(extrinsic):
-            for group in conditions:
-                for key in group:
-                    if key not in extrinsic:
-                        return True
-                    actual_value = extrinsic[key]
-                    predicates = group[key]
-                    for predicate in predicates:
-                        if "<" in predicate:
-                            value = predicate["<"]
-                            if actual_value < value:
-                                continue
-                            else:
-                                return True
-            return False
-        return filter
+                    calls = modules[module]
+                    module_config = extrinsic_config.create_inner_config(calls)
+                    
+                    for call in calls:
+                        # ignore metadata
+                        if call.startswith("_"):
+                            continue
+
+                        # deduce config
+                        if type(calls) is dict:
+                            call_config = module_config.create_inner_config(calls[call])
+                        else:
+                            call_config = module_config
+
+                        # config wants us to skip this call?
+                        if call_config.skip:
+                            self.logger.info(f"Config asks to skip {module} {call}")
+                            continue
+
+                        # go
+                        await self.fetch_extrinsics(module, call, call_config.filter, call_config.digits_per_sector)
+            elif key == "addresses":
+                await self.fetch_addresses()
+            elif key.startswith("_"):
+                continue
+            else:
+                self.logger.error(f"config contained an operation that does not exist: {key}")            
+                exit
+
+    async def fetch_extrinsics(self, call_module, call_name, filter, digits_per_sector):
+        call_string = f"{call_module}_{call_name}"
+
+        self.db.digits_per_sector = digits_per_sector
+        self.db.set_active_extrinsics_call(call_module, call_name)
+
+        self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
+
+        method = "/api/scan/extrinsics"
+
+        self.db.dimension = ""
+        body = {"module": call_module, "call": call_name}
+        await self.api.iterate_pages(
+            method,
+            self.db.write_extrinsic,
+            list_key="extrinsics",
+            body=body,
+            filter=filter
+            )
+
+        self.db.flush_extrinsics()
 
     async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
@@ -73,86 +101,8 @@ class ParachainScraper:
         file.close()
 
     def process_account(self, account):
-            # example result: 
-            # {"code":0,"message":"Success","generated_at":1644941702,"data":
-            #   {"count":238607,"list":[
-            #       {"account_display":{"account_index":"54TxD","address":"DgCKZyuptaHJeVaA9X6o7vdgPRXUSXo8sQwpe9hMyi8TVYB","display":"","identity":false,"judgements":null,"parent":null},
-            #        "address":"DgCKZyuptaHJeVaA9X6o7vdgPRXUSXo8sQwpe9hMyi8TVYB","balance":"13.762980093164","balance_lock":"13.5","derive_token":null,"is_erc20":false,"is_evm_contract":false,"lock":"13.5","registrar_info":null}
-            #   ]}
-            #  }
         account_display = account["account_display"]
         address = account_display["address"]
         self.addresses.append(address)
-
-    async def fetch_extrinsics(self, call_module, call_name, filter_conditions):
-        call_string = f"{call_module}_{call_name}"
-        assert(call_string not in self.extrinsics)
-
-        file_path = self.db_path + f"extrinsics_{call_module}_{call_name}.json"
-        if os.path.exists(file_path):
-            self.logger.warn(f"{file_path} already exists. Skipping.")
-            return
-
-        self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
-
-        self.extrinsics[call_string] = {}
-
-        method = "/api/scan/extrinsics"
-        filter = None
-        if filter_conditions is not None:
-            filter = self.filter_factory(filter_conditions)
-
-        def process_extrinsic_hit(extrinsic):
-            address = extrinsic["account_id"]
-            if address not in self.extrinsics[call_string]:
-                self.extrinsics[call_string][address] = 1
-            else:
-                self.extrinsics[call_string][address] += 1
-        
-        # recursively goes through batched calls to check for an actual hit
-        def process_batch_hit(extrinsic):
-            params = json.loads(extrinsic["params"])
-            assert(len(params) == 1)
-            calls = params[0]["value"]
-            for call in calls:
-                actual_call_module = call["call_module"].lower()
-                actual_call_name = call["call_name"].lower()
-                if actual_call_module == call_module and actual_call_name == call_name:
-                    process_extrinsic_hit(extrinsic)
-                elif actual_call_module == "utility" and (actual_call_name == "batch" or actual_call_name == "batch_all"):
-                    process_batch_hit(call)                    
-
-
-        body = {"module": call_module, "call": call_name}
-        await self.api.iterate_pages(
-            method,
-            process_extrinsic_hit,
-            list_key="extrinsics",
-            body=body,
-            filter=filter
-            )
-
-        body = {"module": "utility", "call": "batch"}
-        await self.api.iterate_pages(
-            method,
-            process_batch_hit,
-            list_key="extrinsics",
-            body=body,
-            filter=filter
-            )
-
-        body = {"module": "utility", "call": "batch_all"}
-        await self.api.iterate_pages(
-            method,
-            process_batch_hit,
-            list_key="extrinsics",
-            body=body,
-            filter=filter
-            )
-
-        file_path = self.db_path + f"extrinsics_{call_module}_{call_name}.json"
-        payload = json.dumps(self.extrinsics[call_string])
-        file = io.open(file_path, "w")
-        file.write(payload)
-        file.close()
+        return True
 

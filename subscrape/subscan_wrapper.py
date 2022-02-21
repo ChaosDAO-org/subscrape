@@ -35,6 +35,8 @@ class SubscanWrapper:
 
         return response.text
 
+    # iterates through all pages until it processed all elements
+    # or gets False from the processor
     async def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
         assert(list_key is not None)
 
@@ -62,17 +64,33 @@ class SubscanWrapper:
                     break
             elements = data[list_key]
 
+            if elements is None:
+                self.logger.info("elements was empty. Stopping.")
+                break
+
             # process the elements
+            # Subscan has no cursor and so getting to a new page could yield results
+            # that were already present on the previous page. we try to cope with
+            # this by checking if any of the elements on the current page were new
+            # and if they were, we continue
+            found_new_elements = False
             for element in elements:
                 if filter is not None:
-                    shoud_skip = filter(element)
-                    if shoud_skip:
+                    should_skip = filter(element)
+                    if should_skip:
                         continue
-                element_processor(element)
+                # process the element and check if we should continue
+                was_new_element = element_processor(element)
+                if was_new_element:
+                    found_new_elements = True
+
+            if not found_new_elements:
+                self.logger.info("We did not find any new elements on the latest page. Stopping.")
+                break
 
             # update counters and check if we should exit
             count += len(elements)
-            self.logger.info(count)
+            self.logger.debug(count)
 
             if count >= limit:
                 done = True
