@@ -1,6 +1,7 @@
 {
     "kusama": {
         "extrinsics": {
+            "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
                 "remark"
             ]

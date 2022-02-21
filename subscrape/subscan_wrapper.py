@@ -22,7 +22,7 @@ class SubscanWrapper:
         body = json.dumps(body)
         before = datetime.now()
         url = self.endpoint + method
-        response = requests.post(url, headers = headers, data = body, timeout=20)
+        response = requests.post(url, headers = headers, data = body)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
 
@@ -35,7 +35,7 @@ class SubscanWrapper:
 
         return response.text
 
-    async def iterate_pages(self, method, element_processor, list_key=None, body={}):
+    async def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
         assert(list_key is not None)
 
         done = False        # keep crunching until we are done
@@ -64,6 +64,10 @@ class SubscanWrapper:
 
             # process the elements
             for element in elements:
+                if filter is not None:
+                    shoud_skip = filter(element)
+                    if shoud_skip:
+                        continue
                 element_processor(element)
 
             # update counters and check if we should exit
