@@ -48,9 +48,13 @@ async def main():
     raw_config = f.read()
     config = json.loads(raw_config)
 
-    for parachain_name in config:
-        parachain_scraper = scraper_factory(parachain_name)
-        operations = config[parachain_name]
+    for key in config:
+        if key.startswith("_"):
+            if key == "_version" and config[key] != 1:
+                logging.warn("config does not have version 1. It could contain runtime breaking contents")
+            continue
+        parachain_scraper = scraper_factory(key)
+        operations = config[key]
         for operation in operations:
             payload = operations[operation]
             await parachain_scraper.perform_operation(operation, payload)
