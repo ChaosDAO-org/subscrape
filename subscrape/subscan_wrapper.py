@@ -35,6 +35,8 @@ class SubscanWrapper:
 
         return response.text
 
+    # iterates through all pages until it processed all elements
+    # or gets False from the processor
     async def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
         assert(list_key is not None)
 
@@ -63,12 +65,20 @@ class SubscanWrapper:
             elements = data[list_key]
 
             # process the elements
+            should_continue = True
             for element in elements:
                 if filter is not None:
-                    shoud_skip = filter(element)
-                    if shoud_skip:
+                    should_skip = filter(element)
+                    if should_skip:
                         continue
-                element_processor(element)
+                # process the element and check if we should continue
+                should_continue = element_processor(element)
+                if not should_continue:
+                    self.logger.log("Processor sent stop signal.")
+                    break
+
+            if not should_continue:
+                break
 
             # update counters and check if we should exit
             count += len(elements)

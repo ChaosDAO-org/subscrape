@@ -7,6 +7,7 @@ from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
 from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
+from subscrape.serializers.file_serializer import FileSerializer
 
 log_level = logging.INFO
 
@@ -32,8 +33,9 @@ def scraper_factory(name):
         return scraper
     else:
         db_path = f"data/parachains/{name}_"
+        db = FileSerializer(db_path)
         api = subscan_factory(name)
-        scraper = ParachainScraper(db_path, api)
+        scraper = ParachainScraper(db, api)
         return scraper
 
 async def main():
