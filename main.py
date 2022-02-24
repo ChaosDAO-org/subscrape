@@ -51,7 +51,7 @@ async def main():
     for key in config:
         if key.startswith("_"):
             if key == "_version" and config[key] != 1:
-                logging.warn("config does not have version 1. It could contain runtime breaking contents")
+                logging.warn("config version != 1. It could contain runtime breaking contents")
             continue
         parachain_scraper = scraper_factory(key)
         operations = config[key]

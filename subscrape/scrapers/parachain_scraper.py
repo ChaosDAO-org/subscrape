@@ -4,7 +4,38 @@ import io
 import os
 import json
 import logging
+import copy
 from tkinter import NONE
+from typing import List
+
+class ParachainScrapeConfig:
+    def __init__(self, config):
+        self.filter = None
+        self.processor_name = None
+        self.skip = False
+
+    def _set_config(self, config):
+        if type(config) is list:
+            return
+
+        filter_conditions = config.get("_filter", None)
+        if filter_conditions is not None:
+            self.filter = self.filter_factory(filter_conditions)
+
+        processor_name = config.get("_processor", None)
+        if processor_name is not None:
+            self.processor_name = processor_name
+
+        skip = config.get("_skip", None)
+        if skip is not None:
+            self.skip = skip
+
+    # creates a config that can be nested to lower layers
+    def create_inner_config(self, config):
+        result = copy.deepcopy(self)
+        result._set_config(config)
+        return result
+
 
 # A generic scraper for parachains
 class ParachainScraper:
@@ -18,21 +49,98 @@ class ParachainScraper:
         self.addresses = []
         self.extrinsics = {}
 
-    async def perform_operation(self, operation, payload):
+    async def perform_operation(self, operation, modules):
         if operation == "extrinsics":
-            filter = payload.pop("_filter", None)
-            for module in payload:
-                calls = payload[module]
+
+            extrinsic_config = ParachainScrapeConfig(modules)
+
+            for module in modules:
+                # ignore metadata
+                if module.startswith("_"):
+                    continue
+
+                calls = modules[module]
+                module_config = extrinsic_config.create_inner_config(calls)
+                
                 for call in calls:
-                    await self.fetch_extrinsics(module, call, filter)
+                    # ignore metadata
+                    if call.startswith("_"):
+                        continue
+
+                    # deduce config
+                    if type(calls) is dict:
+                        call_config = module_config.create_inner_config(calls[call])
+                    else:
+                        call_config = module_config
+
+                    # config wants us to skip this call?
+                    if call_config.skip:
+                        self.logger.info(f"Config asks to skip {module} {call}")
+                        continue
+
+                    # create the proper processor
+                    call_string = f"{module}_{call}"
+                    processor = self.processor_factory(call_config.processor_name, call_string)
+
+                    # go
+                    await self.fetch_extrinsics(module, call, call_config.filter, processor)
         elif operation == "addresses":
             await self.fetch_addresses()
         else:
             self.logger.error(f"config contained an operation that does not exist: {operation}")            
             exit
 
+    def processor_factory(self, name, call_string):
+        processor = None
+        if name == "count_from_addresses" or name is None:
+            processor = self.dispatch_address_count_processor_factory(call_string)
+        elif name == "rmrk":
+            processor = self.remark_processor_factory(call_string)
+        elif name == "params":
+            processor = self.params_processor_factory(call_string)
+        else:
+            self.logger.error(f"unknown processor given for {call_string}: {name}")
+            raise Exception()
+        return processor
+
+    def dispatch_address_count_processor_factory(self, call_string):
+        def processor(extrinsic):
+            address = extrinsic["account_id"]
+            if address not in self.extrinsics[call_string]:
+                self.extrinsics[call_string][address] = 1
+            else:
+                self.extrinsics[call_string][address] += 1
+        return processor
+
+    def remark_processor_factory(self, call_string):
+        def processor(extrinsic):
+            params = json.loads(extrinsic["params"])
+            assert(len(params) == 1)
+            value = params[0]["value"]
+            extrinsic_index = extrinsic["extrinsic_index"]
+            self.extrinsics[call_string][extrinsic_index] = value
+        return processor
+
+    def params_processor_factory(self, call_string):
+        def params_processor(extrinsic):
+            params = json.loads(extrinsic["params"])
+            
+            result = {"account_id": extrinsic["account_id"]}
+
+            for param in params:
+                type_name = param["name"]
+                value = param["value"]
+                result[type_name] = value
+
+            extrinsic_index = extrinsic["extrinsic_index"]
+            self.extrinsics[call_string][extrinsic_index] = result
+        return params_processor
+
+
     # returns true if the extrinsic should be skipped because it hits a filter condition
     def filter_factory(self, conditions):
+        if conditions is None:
+            return None
         def filter(extrinsic):
             for group in conditions:
                 for key in group:
@@ -73,18 +181,11 @@ class ParachainScraper:
         file.close()
 
     def process_account(self, account):
-            # example result: 
-            # {"code":0,"message":"Success","generated_at":1644941702,"data":
-            #   {"count":238607,"list":[
-            #       {"account_display":{"account_index":"54TxD","address":"DgCKZyuptaHJeVaA9X6o7vdgPRXUSXo8sQwpe9hMyi8TVYB","display":"","identity":false,"judgements":null,"parent":null},
-            #        "address":"DgCKZyuptaHJeVaA9X6o7vdgPRXUSXo8sQwpe9hMyi8TVYB","balance":"13.762980093164","balance_lock":"13.5","derive_token":null,"is_erc20":false,"is_evm_contract":false,"lock":"13.5","registrar_info":null}
-            #   ]}
-            #  }
         account_display = account["account_display"]
         address = account_display["address"]
         self.addresses.append(address)
 
-    async def fetch_extrinsics(self, call_module, call_name, filter_conditions):
+    async def fetch_extrinsics(self, call_module, call_name, filter, processor):
         call_string = f"{call_module}_{call_name}"
         assert(call_string not in self.extrinsics)
 
@@ -98,27 +199,24 @@ class ParachainScraper:
         self.extrinsics[call_string] = {}
 
         method = "/api/scan/extrinsics"
-        filter = None
-        if filter_conditions is not None:
-            filter = self.filter_factory(filter_conditions)
-
-        def process_extrinsic_hit(extrinsic):
-            address = extrinsic["account_id"]
-            if address not in self.extrinsics[call_string]:
-                self.extrinsics[call_string][address] = 1
-            else:
-                self.extrinsics[call_string][address] += 1
         
         # recursively goes through batched calls to check for an actual hit
         def process_batch_hit(extrinsic):
-            params = json.loads(extrinsic["params"])
+            params = extrinsic["params"]
+            if type(params) is str:
+                params = json.loads(params)
             assert(len(params) == 1)
             calls = params[0]["value"]
+            
+            # check for empty batch
+            if calls is None:
+                return
+
             for call in calls:
                 actual_call_module = call["call_module"].lower()
                 actual_call_name = call["call_name"].lower()
                 if actual_call_module == call_module and actual_call_name == call_name:
-                    process_extrinsic_hit(extrinsic)
+                    processor(extrinsic)
                 elif actual_call_module == "utility" and (actual_call_name == "batch" or actual_call_name == "batch_all"):
                     process_batch_hit(call)                    
 
@@ -126,7 +224,7 @@ class ParachainScraper:
         body = {"module": call_module, "call": call_name}
         await self.api.iterate_pages(
             method,
-            process_extrinsic_hit,
+            processor,
             list_key="extrinsics",
             body=body,
             filter=filter
@@ -155,4 +253,3 @@ class ParachainScraper:
         file = io.open(file_path, "w")
         file.write(payload)
         file.close()
-
