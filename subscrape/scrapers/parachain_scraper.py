@@ -50,7 +50,7 @@ class ParachainScraper:
                     processor = self.processor_factory(call_config.processor_name, call_string)
 
                     # go
-                    await self.fetch_extrinsics(module, call, call_config.filter, processor, call_config.include_batch_calls)
+                    await self.fetch_extrinsics(module, call, call_config.filter, processor, call_config.include_batch_calls, call_config.digits_per_sector)
         elif operation == "addresses":
             await self.fetch_addresses()
         else:
@@ -94,9 +94,10 @@ class ParachainScraper:
             return should_continue
         return params_processor
 
-    async def fetch_extrinsics(self, call_module, call_name, filter, processor, include_batch_calls):
+    async def fetch_extrinsics(self, call_module, call_name, filter, processor, include_batch_calls, digits_per_sector):
         call_string = f"{call_module}_{call_name}"
 
+        self.db.digits_per_sector = digits_per_sector
         self.db.warmup_extrinsics(call_string)
 
         self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")

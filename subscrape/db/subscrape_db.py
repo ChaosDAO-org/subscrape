@@ -1,12 +1,14 @@
 import os
 import io
 import json
+import logging
 
 
 # one DB per Parachain
 class SubscrapeDB:
 
     def __init__(self, path):
+        self.logger = logging.getLogger("SubscrapeDB")
         self._path = path
         # the name of the currently loaded extrinsics
         self._extrinsics_name = None
@@ -18,7 +20,7 @@ class SubscrapeDB:
         self._dirty = False
         # store information from batched calls by setting a dimension
         self._dimension = ""
-        self.decimals_per_sector_file = 5
+        self.digits_per_sector = 6
 
     @property
     def dimension(self):
@@ -63,9 +65,9 @@ class SubscrapeDB:
 
         # determine the sector
         sector = index.split("-")[0]
-        suffix = "x" * self.decimals_per_sector_file
-        if(len(sector) > self.decimals_per_sector_file):
-            sector = sector[:-self.decimals_per_sector_file] + suffix
+        suffix = "x" * self.digits_per_sector
+        if(len(sector) > self.digits_per_sector):
+            sector = sector[:-self.digits_per_sector] + suffix
         else:
             sector = suffix
 
@@ -73,16 +75,18 @@ class SubscrapeDB:
         if self._extrinsics_sector_name != sector:
             # make sure previous data is saved
             self.flush_extrinsics()
+            self._clean_state()
 
             # load sector file or create empty dict
             self._extrinsics_sector_name = sector
             file_path = self._extrinsics_sector_file_path(name, sector, self._dimension)
             if os.path.exists(file_path):
                 file = io.open(file_path)
-                payload = file.read()
-                self._extrinsics = json.loads(payload)
+                file_payload = file.read()
+                self._extrinsics = json.loads(file_payload)
             else:
                 self._extrinsics = {}
+            self.logger.info(f"Switched to sector {self._extrinsics_sector_name}. {len(self._extrinsics)} active entries")
         
 
         # do we already know this extrinsic? 
@@ -99,6 +103,7 @@ class SubscrapeDB:
             return
 
         file_path = self._extrinsics_sector_file_path(self._extrinsics_name, self._extrinsics_sector_name, self._dimension)
+        self.logger.info(f"Writing {len(self._extrinsics)} entries")
         payload = json.dumps(self._extrinsics)
         file = io.open(file_path, "w")
         file.write(payload)

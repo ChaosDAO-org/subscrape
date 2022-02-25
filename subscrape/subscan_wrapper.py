@@ -86,7 +86,7 @@ class SubscanWrapper:
 
             # update counters and check if we should exit
             count += len(elements)
-            self.logger.info(count)
+            self.logger.debug(count)
 
             if count >= limit:
                 done = True
