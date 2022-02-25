@@ -65,19 +65,23 @@ class SubscanWrapper:
             elements = data[list_key]
 
             # process the elements
-            should_continue = True
+            # Subscan has no cursor and so getting to a new page could yield results
+            # that were already present on the previous page. we try to cope with
+            # this by checking if any of the elements on the current page were new
+            # and if they were, we continue
+            found_new_elements = False
             for element in elements:
                 if filter is not None:
                     should_skip = filter(element)
                     if should_skip:
                         continue
                 # process the element and check if we should continue
-                should_continue = element_processor(element)
-                if not should_continue:
-                    self.logger.info("Processor sent stop signal.")
-                    break
+                was_new_element = element_processor(element)
+                if was_new_element:
+                    found_new_elements = True
 
-            if not should_continue:
+            if not found_new_elements:
+                self.logger.info("We did not find any new elements on the latest page. Stopping.")
                 break
 
             # update counters and check if we should exit

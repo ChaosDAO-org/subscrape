@@ -119,11 +119,13 @@ class ParachainScraper:
                 actual_call_module = call["call_module"].lower()
                 actual_call_name = call["call_name"].lower()
                 if actual_call_module == call_module and actual_call_name == call_name:
-                    processor(extrinsic)
+                    return processor(extrinsic)
                 elif actual_call_module == "utility" and (actual_call_name == "batch" or actual_call_name == "batch_all"):
-                    process_batch_hit(call)                    
+                    return process_batch_hit(call)               
+            return True
 
 
+        self.db.dimension = ""
         body = {"module": call_module, "call": call_name}
         await self.api.iterate_pages(
             method,
@@ -134,6 +136,7 @@ class ParachainScraper:
             )
 
         if include_batch_calls:
+            self.db.dimension = "batch"
             body = {"module": "utility", "call": "batch"}
             await self.api.iterate_pages(
                 method,
@@ -143,6 +146,7 @@ class ParachainScraper:
                 filter=filter
                 )
 
+            self.db.dimension = "batch_all"
             body = {"module": "utility", "call": "batch_all"}
             await self.api.iterate_pages(
                 method,
