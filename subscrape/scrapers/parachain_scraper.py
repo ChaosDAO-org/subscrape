@@ -90,17 +90,16 @@ class ParachainScraper:
                 result[name] = value
 
             extrinsic_index = extrinsic["extrinsic_index"]
-            self.extrinsics[call_string][extrinsic_index] = result
+            self.db.set_extrinsic(call_string, extrinsic_index, result)
             return True
         return params_processor
 
     async def fetch_extrinsics(self, call_module, call_name, filter, processor, include_batch_calls):
         call_string = f"{call_module}_{call_name}"
-        assert(call_string not in self.extrinsics)
+
+        self.db.warmup_extrinsic_index(call_string)
 
         self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
-
-        self.extrinsics[call_string] = {}
 
         method = "/api/scan/extrinsics"
         
@@ -153,7 +152,7 @@ class ParachainScraper:
                 filter=filter
                 )
 
-        self.storage.save_extrinsics(call_string, self.extrinsics[call_string])
+        self.db.save_extrinsics(call_string)
 
     async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
