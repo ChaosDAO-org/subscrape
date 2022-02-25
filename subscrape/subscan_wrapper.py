@@ -74,7 +74,7 @@ class SubscanWrapper:
                 # process the element and check if we should continue
                 should_continue = element_processor(element)
                 if not should_continue:
-                    self.logger.log("Processor sent stop signal.")
+                    self.logger.info("Processor sent stop signal.")
                     break
 
             if not should_continue:
