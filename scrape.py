@@ -32,8 +32,7 @@ def scraper_factory(name):
         scraper = MoonbeamScraper(db_path, api)
         return scraper
     else:
-        db_path = f"data/parachains/{name}_"
-        db = SubscrapeDB(db_path)
+        db = SubscrapeDB(name)
         api = subscan_factory(name)
         scraper = ParachainScraper(db, api)
         return scraper
@@ -56,11 +55,7 @@ async def main():
                 logging.warn("config version != 1. It could contain runtime breaking contents")
             continue
         parachain_scraper = scraper_factory(key)
-        operations = config[key]
-        for operation in operations:
-            payload = operations[operation]
-            await parachain_scraper.perform_operation(operation, payload)
-
+        await parachain_scraper.scrape(config[key])
     
     
 

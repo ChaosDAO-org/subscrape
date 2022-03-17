@@ -6,7 +6,6 @@ import logging
 from tkinter import NONE
 from typing import List
 from subscrape.scrapers.parachain_scrape_config import ParachainScrapeConfig
-from subscrape.db.subscrape_db import SubscrapeDB
 
 # A generic scraper for parachains
 class ParachainScraper:
@@ -16,146 +15,66 @@ class ParachainScraper:
         self.db = db
         self.api = api
 
-    async def perform_operation(self, operation, modules):
-        if operation == "extrinsics":
+    async def scrape(self, operations):
+        chain_config = ParachainScrapeConfig(operations)
+        for key in operations:
+            if key == "extrinsics":
+                modules = operations[key]
+                extrinsic_config = chain_config.create_inner_config(modules)
 
-            extrinsic_config = ParachainScrapeConfig(modules)
-
-            for module in modules:
-                # ignore metadata
-                if module.startswith("_"):
-                    continue
-
-                calls = modules[module]
-                module_config = extrinsic_config.create_inner_config(calls)
-                
-                for call in calls:
+                for module in modules:
                     # ignore metadata
-                    if call.startswith("_"):
+                    if module.startswith("_"):
                         continue
 
-                    # deduce config
-                    if type(calls) is dict:
-                        call_config = module_config.create_inner_config(calls[call])
-                    else:
-                        call_config = module_config
+                    calls = modules[module]
+                    module_config = extrinsic_config.create_inner_config(calls)
+                    
+                    for call in calls:
+                        # ignore metadata
+                        if call.startswith("_"):
+                            continue
 
-                    # config wants us to skip this call?
-                    if call_config.skip:
-                        self.logger.info(f"Config asks to skip {module} {call}")
-                        continue
+                        # deduce config
+                        if type(calls) is dict:
+                            call_config = module_config.create_inner_config(calls[call])
+                        else:
+                            call_config = module_config
 
-                    # create the proper processor
-                    call_string = f"{module}_{call}"
-                    processor = self.processor_factory(call_config.processor_name, call_string)
+                        # config wants us to skip this call?
+                        if call_config.skip:
+                            self.logger.info(f"Config asks to skip {module} {call}")
+                            continue
 
-                    # go
-                    await self.fetch_extrinsics(module, call, call_config.filter, processor, call_config.include_batch_calls, call_config.digits_per_sector)
-        elif operation == "addresses":
-            await self.fetch_addresses()
-        else:
-            self.logger.error(f"config contained an operation that does not exist: {operation}")            
-            exit
-
-    def processor_factory(self, name, call_string):
-        processor = None
-        if name == "count_from_addresses" or name is None:
-            processor = self.dispatch_address_count_processor_factory(call_string)
-        elif name == "params":
-            processor = self.params_processor_factory(call_string)
-        else:
-            self.logger.error(f"unknown processor given for {call_string}: {name}")
-            raise Exception()
-        return processor
-
-    def dispatch_address_count_processor_factory(self, call_string):
-        def processor(extrinsic):
-            address = extrinsic["account_id"]
-            if address not in self.extrinsics[call_string]:
-                self.extrinsics[call_string][address] = 1
+                        # go
+                        await self.fetch_extrinsics(module, call, call_config.filter, call_config.digits_per_sector)
+            elif key == "addresses":
+                await self.fetch_addresses()
+            elif key.startswith("_"):
+                continue
             else:
-                self.extrinsics[call_string][address] += 1
-            return True
-        return processor
+                self.logger.error(f"config contained an operation that does not exist: {key}")            
+                exit
 
-    def params_processor_factory(self, call_string):
-        def params_processor(extrinsic):
-            params = json.loads(extrinsic["params"])
-            
-            result = {"account_id": extrinsic["account_id"]}
-
-            for param in params:
-                name = param["name"]
-                value = param["value"]
-                result[name] = value
-
-            extrinsic_index = extrinsic["extrinsic_index"]
-            should_continue = self.db.set_extrinsic(call_string, extrinsic_index, result)
-            return should_continue
-        return params_processor
-
-    async def fetch_extrinsics(self, call_module, call_name, filter, processor, include_batch_calls, digits_per_sector):
+    async def fetch_extrinsics(self, call_module, call_name, filter, digits_per_sector):
         call_string = f"{call_module}_{call_name}"
 
         self.db.digits_per_sector = digits_per_sector
-        self.db.warmup_extrinsics(call_string)
+        self.db.set_active_extrinsics_call(call_module, call_name)
 
         self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
 
         method = "/api/scan/extrinsics"
-        
-        # recursively goes through batched calls to check for an actual hit
-        def process_batch_hit(extrinsic):
-            params = extrinsic["params"]
-            if type(params) is str:
-                params = json.loads(params)
-            assert(len(params) == 1)
-            calls = params[0]["value"]
-            
-            # check for empty batch
-            if calls is None:
-                return
-
-            for call in calls:
-                actual_call_module = call["call_module"].lower()
-                actual_call_name = call["call_name"].lower()
-                if actual_call_module == call_module and actual_call_name == call_name:
-                    return processor(extrinsic)
-                elif actual_call_module == "utility" and (actual_call_name == "batch" or actual_call_name == "batch_all"):
-                    return process_batch_hit(call)               
-            return True
-
 
         self.db.dimension = ""
         body = {"module": call_module, "call": call_name}
         await self.api.iterate_pages(
             method,
-            processor,
+            self.db.write_extrinsic,
             list_key="extrinsics",
             body=body,
             filter=filter
             )
-
-        if include_batch_calls:
-            self.db.dimension = "batch"
-            body = {"module": "utility", "call": "batch"}
-            await self.api.iterate_pages(
-                method,
-                process_batch_hit,
-                list_key="extrinsics",
-                body=body,
-                filter=filter
-                )
-
-            self.db.dimension = "batch_all"
-            body = {"module": "utility", "call": "batch_all"}
-            await self.api.iterate_pages(
-                method,
-                process_batch_hit,
-                list_key="extrinsics",
-                body=body,
-                filter=filter
-                )
 
         self.db.flush_extrinsics()
 

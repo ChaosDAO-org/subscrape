@@ -11,15 +11,17 @@ class MoonbeamScraper:
         self.api = api
         self.transactions = {}
 
-    async def perform_operation(self, operation, payload):
-        if operation == "transactions":
-            for contract in payload:
-                methods = payload[contract]
-                for method in methods:
-                    await self.fetch_transactions(contract, method)
-        else:
-            self.logger.error(f"config contained an operation that does not exist: {operation}")            
-            exit
+    async def scrape(self, operations):
+        for operation in operations:
+            payload = operations[operation]
+            if operation == "transactions":
+                for contract in payload:
+                    methods = payload[contract]
+                    for method in methods:
+                        await self.fetch_transactions(contract, method)
+            else:
+                self.logger.error(f"config contained an operation that does not exist: {operation}")            
+                exit
 
     async def fetch_transactions(self, contract, method):
         contract_method = f"{contract}_{method}"

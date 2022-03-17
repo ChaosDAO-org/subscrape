@@ -25,10 +25,6 @@ class ParachainScrapeConfig:
         if skip is not None:
             self.skip = skip
 
-        include_batch_calls = config.get("_include_batch_calls", None)
-        if include_batch_calls is not None:
-            self.include_batch_calls = include_batch_calls
-
         digits_per_sector = config.get("_digits_per_sector", None)
         if digits_per_sector is not None:
             self.digits_per_sector = digits_per_sector
