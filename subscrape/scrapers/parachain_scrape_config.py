@@ -5,7 +5,6 @@ class ParachainScrapeConfig:
         self.filter = None
         self.processor_name = None
         self.skip = False
-        self.include_batch_calls = False
         self.digits_per_sector = 6
         self._set_config(config)
 

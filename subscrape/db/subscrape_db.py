@@ -99,8 +99,9 @@ class SubscrapeDB:
         else:
             return {}
             
-    def extrinsics_iter(self, name):
-        self.set_active_extrinsics_call(name)
+    def extrinsics_iter(self, call_module, call_name):
+        self.set_active_extrinsics_call(call_module, call_name)
+        call_string = f"{call_module}_{call_name}"
         
         class ExtrinsicsIter:
             def __init__(self, folder, file_list):
@@ -139,6 +140,6 @@ class SubscrapeDB:
 
                 return key, result
 
-        folder = self._extrinsics_folder(name)
+        folder = self._extrinsics_folder(call_string)
         file_list = os.listdir(folder)
         return ExtrinsicsIter(folder, file_list)

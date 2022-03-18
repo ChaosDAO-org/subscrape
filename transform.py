@@ -4,27 +4,42 @@ from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
 # pip install substrate-interface
 
-
-db = SubscrapeDB("Kusama")
 rows = [["type", "index", "account_id", "value", "referral"]]
 
+db = SubscrapeDB("Kusama")
+
+def unwrap_params(params):
+    result = {}
+    for param in params:
+        name = param["name"]
+        value = param["value"]
+        result[name] = value
+    return result
+
+
 def fetch_direct_contributions():
-    extrinsics = db.extrinsics_iter("crowdloan_contribute")
+    extrinsics = db.extrinsics_iter("crowdloan", "contribute")
 
     for index, extrinsic in extrinsics:
-        if extrinsic["index"] == 2110:
+        extrinsic = json.loads(extrinsic)
+        params = json.loads(extrinsic["params"])
+        params = unwrap_params(params)
+        if params["index"] == 2110:
             account_id = extrinsic["account_id"]
-            value = extrinsic["value"]
+            value = params["value"]
             row = ["direct", index, account_id, value]
             rows.append(row)
             #direct_contributions[index] = extrinsic
     #return direct_contributions
 
 def fetch_batch_contributions():
-    extrinsics = db.extrinsics_iter("utility_batch_all")
+    extrinsics = db.extrinsics_iter("utility", "batch_all")
 
     for index, extrinsic in extrinsics:
-        calls = extrinsic["calls"]
+        extrinsic = json.loads(extrinsic)
+        params = json.loads(extrinsic["params"])
+        params = unwrap_params(params)
+        calls = params["calls"]
         if calls is not None:
             for call in calls:
                 if call["call_module"] == "Crowdloan" and call["call_name"] == "contribute":
@@ -51,7 +66,7 @@ def fetch_batch_contributions():
 fetch_direct_contributions()
 fetch_batch_contributions()
 file_path = "data/transforms/transform.csv"
-with open(file_path, "w") as csvfile:
+with open(file_path, "w", newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(rows)
 
