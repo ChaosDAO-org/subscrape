@@ -4,7 +4,10 @@ from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
 # pip install substrate-interface
 
-rows = [["type", "index", "account_id", "value", "referral"]]
+created_header = False
+interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_id", "account_index", "nonce", "success", "fee"]
+rows =  [["type", "value", "referral"]]
+rows[0].extend(interesting_rows)
 
 db = SubscrapeDB("Kusama")
 
@@ -16,6 +19,12 @@ def unwrap_params(params):
         result[name] = value
     return result
 
+def extract_interesting_extrinsic_properties(extrinsic):
+    result = []
+    for key in interesting_rows:            
+        result.append(extrinsic[key])
+    return result
+
 
 def fetch_direct_contributions():
     extrinsics = db.extrinsics_iter("crowdloan", "contribute")
@@ -24,10 +33,11 @@ def fetch_direct_contributions():
         extrinsic = json.loads(extrinsic)
         params = json.loads(extrinsic["params"])
         params = unwrap_params(params)
-        if params["index"] == 2110:
-            account_id = extrinsic["account_id"]
+        if params["index"] == 2110 and extrinsic["success"] == True:
+            #account_id = extrinsic["account_id"]
             value = params["value"]
-            row = ["direct", index, account_id, value]
+            row = ["direct", value, ""]
+            row.extend(extract_interesting_extrinsic_properties(extrinsic))
             rows.append(row)
             #direct_contributions[index] = extrinsic
     #return direct_contributions
@@ -53,11 +63,11 @@ def fetch_batch_contributions():
                             referral = ss58.ss58_encode(f"0x{memo}", ss58_format=42)
                         else:
                             referral = json.dumps(memo_call)
-                        account_id = extrinsic["account_id"]
                         value = contribute_call["params"][1]["value"]
                         #public_key = ss58.ss58_decode(address)
                         #ksm_address = ss58.ss58_encode(public_key, ss58_format=2)
-                        row = ["memo", index, account_id, value, referral]
+                        row = ["batch", value, referral]
+                        row.extend(extract_interesting_extrinsic_properties(extrinsic))
                         rows.append(row)
         else:
             pi = 3
