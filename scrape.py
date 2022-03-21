@@ -11,9 +11,11 @@ from subscrape.db.subscrape_db import SubscrapeDB
 
 log_level = logging.INFO
 
+
 def moonscan_factory(chain):
     endpoint = f"https://api-{chain}.moonscan.io/api"
     return MoonscanWrapper(endpoint)
+
 
 def subscan_factory(chain):
     subscan_key = None
@@ -27,7 +29,10 @@ def subscan_factory(chain):
 
 def scraper_factory(name):
     if name == "moonriver" or name == "moonbeam":
-        db_path = f"data/parachains/{name}_"
+        db_path = f"data/parachains"
+        if not os.path.exists(db_path):
+            os.makedirs(db_path)
+        db_path += f'/{name}_'
         api = moonscan_factory(name)
         scraper = MoonbeamScraper(db_path, api)
         return scraper
@@ -36,6 +41,7 @@ def scraper_factory(name):
         api = subscan_factory(name)
         scraper = ParachainScraper(db, api)
         return scraper
+
 
 async def main():
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -56,7 +62,6 @@ async def main():
             continue
         parachain_scraper = scraper_factory(key)
         await parachain_scraper.scrape(config[key])
-    
-    
+
 
 asyncio.run(main())

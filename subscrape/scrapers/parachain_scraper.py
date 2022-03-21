@@ -7,6 +7,7 @@ from tkinter import NONE
 from typing import List
 from subscrape.scrapers.parachain_scrape_config import ParachainScrapeConfig
 
+
 # A generic scraper for parachains
 class ParachainScraper:
 
@@ -81,7 +82,7 @@ class ParachainScraper:
     async def fetch_addresses(self):
         assert(len(self.addresses) == 0)
 
-        file_path = self.db_path + "adresses.json"
+        file_path = self.db_path + "addresses.json"
         if os.path.exists(file_path):
             self.logger.warn(f"{file_path} already exists. Skipping.")
             return
@@ -91,10 +92,9 @@ class ParachainScraper:
         method = "/api/v2/scan/accounts"
         url = self.endpoint + method
 
-        await self.api.iterate_pages(url, self.process_account,
-            list_key = "list")
+        await self.api.iterate_pages(url, self.process_account, list_key="list")
 
-        file_path = self.db_path + "adresses.json"
+        file_path = self.db_path + "addresses.json"
         payload = json.dumps(self.addresses)
         file = io.open(file_path, "w")
         file.write(payload)

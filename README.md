@@ -3,8 +3,7 @@ A Python scraper for substrate chains that uses Subscan.
 
 ## Usage
 - copy config/sample_scrape_config.json to config/scrape_config.json and configure to your desire.
-- make sure there is a data/parachains folder
-- run
+- run "scrape.py"
 - corresponding files will be created in data/
 
 If a file already exists in data/, that operation will be skipped in subsequent runs.
@@ -37,6 +36,6 @@ API: https://docs.api.subscan.io/
 If you have a Subscan API key, you can put it in the main folder in a file called "subscan-key" and it will be applied to your calls.
 
 ### ParachainScraper
-This is a scraoer that knows how to use the SubscanWrapper to fetch data for a parachain and serialize it to disk.
+This is a scraper that knows how to use the SubscanWrapper to fetch data for a parachain and serialize it to disk.
 
 Currently it knows how to fetch addresses and extrinsics.
