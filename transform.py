@@ -60,7 +60,7 @@ def fetch_batch_contributions():
                         memo_call = calls[1]
                         if memo_call["call_module"] == "Crowdloan" and memo_call["call_name"] == "add_memo":
                             memo = memo_call["params"][1]["value"]
-                            referral = ss58.ss58_encode(f"0x{memo}", ss58_format=42)
+                            referral = ss58.ss58_encode(f"0x{memo}", ss58_format=2)
                         else:
                             referral = json.dumps(memo_call)
                         value = contribute_call["params"][1]["value"]

@@ -7,9 +7,10 @@ import logging
 # one DB per Parachain
 class SubscrapeDB:
 
-    def __init__(self, name):
+    def __init__(self, parachain):
         self.logger = logging.getLogger("SubscrapeDB")
-        self._path = f"data/parachains/{name}_"
+        self._path = f"data/parachains/{parachain}_"
+        self._parachain = parachain
         # the name of the currently loaded extrinsics
         self._extrinsics_name = None
         # the name of the currently loaded extrinsics sector
@@ -18,7 +19,7 @@ class SubscrapeDB:
         self._extrinsics = None
         # a dirty flag that keeps track of unsaved changes
         self._dirty = False
-        self.digits_per_sector = 6
+        self.digits_per_sector = 4
 
     def _extrinsics_folder(self, name):
         return f"{self._path}extrinsics_{name}/"
@@ -40,7 +41,7 @@ class SubscrapeDB:
         # make sure folder exists
         folder_path = self._extrinsics_folder(call_string)
         if not os.path.exists(folder_path):
-            os.mkdir(folder_path)
+            os.makedirs(folder_path)
 
     # the method assumes that consumers go through sorted block lists
     # it will load a sector from disk when it becomes active
@@ -64,7 +65,7 @@ class SubscrapeDB:
             # load sector file or create empty dict
             self._extrinsics_sector_name = sector
             self._extrinsics = self._load_extrinsics_sector(self._extrinsics_name, sector)
-            self.logger.info(f"Switched to sector {self._extrinsics_sector_name}. {len(self._extrinsics)} active entries")
+            self.logger.info(f"{self._parachain} {self._extrinsics_name}: Switched to sector {self._extrinsics_sector_name}. {len(self._extrinsics)} active entries")
         
 
         # do we already know this extrinsic? 
