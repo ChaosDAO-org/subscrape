@@ -1,6 +1,7 @@
 # subscrape
 A Python scraper for substrate chains that uses Subscan.
 
+
 The basic workflow if `scrape.py` considers the configuration presented in `data/scrape_config.json`
 to traverse through the given chains and perform the operations for each chain.
 Currently, only scraping extrinsics is supported.

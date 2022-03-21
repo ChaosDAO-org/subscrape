@@ -1,5 +1,6 @@
 import copy
 
+
 class ParachainScrapeConfig:
     def __init__(self, config):
         self.filter = None
@@ -28,7 +29,6 @@ class ParachainScrapeConfig:
         if digits_per_sector is not None:
             self.digits_per_sector = digits_per_sector
 
-
     # creates a config that can be nested to lower layers
     def create_inner_config(self, config):
         result = copy.deepcopy(self)
@@ -39,6 +39,7 @@ class ParachainScrapeConfig:
     def _filter_factory(self, conditions):
         if conditions is None:
             return None
+
         def filter(extrinsic):
             for group in conditions:
                 for key in group:
