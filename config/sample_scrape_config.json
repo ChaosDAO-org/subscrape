@@ -1,10 +1,16 @@
 {
+    "_version": 1,
     "kusama": {
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
                 "remark"
-            ]
+            ],
+            "utility":{
+                "_skip": true,
+                "batch":{},
+                "batch_all":{}
+            }
         }
     },
     "moonriver": {

@@ -48,7 +48,7 @@ class ParachainScraper:
                             continue
 
                         # go
-                        await self.fetch_extrinsics(module, call, call_config.filter, call_config.digits_per_sector)
+                        await self.fetch_extrinsics(module, call, call_config)
             elif key == "addresses":
                 await self.fetch_addresses()
             elif key.startswith("_"):
@@ -57,10 +57,11 @@ class ParachainScraper:
                 self.logger.error(f"config contained an operation that does not exist: {key}")            
                 exit
 
-    async def fetch_extrinsics(self, call_module, call_name, filter, digits_per_sector):
+    async def fetch_extrinsics(self, call_module, call_name, call_config):
         call_string = f"{call_module}_{call_name}"
 
-        self.db.digits_per_sector = digits_per_sector
+        if call_config.digits_per_sector is not None:
+            self.db.digits_per_sector = call_config.digits_per_sector
         self.db.set_active_extrinsics_call(call_module, call_name)
 
         self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
@@ -74,7 +75,7 @@ class ParachainScraper:
             self.db.write_extrinsic,
             list_key="extrinsics",
             body=body,
-            filter=filter
+            filter=call_config.filter
             )
 
         self.db.flush_extrinsics()

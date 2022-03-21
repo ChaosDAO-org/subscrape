@@ -6,7 +6,7 @@ class ParachainScrapeConfig:
         self.filter = None
         self.processor_name = None
         self.skip = False
-        self.digits_per_sector = 6
+        self.digits_per_sector = None
         self._set_config(config)
 
     def _set_config(self, config):
