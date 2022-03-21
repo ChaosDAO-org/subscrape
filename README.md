@@ -59,7 +59,7 @@ Currently it knows how to fetch extrinsics.
 Analoguous to `SubscanWrapper`
 
 ### MoonbeamScraper
-Analoguous to `ParachainScraper`
+Analoguous to `ParachainScraper`. Can scan for `transactions` of a method from a contract or `account_transactions`.
 
 ### SubscanDB
 `SubscanDB` serializes extracted data to disk and unserializes it later.

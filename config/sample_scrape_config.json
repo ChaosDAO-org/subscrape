@@ -18,6 +18,11 @@
             "0xaa30ef758139ae4a7f798112902bf6d65612045f": [
                 "0xe8e33700"
             ]
+        },
+        "account_transactions": {
+            "accounts": [
+                "0x1a93b23281cc1cde4c4741353f3064709a16197d"
+            ]
         }
     }
 }
