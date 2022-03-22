@@ -61,8 +61,24 @@ class MoonbeamScraper:
                         await self.fetch_transactions(contract, processor, contract_method)
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
+                account_transactions_config = chain_config.create_inner_config(contracts)
                 if "accounts" in account_transactions_payload:
-                    for account in account_transactions_payload['accounts']:
+                    accounts = account_transactions_payload['accounts']
+                    for account in accounts:
+                        # ignore metadata
+                        if account.startswith("_"):
+                            continue
+
+                        # deduce config
+                        if type(accounts) is dict:
+                            account_config = contract_config.create_inner_config(methods[method])
+                        else:
+                            account_config = contract_config
+
+                        if account_config.skip:
+                            self.logger.info(f"Config asks to skip account {account}")
+                            continue
+
                         self.transactions[account] = {}
                         processor = self.process_transactions_on_account_factory(account)
                         await self.fetch_transactions(account, processor)
