@@ -1,7 +1,7 @@
 import copy
 
 
-class ParachainScrapeConfig:
+class ScrapeConfig:
     def __init__(self, config):
         self.filter = None
         self.processor_name = None

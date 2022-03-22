@@ -8,6 +8,8 @@ from subscrape.subscan_wrapper import SubscanWrapper
 from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
+from subscrape.scrapers.scrape_config import ScrapeConfig
+
 
 log_level = logging.INFO
 
@@ -44,6 +46,10 @@ def scraper_factory(name):
 
 
 async def main():
+    """Loads `config/scrape_config.json and iterates over all chains present in the config.
+    Will call `scraper_factors()` to retrieve the proper scraper for a chain.
+    If `_version` in the config does not match the current version, a warning is logged.    
+    """
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # load config
@@ -53,15 +59,25 @@ async def main():
         exit
     f = open(config_path)
     raw_config = f.read()
-    config = json.loads(raw_config)
+    chains = json.loads(raw_config)
+    scrape_config = ScrapeConfig(chains)
 
-    for key in config:
-        if key.startswith("_"):
-            if key == "_version" and config[key] != 1:
+    for chain in chains:
+        if chain.startswith("_"):
+            if chain == "_version" and chains[chain] != 1:
                 logging.warn("config version != 1. It could contain runtime breaking contents")
             continue
-        parachain_scraper = scraper_factory(key)
-        await parachain_scraper.scrape(config[key])
+        operations = chains[chain]
+        chain_config = scrape_config.create_inner_config(operations)
+
+        # check if we should skip this chain
+        if chain_config.skip:
+            logging.info(f"Config asks to skip chain {chain}")
+            continue
+
+
+        parachain_scraper = scraper_factory(chain)
+        await parachain_scraper.scrape(operations, chain_config)
 
 
 asyncio.run(main())

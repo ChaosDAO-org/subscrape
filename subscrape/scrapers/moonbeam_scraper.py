@@ -13,21 +13,56 @@ class MoonbeamScraper:
         self.api = api
         self.transactions = {}
 
-    async def scrape(self, operations):
+    async def scrape(self, operations, chain_config):
         for operation in operations:
-            payload = operations[operation]
+            # ignore metadata
+            if operation.startswith("_"):
+                continue
+
             if operation == "transactions":
-                for contract in payload:
-                    methods = payload[contract]
+                contracts = operations[operation]
+                transactions_config = chain_config.create_inner_config(contracts)
+                if transactions_config.skip:
+                    self.logger.info(f"Config asks to skip transactions.")
+                    continue
+
+                for contract in contracts:
+                    # ignore metadata
+                    if operation.startswith("_"):
+                        continue
+
+                    methods = contracts[contract]
+                    contract_config = transactions_config.create_innerconfig(methods)
+                    if contract_config.skip:
+                        self.logger.info(f"Config asks to skip transactions of contract {contract}.")
+                        continue
+
+
                     for method in methods:
+                        # ignore metadata
+                        if operation.startswith("_"):
+                            continue
+
+                        # deduce config
+                        if type(methods) is dict:
+                            method_config = contract_config.create_inner_config(methods[method])
+                        else:
+                            method_config = contract_config
+
+                        # config wants us to skip this call?
+                        if method_config.skip:
+                            self.logger.info(f"Config asks to skip contract {contract} method {method}")
+                            continue
+
                         contract_method = f"{contract}_{method}"
                         assert(contract_method not in self.transactions)
                         self.transactions[contract_method] = {}
                         processor = self.process_methods_in_transaction_factory(contract_method, method)
                         await self.fetch_transactions(contract, processor, contract_method)
             elif operation == "account_transactions":
-                if "accounts" in payload:
-                    for account in payload['accounts']:
+                account_transactions_payload = operations[operation]
+                if "accounts" in account_transactions_payload:
+                    for account in account_transactions_payload['accounts']:
                         self.transactions[account] = {}
                         processor = self.process_transactions_on_account_factory(account)
                         await self.fetch_transactions(account, processor)

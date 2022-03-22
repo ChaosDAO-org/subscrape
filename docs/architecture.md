@@ -23,3 +23,6 @@ Analoguous to `ParachainScraper`. Can scan for `transactions` of a method from a
 
 ## SubscanDB
 `SubscanDB` serializes extracted data to disk and unserializes it later.
+
+## ScrapeConfig
+`ScrapeConfig` is a helper class that helps bubble configuration properties from the outermost configuration elements to the innermost.

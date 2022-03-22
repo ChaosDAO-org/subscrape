@@ -5,7 +5,6 @@ import json
 import logging
 from tkinter import NONE
 from typing import List
-from subscrape.scrapers.parachain_scrape_config import ParachainScrapeConfig
 
 
 # A generic scraper for parachains
@@ -16,11 +15,13 @@ class ParachainScraper:
         self.db = db
         self.api = api
 
-    async def scrape(self, operations):
-        chain_config = ParachainScrapeConfig(operations)
-        for key in operations:
-            if key == "extrinsics":
-                modules = operations[key]
+    async def scrape(self, operations, chain_config):
+        for operation in operations:
+            if operation.startswith("_"):
+                continue
+
+            if operation == "extrinsics":
+                modules = operations[operation]
                 extrinsic_config = chain_config.create_inner_config(modules)
 
                 for module in modules:
@@ -49,12 +50,10 @@ class ParachainScraper:
 
                         # go
                         await self.fetch_extrinsics(module, call, call_config)
-            elif key == "addresses":
+            elif operation == "addresses":
                 await self.fetch_addresses()
-            elif key.startswith("_"):
-                continue
             else:
-                self.logger.error(f"config contained an operation that does not exist: {key}")            
+                self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
 
     async def fetch_extrinsics(self, call_module, call_name, call_config):
