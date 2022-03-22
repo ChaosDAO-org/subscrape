@@ -79,28 +79,3 @@ file_path = "data/transforms/transform.csv"
 with open(file_path, "w", newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(rows)
-
-
-# Archived code below
-
-
-# recursively goes through batched calls to check for an actual hit
-def process_batch_hit(extrinsic):
-    params = extrinsic["params"]
-    if type(params) is str:
-        params = json.loads(params)
-    assert(len(params) == 1)
-    calls = params[0]["value"]
-    
-    # check for empty batch
-    if calls is None:
-        return
-
-    for call in calls:
-        actual_call_module = call["call_module"].lower()
-        actual_call_name = call["call_name"].lower()
-        if actual_call_module == call_module and actual_call_name == call_name:
-            return process_extrinsic_hit(extrinsic)
-        elif actual_call_module == "utility" and (actual_call_name == "batch" or actual_call_name == "batch_all"):
-            return process_batch_hit(call)               
-    return True
