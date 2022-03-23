@@ -71,6 +71,15 @@ class ParachainScraper:
             await self.fetch_transfers(account, account_config)
 
     async def fetch_transfers(self, account, call_config):
+        """
+        Fetches the treansfers for a single account and writes them to the db.
+
+        :param account: The account to scrape
+        :type account: str
+        :param call_config: The call_config which has the filter set
+        :type call_config: ScrapeConfig
+        """
+
         # Todo: determine if the address is valid or emit a warning
 
         self.db.set_active_transfers_account(account)

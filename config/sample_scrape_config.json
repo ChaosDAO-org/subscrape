@@ -1,6 +1,9 @@
 {
     "_version": 1,
     "kusama": {
+        "transfers": {
+            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
+        },
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
