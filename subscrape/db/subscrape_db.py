@@ -6,35 +6,66 @@ import logging
 
 # one DB per Parachain
 class SubscrapeDB:
+    """
+    This class is used to support online scraping of various types of data.
+    The write_<type>() methods are used as callbacks for the scraper that constantly feeds new data from web responses.
+    To accomodate this behavior, before scraping begins the DB object must be parameterized by calling
+    set_active_<type>().
+    At the end of the process, flush_<type>() is called to make sure the state is properly saved.
+    """
 
     def __init__(self, parachain):
         self.logger = logging.getLogger("SubscrapeDB")
-        self._path = f"data/parachains/{parachain}_"
-        self._parachain = parachain
-        # the name of the currently loaded extrinsics
-        self._extrinsics_name = None
-        # the name of the currently loaded extrinsics sector
-        self._extrinsics_sector_name = None
-        # the currently loaded extrinsics sector
-        self._extrinsics = None
-        # a dirty flag that keeps track of unsaved changes
-        self._dirty = False
-        self.digits_per_sector = 4
 
-    def _extrinsics_folder(self, name):
-        return f"{self._path}extrinsics_{name}/"
+        #: str: the root path to this db
+        self._path = f"data/parachains/{parachain}_"
+        #: str: the name of the chain this db represents
+        self._parachain = parachain
+        #: str: the name of the currently loaded extrinsics
+        self._extrinsics_name = None
+        #: str: the name of the currently loaded extrinsics sector
+        self._extrinsics_sector_name = None
+        #: list: the currently loaded extrinsics sector
+        self._extrinsics = None
+        #: bool: a dirty flag that keeps track of unsaved extrinsics
+        self._extrinsics_dirty = False
+        #: int: the number of digits of blocks a sector takes, e.g. 4 -> 1e4 blocks per sector
+        self.extrinsics_digits_per_sector = 4
+
+        #: str: the account transfers are being store for
+        self._transfers_account = None
+        #: list: the list of transfers we are storing
+        self._transfers = None
+        #: bool: a dirty flag that keeps track of unsaved transfers
+        self._transfers_dirty = False
+
+
+    # Extrinsics
+
+    def _extrinsics_folder(self, module_call):
+        """
+        Returns the folder where extrinsics of a given module and call are stored.
+
+        :param module_call: The module and call
+        :type module_call: str
+        """
+        return f"{self._path}extrinsics_{module_call}/"
+
 
     def _extrinsics_sector_file_path(self, extrinsic, sector):
         return self._extrinsics_folder(extrinsic) + sector +  ".json"
 
-    def _clean_state(self):
-        assert(not self._dirty)
+
+    def _clear_extrinsics_state(self):
+        assert(not self._extrinsics_dirty)
         # remove references to existing sectors
+        self._extrinsics_name = None
         self._extrinsics = None
         self._extrinsics_sector_name = None
 
+
     def set_active_extrinsics_call(self, call_module, call_name):
-        self._clean_state()
+        self._clear_extrinsics_state()
         call_string = f"{call_module}_{call_name}"
 
         self._extrinsics_name = call_string
@@ -43,16 +74,23 @@ class SubscrapeDB:
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-    # the method assumes that consumers go through sorted block lists
-    # it will load a sector from disk when it becomes active
-    # and unloads it once a new one becomes active
+
     def write_extrinsic(self, extrinsic):
+        """
+        The method assumes that consumers go through sorted block lists.
+        It will load a sector from disk when it becomes active
+        and unloads it once a new one becomes active.
+
+        :param extrinsic: The extrinsic as dict
+        :type extrinsic: dict
+        """
+
         # determine the sector
         index = extrinsic["extrinsic_index"]
         sector = index.split("-")[0]
-        suffix = "x" * self.digits_per_sector
-        if(len(sector) > self.digits_per_sector):
-            sector = sector[:-self.digits_per_sector] + suffix
+        suffix = "x" * self.extrinsics_digits_per_sector
+        if(len(sector) > self.extrinsics_digits_per_sector):
+            sector = sector[:-self.extrinsics_digits_per_sector] + suffix
         else:
             sector = suffix
 
@@ -60,26 +98,25 @@ class SubscrapeDB:
         if self._extrinsics_sector_name != sector:
             # make sure previous data is saved
             self.flush_extrinsics()
-            self._clean_state()
+            self._clear_extrinsics_state()
 
             # load sector file or create empty dict
             self._extrinsics_sector_name = sector
             self._extrinsics = self._load_extrinsics_sector(self._extrinsics_name, sector)
             self.logger.info(f"{self._parachain} {self._extrinsics_name}: Switched to sector {self._extrinsics_sector_name}. {len(self._extrinsics)} active entries")
-        
 
         # do we already know this extrinsic? 
         if index in self._extrinsics:
             return False
 
-        self._dirty = True
-        payload = json.dumps(extrinsic)
-        self._extrinsics[index] = payload
+        self._extrinsics_dirty = True
+        self._extrinsics[index] = extrinsic
 
         return True
 
+
     def flush_extrinsics(self):
-        if not self._dirty:
+        if not self._extrinsics_dirty:
             return
 
         file_path = self._extrinsics_sector_file_path(self._extrinsics_name, self._extrinsics_sector_name)
@@ -89,8 +126,9 @@ class SubscrapeDB:
         file.write(payload)
         file.close()
 
-        self._dirty = False
-        
+        self._extrinsics_dirty = False
+
+
     def _load_extrinsics_sector(self, name, sector):
         file_path = self._extrinsics_sector_file_path(name, sector)
         if os.path.exists(file_path):
@@ -99,7 +137,8 @@ class SubscrapeDB:
             return json.loads(file_payload)
         else:
             return {}
-            
+
+
     def extrinsics_iter(self, call_module, call_name):
         self.set_active_extrinsics_call(call_module, call_name)
         call_string = f"{call_module}_{call_name}"
@@ -144,3 +183,83 @@ class SubscrapeDB:
         folder = self._extrinsics_folder(call_string)
         file_list = os.listdir(folder)
         return ExtrinsicsIter(folder, file_list)
+
+    # Transfers
+
+    def _transfers_folder(self):
+        """
+        Returns the folder where transfers are stored.
+        """
+        return f"{self._path}transfers/"
+
+    def _clear_transfers_state(self):
+        """
+        Clears the internal state of a transfers
+        """
+        assert(not self._transfers_dirty)
+        self._transfers_account = None
+        self._transfers = None
+
+
+    def set_active_transfers_account(self, account):
+        """
+        Sets the active transfers account for the upcoming scrape.
+
+        :param account: The account we are about to scrape
+        :type account: str
+        """
+        self._clear_transfers_state()
+        self._transfers_account = account
+        self._transfers = []
+
+        # make sure folder exists
+        folder_path = self._transfers_folder()
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
+
+    def write_transfer(self, transfer):
+        """
+        Write a new transfer object to the state.
+
+        :param transfer: The transfer to write
+        :type transfer: dict
+        """
+        self._transfers.append(transfer)
+        self._transfers_dirty = True
+        return True
+
+
+    def flush_transfers(self):
+        """
+        Flushes the unsaved transfers to disk.
+        """
+        if not self._transfers_dirty:
+            return
+
+        payload = json.dumps(self._transfers)
+
+        file_path = self._transfers_folder() + self._transfers_account + ".json"
+        self.logger.info(f"Writing {len(self._transfers)} entries")
+        file = io.open(file_path, "w")
+        file.write(payload)
+        file.close()
+
+        self._transfers_dirty = False
+
+
+    def transfers_iter(self, account):
+        """
+        Returns an iterable object of transfers for the given account.
+
+        :param account: The account to read transfers for
+        :type account: str
+        """
+        file_path = self._transfers_folder() + account + ".json"
+        if os.path.exists(file_path):
+            file = io.open(file_path)
+            file_payload = file.read()
+            return json.loads(file_payload)
+        else:
+            self.logger.warn(f"transfers from account {account} have been requested but do not exist on disk.")
+            return None
