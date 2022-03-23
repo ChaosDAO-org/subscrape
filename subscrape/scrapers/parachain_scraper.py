@@ -16,7 +16,7 @@ class ParachainScraper:
         self.api = api
 
 
-    async def scrape(self, operations, chain_config):
+    def scrape(self, operations, chain_config):
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
         method.
         
@@ -32,16 +32,16 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                await self.scrape_extrinsics(modules, chain_config)
+                self.scrape_extrinsics(modules, chain_config)
             elif operation == "transfers":
                 accounts = operations[operation]
-                await self.scrape_transfers(accounts, chain_config)
+                self.scrape_transfers(accounts, chain_config)
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
 
 
-    async def scrape_transfers(self, accounts, chain_config):
+    def scrape_transfers(self, accounts, chain_config):
         """
         Scrapes all transfers that belong to the list of accounts.
         
@@ -68,9 +68,9 @@ class ParachainScraper:
                 self.logger.info(f"Config asks to skip account {account}")
                 continue
 
-            await self.fetch_transfers(account, account_config)
+            self.fetch_transfers(account, account_config)
 
-    async def fetch_transfers(self, account, call_config):
+    def fetch_transfers(self, account, call_config):
         """
         Fetches the treansfers for a single account and writes them to the db.
 
@@ -89,7 +89,7 @@ class ParachainScraper:
         method = "/api/scan/transfers"
 
         body = {"address": account}
-        await self.api.iterate_pages(
+        self.api.iterate_pages(
             method,
             self.db.write_transfer,
             list_key="transfers",
@@ -99,7 +99,7 @@ class ParachainScraper:
 
         self.db.flush_transfers()
 
-    async def scrape_extrinsics(self, modules, chain_config):
+    def scrape_extrinsics(self, modules, chain_config):
         extrinsic_config = chain_config.create_inner_config(modules)
 
         for module in modules:
@@ -127,9 +127,9 @@ class ParachainScraper:
                     continue
 
                 # go
-                await self.fetch_extrinsics(module, call, call_config)
+                self.fetch_extrinsics(module, call, call_config)
 
-    async def fetch_extrinsics(self, call_module, call_name, call_config):
+    def fetch_extrinsics(self, call_module, call_name, call_config):
         call_string = f"{call_module}_{call_name}"
 
         if call_config.digits_per_sector is not None:
@@ -141,7 +141,7 @@ class ParachainScraper:
         method = "/api/scan/extrinsics"
 
         body = {"module": call_module, "call": call_name}
-        await self.api.iterate_pages(
+        self.api.iterate_pages(
             method,
             self.db.write_extrinsic,
             list_key="extrinsics",
@@ -153,7 +153,7 @@ class ParachainScraper:
 
 """
 
-    async def fetch_addresses(self):
+    def fetch_addresses(self):
         assert(len(self.addresses) == 0)
 
         file_path = self.db_path + "addresses.json"
@@ -166,7 +166,7 @@ class ParachainScraper:
         method = "/api/v2/scan/accounts"
         url = self.endpoint + method
 
-        await self.api.iterate_pages(url, self.process_account, list_key="list")
+        self.api.iterate_pages(url, self.process_account, list_key="list")
 
         file_path = self.db_path + "addresses.json"
         payload = json.dumps(self.addresses)

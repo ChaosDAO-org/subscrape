@@ -10,6 +10,7 @@ class MoonscanWrapper:
         self.logger = logging.getLogger("MoonscanWrapper")
         self.endpoint = endpoint
 
+
     def query(self, params):
         params["apikey"] = "YourApiKeyToken"
         response = requests.get(self.endpoint, params=params)
@@ -17,10 +18,7 @@ class MoonscanWrapper:
         return response.text
         
 
-
-    #async def iterate_pages(self, element_processor):
-
-    async def iterate_pages(self, element_processor, params={}):
+    def iterate_pages(self, element_processor, params={}):
         done = False            # keep crunching until we are done
         startblock = 0          # iterator for the page we want to query
         previousblock = 0       # to check if the iterator actually moved forward

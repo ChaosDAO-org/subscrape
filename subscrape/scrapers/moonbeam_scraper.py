@@ -13,7 +13,7 @@ class MoonbeamScraper:
         self.api = api
         self.transactions = {}
 
-    async def scrape(self, operations, chain_config):
+    def scrape(self, operations, chain_config):
         for operation in operations:
             # ignore metadata
             if operation.startswith("_"):
@@ -58,7 +58,7 @@ class MoonbeamScraper:
                         assert(contract_method not in self.transactions)
                         self.transactions[contract_method] = {}
                         processor = self.process_methods_in_transaction_factory(contract_method, method)
-                        await self.fetch_transactions(contract, processor, contract_method)
+                        self.fetch_transactions(contract, processor, contract_method)
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
                 account_transactions_config = chain_config.create_inner_config(contracts)
@@ -81,14 +81,14 @@ class MoonbeamScraper:
 
                         self.transactions[account] = {}
                         processor = self.process_transactions_on_account_factory(account)
-                        await self.fetch_transactions(account, processor)
+                        self.fetch_transactions(account, processor)
                 else:
                     self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
 
-    async def fetch_transactions(self, address, processor, reference=None):
+    def fetch_transactions(self, address, processor, reference=None):
         """Fetch all transactions for a given address (account/contract) and use the given processor method to filter
         or post-process each transaction as we work through them. Optionally, use 'reference' to uniquely identify this
         set of post-processed transaction data.
@@ -123,7 +123,7 @@ class MoonbeamScraper:
         params["endblock"] = "99999999"
         params["sort"] = "asc"
 
-        await self.api.iterate_pages(processor, params=params)
+        self.api.iterate_pages(processor, params=params)
 
         payload = json.dumps(self.transactions[reference], indent=4, sort_keys=False)
         file = io.open(file_path, "w")

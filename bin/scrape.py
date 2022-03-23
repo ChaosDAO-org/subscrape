@@ -2,7 +2,6 @@ from audioop import add
 import logging
 import json
 import os
-import asyncio
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
 from subscrape.moonscan_wrapper import MoonscanWrapper
@@ -45,21 +44,7 @@ def scraper_factory(name):
         return scraper
 
 
-async def main():
-    """Loads `config/scrape_config.json and iterates over all chains present in the config.
-    Will call `scraper_factors()` to retrieve the proper scraper for a chain.
-    If `_version` in the config does not match the current version, a warning is logged.    
-    """
-    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    # load config
-    config_path = "config/scrape_config.json"
-    if not os.path.exists(config_path):
-        logging.error("missing scrape config. Exiting")
-        exit
-    f = open(config_path)
-    raw_config = f.read()
-    chains = json.loads(raw_config)
+def scrape(chains):
     scrape_config = ScrapeConfig(chains)
 
     for chain in chains:
@@ -77,7 +62,25 @@ async def main():
 
 
         parachain_scraper = scraper_factory(chain)
-        await parachain_scraper.scrape(operations, chain_config)
+        parachain_scraper.scrape(operations, chain_config)
+
+def main():
+    """Loads `config/scrape_config.json and iterates over all chains present in the config.
+    Will call `scraper_factors()` to retrieve the proper scraper for a chain.
+    If `_version` in the config does not match the current version, a warning is logged.    
+    """
+    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # load config
+    config_path = "config/scrape_config.json"
+    if not os.path.exists(config_path):
+        logging.error("missing scrape config. Exiting")
+        exit
+    f = open(config_path)
+    raw_config = f.read()
+    chains = json.loads(raw_config)
+    scrape(chains)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    main()

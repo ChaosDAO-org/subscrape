@@ -3,7 +3,6 @@ On overview with practical examples is given in this Twitter thread: https://twi
 ## General
 We use the following methods in the projects:
 - Logging: https://docs.python.org/3/howto/logging.html
-- Async Operations: https://docs.python.org/3/library/asyncio-task.html
 
 ## SubscanWrapper
 There is a class `SubscanWrapper` that encapsulates the logic around calling Subscan.
