@@ -65,7 +65,7 @@ async def main():
     for chain in chains:
         if chain.startswith("_"):
             if chain == "_version" and chains[chain] != 1:
-                logging.warn("config version != 1. It could contain runtime breaking contents")
+                logging.warning("config version != 1. It could contain runtime breaking contents")
             continue
         operations = chains[chain]
         chain_config = scrape_config.create_inner_config(operations)
