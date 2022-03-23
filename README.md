@@ -24,7 +24,17 @@ the delta might be incomplete and subsequent runs might miss some data. To remed
 the delta must be deleted and the scraper run again.
 
 ## Usage
-- If you have a Subscan API key, drop it in a file named `config/subscan-key`
+
+### Installation
+  pip install -r .\PipRequirements.txt
+
+### Subscan API Key
+If you have a Subscan API key, drop it in a file named `config/subscan-key`
+
+### Example applications
+Take a look at the `/bin/` folder. There are some sample applications there.
+
+### Using scrape.py
 - copy `config/sample_scrape_config.json` to `config/scrape_config.json`
 - configure to your desire. See [configuration](docs/configuration.md)
 - run `scrape.py`

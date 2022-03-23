@@ -4,7 +4,6 @@ from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
 import logging
 from scrape import scrape
-# pip install substrate-interface
 
 config = {
     "kusama":{
@@ -30,6 +29,7 @@ def unwrap_params(params):
         result[name] = value
     return result
 
+
 def extract_interesting_extrinsic_properties(extrinsic):
     result = []
     for key in interesting_rows:            
@@ -49,8 +49,7 @@ def fetch_direct_contributions():
             row = ["direct", value, ""]
             row.extend(extract_interesting_extrinsic_properties(extrinsic))
             rows.append(row)
-            #direct_contributions[index] = extrinsic
-    #return direct_contributions
+
 
 def fetch_batch_contributions():
     extrinsics = db.extrinsics_iter("utility", "batch_all")

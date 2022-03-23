@@ -1,2 +1,4 @@
 eth_utils
 requests
+substrate-interface
+pandas
