@@ -59,7 +59,6 @@ class SubscrapeDB:
     def _clear_extrinsics_state(self):
         assert(not self._extrinsics_dirty)
         # remove references to existing sectors
-        self._extrinsics_name = None
         self._extrinsics = None
         self._extrinsics_sector_name = None
 
@@ -182,6 +181,8 @@ class SubscrapeDB:
 
         folder = self._extrinsics_folder(call_string)
         file_list = os.listdir(folder)
+        if(len(file_list) == 0):
+            self.logger.warning("Empty file list in extrinsics_iter(). Did you use the correct config?")
         return ExtrinsicsIter(folder, file_list)
 
     # Transfers

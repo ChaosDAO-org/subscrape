@@ -2,7 +2,18 @@ import csv
 import json
 from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
+import logging
+from scrape import scrape
 # pip install substrate-interface
+
+config = {
+    "kusama":{
+        "extrinsics":{
+            "utility": ["batch_all"],
+            "crowdloan": ["contribute"]
+        }
+    }
+}
 
 created_header = False
 interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_id", "account_index", "nonce", "success", "fee"]
@@ -30,7 +41,6 @@ def fetch_direct_contributions():
     extrinsics = db.extrinsics_iter("crowdloan", "contribute")
 
     for index, extrinsic in extrinsics:
-        extrinsic = json.loads(extrinsic)
         params = json.loads(extrinsic["params"])
         params = unwrap_params(params)
         if params["index"] == 2110 and extrinsic["success"] == True:
@@ -46,7 +56,6 @@ def fetch_batch_contributions():
     extrinsics = db.extrinsics_iter("utility", "batch_all")
 
     for index, extrinsic in extrinsics:
-        extrinsic = json.loads(extrinsic)
         params = json.loads(extrinsic["params"])
         params = unwrap_params(params)
         calls = params["calls"]
@@ -73,9 +82,20 @@ def fetch_batch_contributions():
             pi = 3
 
 
-fetch_direct_contributions()
-fetch_batch_contributions()
-file_path = "data/transforms/transform.csv"
-with open(file_path, "w", newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerows(rows)
+def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    logging.info("scraping")
+    scrape(config)
+    logging.info("transforming")
+    fetch_direct_contributions()
+    fetch_batch_contributions()
+    file_path = "data/transforms/transform.csv"
+    with open(file_path, "w", newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(rows)
+
+
+
+if __name__ == "__main__":
+    main()

@@ -37,7 +37,7 @@ class SubscanWrapper:
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
-    async def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
+    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
         assert(list_key is not None)
 
         done = False        # keep crunching until we are done
