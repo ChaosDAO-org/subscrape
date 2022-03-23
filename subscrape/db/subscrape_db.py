@@ -6,23 +6,37 @@ import logging
 
 # one DB per Parachain
 class SubscrapeDB:
+    """
+    This class is used to support online scraping of various types of data.
+    The write_<type>() methods are used as callbacks for the scraper that constantly feeds new data from web responses.
+    To accomodate this behavior, before scraping begins the DB object must be parameterized by calling
+    set_active_<type>().
+    At the end of the process, flush_<type>() is called to make sure the state is properly saved.
+    """
 
     def __init__(self, parachain):
         self.logger = logging.getLogger("SubscrapeDB")
-        self._path = f"data/parachains/{parachain}_"
-        self._parachain = parachain
-        # the name of the currently loaded extrinsics
-        self._extrinsics_name = None
-        # the name of the currently loaded extrinsics sector
-        self._extrinsics_sector_name = None
-        # the currently loaded extrinsics sector
-        self._extrinsics = None
-        # a dirty flag that keeps track of unsaved changes
-        self._extrinsics_dirty = False
-        self.digits_per_sector = 4
 
+        #: str: the root path to this db
+        self._path = f"data/parachains/{parachain}_"
+        #: str: the name of the chain this db represents
+        self._parachain = parachain
+        #: str: the name of the currently loaded extrinsics
+        self._extrinsics_name = None
+        #: str: the name of the currently loaded extrinsics sector
+        self._extrinsics_sector_name = None
+        #: list: the currently loaded extrinsics sector
+        self._extrinsics = None
+        #: bool: a dirty flag that keeps track of unsaved extrinsics
+        self._extrinsics_dirty = False
+        #: int: the number of digits of blocks a sector takes, e.g. 4 -> 1e4 blocks per sector
+        self.extrinsics_digits_per_sector = 4
+
+        #: str: the account transfers are being store for
         self._transfers_account = None
+        #: list: the list of transfers we are storing
         self._transfers = None
+        #: bool: a dirty flag that keeps track of unsaved transfers
         self._transfers_dirty = False
 
 
@@ -74,9 +88,9 @@ class SubscrapeDB:
         # determine the sector
         index = extrinsic["extrinsic_index"]
         sector = index.split("-")[0]
-        suffix = "x" * self.digits_per_sector
-        if(len(sector) > self.digits_per_sector):
-            sector = sector[:-self.digits_per_sector] + suffix
+        suffix = "x" * self.extrinsics_digits_per_sector
+        if(len(sector) > self.extrinsics_digits_per_sector):
+            sector = sector[:-self.extrinsics_digits_per_sector] + suffix
         else:
             sector = suffix
 
@@ -179,12 +193,21 @@ class SubscrapeDB:
         return f"{self._path}transfers/"
 
     def _clear_transfers_state(self):
+        """
+        Clears the internal state of a transfers
+        """
         assert(not self._transfers_dirty)
         self._transfers_account = None
         self._transfers = None
 
 
     def set_active_transfers_account(self, account):
+        """
+        Sets the active transfers account for the upcoming scrape.
+
+        :param account: The account we are about to scrape
+        :type account: str
+        """
         self._clear_transfers_state()
         self._transfers_account = account
         self._transfers = []
@@ -195,13 +218,22 @@ class SubscrapeDB:
             os.makedirs(folder_path)
 
 
-    def write_transfers(self, transfer):
+    def write_transfer(self, transfer):
+        """
+        Write a new transfer object to the state.
+
+        :param transfer: The transfer to write
+        :type transfer: dict
+        """
         self._transfers.append(transfer)
         self._transfers_dirty = True
         return True
 
 
     def flush_transfers(self):
+        """
+        Flushes the unsaved transfers to disk.
+        """
         if not self._transfers_dirty:
             return
 
@@ -217,6 +249,12 @@ class SubscrapeDB:
 
 
     def transfers_iter(self, account):
+        """
+        Returns an iterable object of transfers for the given account.
+
+        :param account: The account to read transfers for
+        :type account: str
+        """
         file_path = self._transfers_folder() + account + ".json"
         if os.path.exists(file_path):
             file = io.open(file_path)

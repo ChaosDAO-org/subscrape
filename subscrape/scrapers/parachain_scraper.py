@@ -82,7 +82,7 @@ class ParachainScraper:
         body = {"address": account}
         await self.api.iterate_pages(
             method,
-            self.db.write_transfers,
+            self.db.write_transfer,
             list_key="transfers",
             body=body,
             filter=call_config.filter
