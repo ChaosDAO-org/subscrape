@@ -1,0 +1,11 @@
+{
+    "addresses": {
+        "FLrVF3bYV7mUHmxPZMzpmTcRJkxVxQrDmkooSKM8RwXYDza": "???"
+    },
+    "chains": [
+        "polkadot", "kusama", "darwinia", "acala", "astar", "altair", "bifrost", "calamari", "centrifuge", "crust",
+        "shadow", "crab", "karura", "kintsugi", "khala", "moonbeam", "moonriver", "parallel", "parallel-heiko", "picasso",
+        "pioneer", "shiden", "statemine", "statemint"
+    ]
+}
+

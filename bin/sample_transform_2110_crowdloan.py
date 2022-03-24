@@ -3,7 +3,7 @@ import json
 from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
 import logging
-from scrape import scrape
+import subscrape
 
 config = {
     "kusama":{
@@ -85,7 +85,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     logging.info("scraping")
-    scrape(config)
+    subscrape.scrape(config)
     logging.info("transforming")
     fetch_direct_contributions()
     fetch_batch_contributions()

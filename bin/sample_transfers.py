@@ -1,6 +1,6 @@
 from subscrape.db.subscrape_db import SubscrapeDB
 import logging
-from scrape import scrape
+import subscrape
 import pandas as pd
 
 def main():
@@ -17,7 +17,7 @@ def main():
     }
 
     logging.info("scraping...")
-    scrape(config)
+    subscrape.scrape(config)
 
     logging.info("transforming...")
     db = SubscrapeDB("Kusama")

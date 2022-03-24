@@ -1,10 +1,7 @@
-from ast import Dict
-from concurrent.futures import process
-import os
-import json
 import logging
 from tkinter import NONE
 from typing import List
+from substrateinterface.utils import ss58
 
 
 # A generic scraper for parachains
@@ -80,15 +77,18 @@ class ParachainScraper:
         :type call_config: ScrapeConfig
         """
 
-        # Todo: determine if the address is valid or emit a warning
+        # normalize to Substrate address
+        public_key = ss58.ss58_decode(account)
+        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
 
-        self.db.set_active_transfers_account(account)
 
-        self.logger.info(f"Fetching transfers for {account} from {self.api.endpoint}")
+        self.db.set_active_transfers_account(substrate_address)
+
+        self.logger.info(f"Fetching transfers for {substrate_address} from {self.api.endpoint}")
 
         method = "/api/scan/transfers"
 
-        body = {"address": account}
+        body = {"address": substrate_address}
         self.api.iterate_pages(
             method,
             self.db.write_transfer,

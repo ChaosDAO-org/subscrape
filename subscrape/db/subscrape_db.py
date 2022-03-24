@@ -2,6 +2,7 @@ import os
 import io
 import json
 import logging
+from substrateinterface.utils import ss58
 
 
 # one DB per Parachain
@@ -16,6 +17,9 @@ class SubscrapeDB:
 
     def __init__(self, parachain):
         self.logger = logging.getLogger("SubscrapeDB")
+
+        # make sure casing is correct
+        parachain = parachain.lower()
 
         #: str: the root path to this db
         self._path = f"data/parachains/{parachain}_"
@@ -193,6 +197,20 @@ class SubscrapeDB:
         """
         return f"{self._path}transfers/"
 
+    def _transfers_account_file(self, account):
+        """
+        Will return the storage path for an account.
+        The address is normalized to the Substrate address format.
+
+        :param account: The account
+        :type account: str
+        """
+        public_key = ss58.ss58_decode(account)
+        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
+        file_path = self._transfers_folder() + substrate_address + ".json"
+        return file_path
+
+
     def _clear_transfers_state(self):
         """
         Clears the internal state of a transfers
@@ -240,7 +258,7 @@ class SubscrapeDB:
 
         payload = json.dumps(self._transfers)
 
-        file_path = self._transfers_folder() + self._transfers_account + ".json"
+        file_path = self._transfers_account_file(self._transfers_account)
         self.logger.info(f"Writing {len(self._transfers)} entries")
         file = io.open(file_path, "w")
         file.write(payload)
@@ -256,7 +274,7 @@ class SubscrapeDB:
         :param account: The account to read transfers for
         :type account: str
         """
-        file_path = self._transfers_folder() + account + ".json"
+        file_path = self._transfers_account_file(account)
         if os.path.exists(file_path):
             file = io.open(file_path)
             file_payload = file.read()

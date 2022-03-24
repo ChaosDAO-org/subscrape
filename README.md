@@ -1,13 +1,16 @@
 # subscrape
 A Python scraper for substrate chains that uses Subscan.
 
-The basic workflow if `scrape.py` considers the configuration presented in `data/scrape_config.json`
+This is a growing library of facilities to scrape Substrate and Moonbeam-based chains.
+
+The basic workflow of `bin/scrape.py` considers the configuration presented in `data/scrape_config.json` 
 to traverse through the given chains and perform the operations for each chain.
-Currently, only scraping extrinsics is supported.
+For Substrate, scraping extrinsics and transfers is supported.
 
-Data is stored locally using `SubscanDB`. It can then be queried. An example is provided with `transform.py`.
+Data is stored locally using `SubscanDB` and can be used to use the data and transform it. The application works in a way that subsequent runs will only fetch deltas.
 
-The application works in a way that subsequent runs will only fetch deltas.
+`bin/transfers_all_chains.py` takes addresses and chains from `data/transfers_config.json` to create a CSV of
+ all transfers associated with that accounts.
 
 ## Links
 - [v2.0 Milestones](https://github.com/ChaosDAO-org/subscrape/milestone/1)
@@ -34,8 +37,19 @@ If you have a Subscan API key, drop it in a file named `config/subscan-key`
 ### Example applications
 Take a look at the `/bin/` folder. There are some sample applications there.
 
-### Using scrape.py
+### Using scrape.py as application
 - copy `config/sample_scrape_config.json` to `config/scrape_config.json`
 - configure to your desire. See [configuration](docs/configuration.md)
 - run `scrape.py`
 - corresponding files will be created in data/
+
+### Consuming scrape.py as helper
+- from scrape import scrape
+- create a dict analogouos to `config/sample_scrape_config.json`
+- call it inline via `scrape(config)`
+
+### Extracting all transfers across chains for an address
+- copy `config/sample_transfers_config.json` to `config/transfers_config.json`
+- configure as needed.
+- run `bin/transfers_all_chains.py`
+- output is in `data/transfers.csv`
