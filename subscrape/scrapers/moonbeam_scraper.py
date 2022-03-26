@@ -3,7 +3,7 @@ import os
 import logging
 import json
 import io
-from eth_utils import keccak
+from eth_utils import keccak, from_wei
 
 
 class MoonbeamScraper:
@@ -36,7 +36,6 @@ class MoonbeamScraper:
                     if contract_config.skip:
                         self.logger.info(f"Config asks to skip transactions of contract {contract}.")
                         continue
-
 
                     for method in methods:
                         # ignore metadata
@@ -156,9 +155,12 @@ class MoonbeamScraper:
             timestamp = transaction['timeStamp']
             acct_tx = {'utcdatetime': str(datetime.utcfromtimestamp(int(timestamp))), 'hash': transaction['hash'],
                        'from': transaction['from'], 'to': transaction['to'], 'valueInWei': transaction['value'],
-                       'value': float(transaction['value'])/1000000000000000000, 'gas': transaction['gas'],
+                       'value': from_wei(transaction['value'], 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
             self.transactions[account][timestamp] = acct_tx
+            if transaction['to'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f'\
+                    or transaction['from'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f':
+                self.logger.info(f'Solarbeam.io transaction: {transaction}')
             # todo: interpret dex token swaps
             # todo: interpret liquidity provisioning
         return process_transaction_on_account

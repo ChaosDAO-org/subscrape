@@ -6,6 +6,7 @@ import subscrape
 
 log_level = logging.INFO
 
+
 def main():
     """Loads `config/scrape_config.json and iterates over all chains present in the config.
     Will call `scraper_factors()` to retrieve the proper scraper for a chain.

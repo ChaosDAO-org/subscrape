@@ -1,4 +1,4 @@
 eth_utils
+pandas
 requests
 substrate-interface
-pandas

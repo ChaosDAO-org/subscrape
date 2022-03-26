@@ -21,6 +21,7 @@ rows[0].extend(interesting_rows)
 
 db = SubscrapeDB("Kusama")
 
+
 def unwrap_params(params):
     result = {}
     for param in params:
@@ -93,7 +94,6 @@ def main():
     with open(file_path, "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(rows)
-
 
 
 if __name__ == "__main__":
