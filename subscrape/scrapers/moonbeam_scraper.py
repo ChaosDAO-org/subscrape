@@ -1,9 +1,11 @@
 from datetime import datetime
 import os
 import logging
+from pathlib import Path
 import simplejson as json
 import io
 from eth_utils import keccak, from_wei
+from subscrape.decode.decode_evm_transaction import decode_tx
 
 
 class MoonbeamScraper:
@@ -12,6 +14,10 @@ class MoonbeamScraper:
         self.db_path = db_path
         self.api = api
         self.transactions = {}
+        self.abis = {}
+        abi_dir = (Path(__file__).parent.parent / 'decode' / 'abi').resolve()
+        with open(str(abi_dir / 'solarbeam_router_abi.json')) as solarbeam_abi_file:
+            self.abis['solarbeam_router'] = solarbeam_abi_file.read()
 
     def scrape(self, operations, chain_config):
         for operation in operations:
@@ -161,11 +167,30 @@ class MoonbeamScraper:
                        'from': transaction['from'], 'to': transaction['to'], 'valueInWei': transaction['value'],
                        'value': from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
-            self.transactions[account][timestamp] = acct_tx
+
+            # todo load more dex abis and use a dictionary to look up the right abi based on the contract address.
             if transaction['to'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f'\
                     or transaction['from'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f':
-                self.logger.info(f'Solarbeam.io transaction: {transaction}')
-            # todo: interpret dex token swaps
-            # todo: interpret liquidity provisioning
+                # self.logger.info(f'Solarbeam.io transaction: {transaction}')
+                solarbeam_tx_decoded = decode_tx(0xaa30ef758139ae4a7f798112902bf6d65612045f, transaction['input'],
+                                                 self.abis['solarbeam_router'])
+                print('solarbeam function called: ', solarbeam_tx_decoded[0])
+                decoded_tx = json.loads(solarbeam_tx_decoded[1])
+                print('arguments: ', json.dumps(decoded_tx, indent=2))
+                if solarbeam_tx_decoded[0] == "swapExactTokensForTokens":
+                    token_path = decoded_tx['path']
+                    acct_tx['input_token'] = token_path[0]
+                    acct_tx['output_token'] = token_path[len(token_path) - 1]
+                    acct_tx['input_token_quantity'] = decoded_tx['amountIn']
+                    acct_tx['output_token_quantity'] = decoded_tx['amountOutMin']
+                    #  We only have an estimate so far based on the inputs.
+                    # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
+
+                    # todo: these amounts need to be converted to floats by dividing by the DECIMAL for each contract.
+                    # todo: translate token contract address into the token's name to make it user readable in spreadsheet.
+
+                # todo: interpret liquidity provisioning and other events (like SwapExactTokensForETH)
+
+            self.transactions[account][timestamp] = acct_tx
         return process_transaction_on_account
 
