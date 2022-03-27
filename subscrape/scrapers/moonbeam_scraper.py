@@ -1,7 +1,7 @@
 from datetime import datetime
 import os
 import logging
-import json
+import simplejson as json
 import io
 from eth_utils import keccak, from_wei
 
@@ -32,7 +32,7 @@ class MoonbeamScraper:
                         continue
 
                     methods = contracts[contract]
-                    contract_config = transactions_config.create_innerconfig(methods)
+                    contract_config = transactions_config.create_inner_config(methods)
                     if contract_config.skip:
                         self.logger.info(f"Config asks to skip transactions of contract {contract}.")
                         continue
@@ -60,7 +60,11 @@ class MoonbeamScraper:
                         self.fetch_transactions(contract, processor, contract_method)
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
-                account_transactions_config = chain_config.create_inner_config(contracts)
+                account_transactions_config = chain_config.create_inner_config(account_transactions_payload)
+                if account_transactions_config.skip:
+                    self.logger.info(f"Config asks to skip account_transactions.")
+                    continue
+
                 if "accounts" in account_transactions_payload:
                     accounts = account_transactions_payload['accounts']
                     for account in accounts:
@@ -70,9 +74,9 @@ class MoonbeamScraper:
 
                         # deduce config
                         if type(accounts) is dict:
-                            account_config = contract_config.create_inner_config(methods[method])
+                            account_config = account_transactions_config.create_inner_config(methods[method])
                         else:
-                            account_config = contract_config
+                            account_config = account_transactions_config
 
                         if account_config.skip:
                             self.logger.info(f"Config asks to skip account {account}")
@@ -155,7 +159,7 @@ class MoonbeamScraper:
             timestamp = transaction['timeStamp']
             acct_tx = {'utcdatetime': str(datetime.utcfromtimestamp(int(timestamp))), 'hash': transaction['hash'],
                        'from': transaction['from'], 'to': transaction['to'], 'valueInWei': transaction['value'],
-                       'value': from_wei(transaction['value'], 'ether'), 'gas': transaction['gas'],
+                       'value': from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
             self.transactions[account][timestamp] = acct_tx
             if transaction['to'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f'\

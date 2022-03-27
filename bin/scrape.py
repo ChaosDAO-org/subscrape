@@ -2,6 +2,9 @@ from audioop import add
 import logging
 import json
 import os
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 import subscrape
 
 log_level = logging.INFO
