@@ -1,4 +1,6 @@
 eth_utils
+hexbytes
 pandas
 requests
 substrate-interface
+web3
