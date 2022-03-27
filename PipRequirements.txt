@@ -3,4 +3,4 @@ hexbytes
 pandas
 requests
 substrate-interface
-web3
+web3>5.0
