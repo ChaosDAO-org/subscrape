@@ -9,6 +9,7 @@ import logging
 #requests_log.setLevel(logging.DEBUG)
 #requests_log.propagate = True
 
+
 class SubscanWrapper:
 
     def __init__(self, api_key, endpoint):
@@ -16,7 +17,7 @@ class SubscanWrapper:
         self.api_key = api_key
         self.endpoint = endpoint
 
-    def query(self, method, headers = {}, body = {}):
+    def query(self, method, headers={}, body={}):
         headers["Content-Type"] = "application/json"
         headers["x-api-key"] = self.api_key
         body = json.dumps(body)

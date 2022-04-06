@@ -12,7 +12,6 @@ class ParachainScraper:
         self.db = db
         self.api = api
 
-
     def scrape(self, operations, chain_config):
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
         method.
@@ -36,7 +35,6 @@ class ParachainScraper:
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
-
 
     def scrape_transfers(self, accounts, chain_config):
         """
@@ -69,7 +67,7 @@ class ParachainScraper:
 
     def fetch_transfers(self, account, call_config):
         """
-        Fetches the treansfers for a single account and writes them to the db.
+        Fetches the transfers for a single account and writes them to the db.
 
         :param account: The account to scrape
         :type account: str
@@ -80,7 +78,6 @@ class ParachainScraper:
         # normalize to Substrate address
         public_key = ss58.ss58_decode(account)
         substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
-
 
         self.db.set_active_transfers_account(substrate_address)
 

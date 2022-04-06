@@ -7,6 +7,7 @@ from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
 
+
 def moonscan_factory(chain):
     endpoint = f"https://api-{chain}.moonscan.io/api"
     return MoonscanWrapper(endpoint)
@@ -53,7 +54,6 @@ def scrape(chains):
         if chain_config.skip:
             logging.info(f"Config asks to skip chain {chain}")
             continue
-
 
         parachain_scraper = scraper_factory(chain)
         parachain_scraper.scrape(operations, chain_config)

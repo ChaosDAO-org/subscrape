@@ -1,4 +1,7 @@
 eth_utils
-requests
-substrate-interface
+hexbytes
 pandas
+requests
+simplejson
+substrate-interface
+web3>5.0

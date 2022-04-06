@@ -43,7 +43,6 @@ class SubscrapeDB:
         #: bool: a dirty flag that keeps track of unsaved transfers
         self._transfers_dirty = False
 
-
     # Extrinsics
 
     def _extrinsics_folder(self, module_call):
@@ -55,17 +54,14 @@ class SubscrapeDB:
         """
         return f"{self._path}extrinsics_{module_call}/"
 
-
     def _extrinsics_sector_file_path(self, extrinsic, sector):
         return self._extrinsics_folder(extrinsic) + sector +  ".json"
-
 
     def _clear_extrinsics_state(self):
         assert(not self._extrinsics_dirty)
         # remove references to existing sectors
         self._extrinsics = None
         self._extrinsics_sector_name = None
-
 
     def set_active_extrinsics_call(self, call_module, call_name):
         self._clear_extrinsics_state()
@@ -76,7 +72,6 @@ class SubscrapeDB:
         folder_path = self._extrinsics_folder(call_string)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
-
 
     def write_extrinsic(self, extrinsic):
         """
@@ -92,7 +87,7 @@ class SubscrapeDB:
         index = extrinsic["extrinsic_index"]
         sector = index.split("-")[0]
         suffix = "x" * self.extrinsics_digits_per_sector
-        if(len(sector) > self.extrinsics_digits_per_sector):
+        if len(sector) > self.extrinsics_digits_per_sector:
             sector = sector[:-self.extrinsics_digits_per_sector] + suffix
         else:
             sector = suffix
@@ -117,7 +112,6 @@ class SubscrapeDB:
 
         return True
 
-
     def flush_extrinsics(self):
         if not self._extrinsics_dirty:
             return
@@ -131,7 +125,6 @@ class SubscrapeDB:
 
         self._extrinsics_dirty = False
 
-
     def _load_extrinsics_sector(self, name, sector):
         file_path = self._extrinsics_sector_file_path(name, sector)
         if os.path.exists(file_path):
@@ -140,7 +133,6 @@ class SubscrapeDB:
             return json.loads(file_payload)
         else:
             return {}
-
 
     def extrinsics_iter(self, call_module, call_name):
         self.set_active_extrinsics_call(call_module, call_name)
@@ -159,7 +151,7 @@ class SubscrapeDB:
 
             def __next__(self):
                 load_next_file = False
-                if self.extrinsics_index == None:
+                if self.extrinsics_index is None:
                     load_next_file = True
                 elif self.extrinsics_index >= len(self.extrinsics):
                     load_next_file = True
@@ -185,7 +177,7 @@ class SubscrapeDB:
 
         folder = self._extrinsics_folder(call_string)
         file_list = os.listdir(folder)
-        if(len(file_list) == 0):
+        if len(file_list) == 0:
             self.logger.warning("Empty file list in extrinsics_iter(). Did you use the correct config?")
         return ExtrinsicsIter(folder, file_list)
 
@@ -210,7 +202,6 @@ class SubscrapeDB:
         file_path = self._transfers_folder() + substrate_address + ".json"
         return file_path
 
-
     def _clear_transfers_state(self):
         """
         Clears the internal state of a transfers
@@ -218,7 +209,6 @@ class SubscrapeDB:
         assert(not self._transfers_dirty)
         self._transfers_account = None
         self._transfers = None
-
 
     def set_active_transfers_account(self, account):
         """
@@ -236,7 +226,6 @@ class SubscrapeDB:
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-
     def write_transfer(self, transfer):
         """
         Write a new transfer object to the state.
@@ -247,7 +236,6 @@ class SubscrapeDB:
         self._transfers.append(transfer)
         self._transfers_dirty = True
         return True
-
 
     def flush_transfers(self):
         """
@@ -266,7 +254,6 @@ class SubscrapeDB:
 
         self._transfers_dirty = False
 
-
     def transfers_iter(self, account):
         """
         Returns an iterable object of transfers for the given account.
@@ -280,5 +267,5 @@ class SubscrapeDB:
             file_payload = file.read()
             return json.loads(file_payload)
         else:
-            self.logger.warn(f"transfers from account {account} have been requested but do not exist on disk.")
+            self.logger.warning(f"transfers from account {account} have been requested but do not exist on disk.")
             return None
