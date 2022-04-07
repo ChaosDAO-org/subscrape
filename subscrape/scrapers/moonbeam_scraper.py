@@ -64,6 +64,7 @@ class MoonbeamScraper:
                         self.transactions[contract_method] = {}
                         processor = self.process_methods_in_transaction_factory(contract_method, method)
                         self.fetch_transactions(contract, processor, contract_method)
+
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
                 account_transactions_config = chain_config.create_inner_config(account_transactions_payload)
@@ -184,7 +185,9 @@ class MoonbeamScraper:
                     acct_tx['input_token_quantity'] = decoded_tx['amountIn']
                     acct_tx['output_token_quantity'] = decoded_tx['amountOutMin']
                     #  We only have an estimate so far based on the inputs.
-                    # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
+
+                    # if moonscan API key then:
+                        # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
 
                     # todo: these amounts need to be converted to floats by dividing by the DECIMAL for each contract.
                     # todo: translate token contract address into the token's name to make it user readable in spreadsheet.

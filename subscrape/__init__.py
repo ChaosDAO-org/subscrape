@@ -9,8 +9,13 @@ from subscrape.scrapers.scrape_config import ScrapeConfig
 
 
 def moonscan_factory(chain):
+    moonscan_key = None
+    if os.path.exists("config/moonscan-key"):
+        f = open("config/moonscan-key")
+        moonscan_key = f.read()
+
     endpoint = f"https://api-{chain}.moonscan.io/api"
-    return MoonscanWrapper(endpoint)
+    return MoonscanWrapper(endpoint, moonscan_key)
 
 
 def subscan_factory(chain):
@@ -20,7 +25,7 @@ def subscan_factory(chain):
         subscan_key = f.read()
 
     endpoint = f"https://{chain}.api.subscan.io"
-    return SubscanWrapper(subscan_key, endpoint)
+    return SubscanWrapper(endpoint, subscan_key)
 
 
 def scraper_factory(name):

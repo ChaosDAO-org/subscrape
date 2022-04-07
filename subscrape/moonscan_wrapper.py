@@ -7,25 +7,26 @@ import logging
 
 
 class MoonscanWrapper:
-    def __init__(self, endpoint):
+    def __init__(self, endpoint, api_key=None):
         self.logger = logging.getLogger("MoonscanWrapper")
         self.endpoint = endpoint
+        self.api_key = api_key
 
     def query(self, params):
-        params["apikey"] = "YourApiKeyToken"
+        params["apikey"] = self.api_key
         response = requests.get(self.endpoint, params=params)
         self.logger.debug(response)
         return response.text
 
     def iterate_pages(self, element_processor, params={}):
         done = False            # keep crunching until we are done
-        start_block = 0          # iterator for the page we want to query
-        previous_block = 0       # to check if the iterator actually moved forward
+        start_block = 0         # iterator for the page we want to query
+        previous_block = 0      # to check if the iterator actually moved forward
         count = 0               # counter for how many items we queried already
         limit = 0               # max amount of items to be queried. to be determined after the first call
 
         while not done:
-            params["start_block"] = start_block
+            params["startblock"] = start_block
             response = self.query(params)
 
             # unpackage the payload

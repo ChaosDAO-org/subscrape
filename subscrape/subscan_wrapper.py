@@ -12,7 +12,7 @@ import logging
 
 class SubscanWrapper:
 
-    def __init__(self, api_key, endpoint):
+    def __init__(self, endpoint, api_key=None):
         self.logger = logging.getLogger("SubscanWrapper")
         self.api_key = api_key
         self.endpoint = endpoint
@@ -23,7 +23,7 @@ class SubscanWrapper:
         body = json.dumps(body)
         before = datetime.now()
         url = self.endpoint + method
-        response = requests.post(url, headers = headers, data = body)
+        response = requests.post(url, headers=headers, data=body)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
 
