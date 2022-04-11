@@ -1,5 +1,5 @@
+import httpx
 import json
-import requests
 from datetime import datetime
 import logging
 
@@ -19,11 +19,12 @@ class SubscanWrapper:
 
     def query(self, method, headers={}, body={}):
         headers["Content-Type"] = "application/json"
-        headers["x-api-key"] = self.api_key
+        if self.api_key is not None:
+            headers["x-api-key"] = self.api_key
         body = json.dumps(body)
         before = datetime.now()
         url = self.endpoint + method
-        response = requests.post(url, headers=headers, data=body)
+        response = httpx.post(url, headers=headers, data=body)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
 

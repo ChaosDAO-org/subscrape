@@ -1,5 +1,5 @@
 from tracemalloc import start
-import requests
+import httpx
 import json
 import logging
 
@@ -14,7 +14,7 @@ class MoonscanWrapper:
 
     def query(self, params):
         params["apikey"] = self.api_key
-        response = requests.get(self.endpoint, params=params)
+        response = httpx.get(self.endpoint, params=params)
         self.logger.debug(response)
         return response.text
 
