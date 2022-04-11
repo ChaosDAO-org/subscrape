@@ -1,7 +1,8 @@
+from datetime import datetime
 import httpx
 import json
-from datetime import datetime
 import logging
+from ratelimit import limits, sleep_and_retry
 
 #import http.client
 #http.client.HTTPConnection.debuglevel = 1
@@ -17,6 +18,8 @@ class SubscanWrapper:
         self.api_key = api_key
         self.endpoint = endpoint
 
+    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
+    @limits(calls=29, period=1)     # API limits us to 30 calls every second
     def query(self, method, headers={}, body={}):
         headers["Content-Type"] = "application/json"
         if self.api_key is not None:

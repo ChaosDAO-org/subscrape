@@ -2,6 +2,7 @@ from tracemalloc import start
 import httpx
 import json
 import logging
+from ratelimit import limits, sleep_and_retry
 
 #https://moonbeam.moonscan.io/apis#contracts
 
@@ -12,8 +13,11 @@ class MoonscanWrapper:
         self.endpoint = endpoint
         self.api_key = api_key
 
+    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
+    @limits(calls=4, period=1)      # API limits us to 5 calls every second
     def query(self, params):
-        params["apikey"] = self.api_key
+        if self.api_key is not None:
+            params["apikey"] = self.api_key
         response = httpx.get(self.endpoint, params=params)
         self.logger.debug(response)
         return response.text
@@ -49,3 +53,33 @@ class MoonscanWrapper:
             if start_block == previous_block:
                 done = True
             previous_block = start_block
+
+    def fetch_and_process_transactions(self, address, element_processor):
+        """Fetch all transactions for an address, and then pass them to the processor for processing.
+
+        :param address: address to retrieve transactions for
+        :type address: str
+        :param element_processor: method to process each transaction as it is received
+        :type element_processor: function
+        """
+        params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
+                  "endblock": "99999999", "sort": "asc"}
+        self.iterate_pages(element_processor, params=params)
+
+    def get_contract_abi(self, contract_address):
+        """Get a contract's ABI (so that its transactions can be decoded).
+
+        :param contract_address: contract address
+        :type contract_address: str
+        :returns: string representing the contract's ABI, or None if not retrievable
+        :rtype: str or None
+        """
+        params = {"module": "contract", "action": "getabi", "address": contract_address}
+        response = self.query(params)   # will add on the optional API key
+        response_dict = json.loads(response)
+        if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
+            self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"')
+            return None
+        else:
+            # response_dict['result'] should contain a long string representation of the contract abi.
+            return response_dict['result']
