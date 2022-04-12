@@ -9,12 +9,14 @@ from subscrape.decode.decode_evm_transaction import decode_tx
 
 
 class MoonbeamScraper:
-    def __init__(self, db_path, api):
+    def __init__(self, db_path, moonscan_api, blockscout_api):
         self.logger = logging.getLogger("MoonbeamScraper")
         self.db_path = db_path
-        self.api = api
+        self.moonscan_api = moonscan_api
+        self.blockscout_api = blockscout_api
         self.transactions = {}
-        self.abis = {}
+        self.abis = {}      # cache of contract ABI interface definitions
+        self.tokens = {}    # cache of token contract basic info
 
     def scrape(self, operations, chain_config):
         for operation in operations:
@@ -120,8 +122,8 @@ class MoonbeamScraper:
             self.logger.warning(f"{file_path} already exists. Skipping.")
             return
 
-        self.logger.info(f"Fetching transactions for {reference} from {self.api.endpoint}")
-        self.api.fetch_and_process_transactions(address, processor)
+        self.logger.info(f"Fetching transactions for {reference} from {self.moonscan_api.endpoint}")
+        self.moonscan_api.fetch_and_process_transactions(address, processor)
 
         payload = json.dumps(self.transactions[reference], indent=4, sort_keys=False)
         file = io.open(file_path, "w")
@@ -163,17 +165,24 @@ class MoonbeamScraper:
 
                 # retrieve and cache the abi for the contract
                 if contract_address not in self.abis and contract_address != account:
-                    self.abis[contract_address] = self.api.get_contract_abi(contract_address)
-                    if self.abis[contract_address] is not None:
-                        self.logger.info(f'Contract abi found for {contract_address}.')
+                    self.abis[contract_address] = self.moonscan_api.get_contract_abi(contract_address)
+                    # if self.abis[contract_address] is not None:
+                    #     self.logger.info(f'Contract abi found for {contract_address}.')
 
                 if contract_address in self.abis and self.abis[contract_address] is not None:
                     decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
 
                     if decoded_transaction[0] == 'decode error':
-                        self.logger.warning(f'Unable to decode contract interaction from transaction={transaction}\r\n'
-                                            f'    abi={self.abis[contract_address]}\r\n'
-                                            f'    and decoded_transaction={decoded_transaction}\r\n\r\n')
+                        known_contracts_with_decode_errors = {
+                            "0xbcc8a3022f69a5cdddc22c068049cd07581b1aa5",  # 0xTaylor "puzzle"
+                            "0xf48ea3bc302f6c0585eceddba70a1bc12d67e76f",  # DPSDocks v1.0
+                            "0x421bff16bba3bca1720638482c647eb832fd9de4",  # DPSDocks v1.5
+                            "0x77da4f1d66004bebfda4d5a42931388cecaf81c5"   # DPSPlunderersGuild
+                        }
+                        if contract_address not in known_contracts_with_decode_errors:
+                            self.logger.warning(f'Unable to decode contract interaction from transaction={transaction}\r\n'
+                                                f'    abi={self.abis[contract_address]}\r\n'
+                                                f'    and decoded_transaction={decoded_transaction}\r\n\r\n')
                     else:
                         # successfully decoded the input data to the contract interaction
                         contract_method_name = decoded_transaction[0]
@@ -182,20 +191,32 @@ class MoonbeamScraper:
                             print('solarbeam function called: ', contract_method_name)
                             print('arguments: ', json.dumps(decoded_tx, indent=2))
 
+                        # todo: add support for lots of dex swap methods
+                        # todo: interpret liquidity provisioning and other events (like SwapExactTokensForETH)
                         if contract_method_name == "swapExactTokensForTokens":
                             token_path = decoded_tx['path']
-                            acct_tx['input_token'] = token_path[0]
-                            acct_tx['output_token'] = token_path[len(token_path) - 1]
-                            acct_tx['input_token_quantity'] = decoded_tx['amountIn']
-                            acct_tx['output_token_quantity'] = decoded_tx['amountOutMin']
+                            # retrieve and cache the token info for all tokens
+                            for token in token_path:
+                                if token not in self.tokens:
+                                    self.tokens[token] = self.blockscout_api.get_token_info(token)
+                                    # if self.tokens[token] is not None:
+                                    #     self.logger.info(f'Token info found for {token} = {self.tokens[token]}')
+
+                            input_token = token_path[0]
+                            input_token_info = self.tokens[input_token]
+                            acct_tx['input_token_name'] = input_token_info['name']
+                            acct_tx['input_symbol'] = input_token_info['symbol']
+                            acct_tx['input_quantity'] = \
+                                decoded_tx['amountIn'] / (10 ** int(input_token_info['decimals']))
+                            output_token = token_path[len(token_path) - 1]
+                            output_token_info = self.tokens[output_token]
+                            acct_tx['output_token_name'] = output_token_info['name']
+                            acct_tx['output_symbol'] = output_token_info['symbol']
+                            acct_tx['output_quantity'] = \
+                                decoded_tx['amountOutMin'] / (10 ** int(output_token_info['decimals']))
+
                             #  We only have an estimate so far based on the inputs.
-                            # todo: these amounts need to be converted to floats by dividing by the DECIMAL for each contract.
-                            # todo: translate token contract address into the token's name to make it user readable in spreadsheet.
-
-                            # if moonscan API key then:
-                                # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
-
-                        # todo: interpret liquidity provisioning and other events (like SwapExactTokensForETH)
+                            # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
 
             self.transactions[account][timestamp] = acct_tx
         return process_transaction_on_account

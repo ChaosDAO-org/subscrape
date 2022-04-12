@@ -10,16 +10,23 @@ from ratelimit import limits, sleep_and_retry
 #requests_log.setLevel(logging.DEBUG)
 #requests_log.propagate = True
 
+SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
+SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
+MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
+
 
 class SubscanWrapper:
-
-    def __init__(self, endpoint, api_key=None):
+    def __init__(self, chain, api_key=None):
         self.logger = logging.getLogger("SubscanWrapper")
+        self.endpoint = f"https://{chain}.api.subscan.io"
         self.api_key = api_key
-        self.endpoint = endpoint
+        global MAX_CALLS_PER_SEC
+        if api_key is not None:
+            MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
+        self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=29, period=1)     # API limits us to 30 calls every second
+    @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     def query(self, method, headers={}, body={}):
         headers["Content-Type"] = "application/json"
         if self.api_key is not None:
