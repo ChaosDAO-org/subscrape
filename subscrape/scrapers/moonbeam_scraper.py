@@ -191,9 +191,12 @@ class MoonbeamScraper:
                             print('solarbeam function called: ', contract_method_name)
                             print('arguments: ', json.dumps(decoded_tx, indent=2))
 
-                        # todo: add support for lots of dex swap methods
+                        # todo: add support for "swapETHForTokens" methods (which don't specify an input quantity?)
                         # todo: interpret liquidity provisioning and other events (like SwapExactTokensForETH)
-                        if contract_method_name == "swapExactTokensForTokens":
+                        if contract_method_name in {"swapExactTokensForTokens", "swapTokensForExactTokens",
+                                                    "swapExactTokensForETH",    "swapTokensForExactETH",
+                                                    "swapExactTokensForTokensSupportingFeeOnTransferTokens",
+                                                    "swapExactTokensForETHSupportingFeeOnTransferTokens"}:
                             token_path = decoded_tx['path']
                             # retrieve and cache the token info for all tokens
                             for token in token_path:
@@ -206,14 +209,22 @@ class MoonbeamScraper:
                             input_token_info = self.tokens[input_token]
                             acct_tx['input_token_name'] = input_token_info['name']
                             acct_tx['input_symbol'] = input_token_info['symbol']
-                            acct_tx['input_quantity'] = \
-                                decoded_tx['amountIn'] / (10 ** int(input_token_info['decimals']))
                             output_token = token_path[len(token_path) - 1]
                             output_token_info = self.tokens[output_token]
                             acct_tx['output_token_name'] = output_token_info['name']
                             acct_tx['output_symbol'] = output_token_info['symbol']
-                            acct_tx['output_quantity'] = \
-                                decoded_tx['amountOutMin'] / (10 ** int(output_token_info['decimals']))
+                            if contract_method_name in {"swapExactTokensForTokens", "swapExactTokensForETH",
+                                                        "swapExactTokensForTokensSupportingFeeOnTransferTokens",
+                                                        "swapExactTokensForETHSupportingFeeOnTransferTokens"}:
+                                amount_in = decoded_tx['amountIn']
+                                amount_out = decoded_tx['amountOutMin']
+                            elif contract_method_name in {"swapTokensForExactTokens", "swapTokensForExactETH"}:
+                                amount_in = decoded_tx['amountInMax']
+                                amount_out = decoded_tx['amountOut']
+                            else:
+                                self.logger.error(f'contract method {contract_method_name} not recognized')
+                            acct_tx['input_quantity'] = amount_in / (10 ** int(input_token_info['decimals']))
+                            acct_tx['output_quantity'] = amount_out / (10 ** int(output_token_info['decimals']))
 
                             #  We only have an estimate so far based on the inputs.
                             # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
