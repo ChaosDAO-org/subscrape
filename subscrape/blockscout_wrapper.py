@@ -1,3 +1,6 @@
+__author__ = 'spazcoin@gmail.com @spazvt'
+__author__ = 'Tommi Enenkel @alice_und_bob'
+
 import httpx
 import json
 import logging

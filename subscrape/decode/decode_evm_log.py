@@ -3,6 +3,8 @@ https://gist.github.com/yifeihuang/818c46464d274e354710de8e8b7ea3ee#file-decode_
 See article explanation: https://towardsdatascience.com/decoding-ethereum-smart-contract-data-eed513a65f76
 """
 
+__author__ = '@yifei_huang'
+
 from eth_utils import event_abi_to_log_topic, to_hex
 from functools import lru_cache
 from hexbytes import HexBytes

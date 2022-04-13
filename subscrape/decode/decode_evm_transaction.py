@@ -2,6 +2,9 @@
 https://gist.github.com/yifeihuang/311d60e8c08b9147d25fd8652d0f6029#file-decode_transaction-py
 See article explanation: https://towardsdatascience.com/decoding-ethereum-smart-contract-data-eed513a65f76"""
 
+__author__ = '@yifei_huang'
+__author__ = 'spazcoin@gmail.com @spazvt'
+
 import json
 import traceback
 from functools import lru_cache

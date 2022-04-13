@@ -1,3 +1,5 @@
+__author__ = 'Tommi Enenkel @alice_und_bob'
+
 import os
 import io
 import json
@@ -10,7 +12,7 @@ class SubscrapeDB:
     """
     This class is used to support online scraping of various types of data.
     The write_<type>() methods are used as callbacks for the scraper that constantly feeds new data from web responses.
-    To accomodate this behavior, before scraping begins the DB object must be parameterized by calling
+    To accommodate this behavior, before scraping begins the DB object must be parameterized by calling
     set_active_<type>().
     At the end of the process, flush_<type>() is called to make sure the state is properly saved.
     """
@@ -55,7 +57,7 @@ class SubscrapeDB:
         return f"{self._path}extrinsics_{module_call}/"
 
     def _extrinsics_sector_file_path(self, extrinsic, sector):
-        return self._extrinsics_folder(extrinsic) + sector +  ".json"
+        return self._extrinsics_folder(extrinsic) + sector + ".json"
 
     def _clear_extrinsics_state(self):
         assert(not self._extrinsics_dirty)
