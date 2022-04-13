@@ -16,6 +16,7 @@ class MoonbeamScraper:
         self.blockscout_api = blockscout_api
         self.transactions = {}
         self.abis = {}      # cache of contract ABI interface definitions
+        self.contracts_with_known_decode_errors = []
         self.tokens = {}    # cache of token contract basic info
 
     def scrape(self, operations, chain_config):
@@ -173,23 +174,20 @@ class MoonbeamScraper:
                     decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
 
                     if decoded_transaction[0] == 'decode error':
-                        known_contracts_with_decode_errors = {
-                            "0xbcc8a3022f69a5cdddc22c068049cd07581b1aa5",  # 0xTaylor "puzzle"
-                            "0xf48ea3bc302f6c0585eceddba70a1bc12d67e76f",  # DPSDocks v1.0
-                            "0x421bff16bba3bca1720638482c647eb832fd9de4",  # DPSDocks v1.5
-                            "0x77da4f1d66004bebfda4d5a42931388cecaf81c5"   # DPSPlunderersGuild
-                        }
-                        if contract_address not in known_contracts_with_decode_errors:
-                            self.logger.warning(f'Unable to decode contract interaction from transaction={transaction}\r\n'
-                                                f'    abi={self.abis[contract_address]}\r\n'
-                                                f'    and decoded_transaction={decoded_transaction}\r\n\r\n')
+                        if contract_address not in self.contracts_with_known_decode_errors:
+                            self.contracts_with_known_decode_errors.append(contract_address)
+                            decode_traceback = decoded_transaction[1]
+                            self.logger.warning(f'Unable to decode contract interaction with contract '
+                                                f'{contract_address} in transaction:\r\n'
+                                                f'{transaction}\r\n\r\n'
+                                                f'{decode_traceback}\r\n')
                     else:
                         # successfully decoded the input data to the contract interaction
                         contract_method_name = decoded_transaction[0]
-                        decoded_tx = json.loads(decoded_transaction[1])
-                        if transaction['to'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f':
-                            print('solarbeam function called: ', contract_method_name)
-                            print('arguments: ', json.dumps(decoded_tx, indent=2))
+                        decoded_func_params = json.loads(decoded_transaction[1])
+                        # if transaction['to'] == '0xaa30ef758139ae4a7f798112902bf6d65612045f':
+                        #     print('solarbeam function called: ', contract_method_name)
+                        #     print('arguments: ', json.dumps(decoded_func_params, indent=2))
 
                         # todo: add support for "swapETHForTokens" methods (which don't specify an input quantity?)
                         # todo: interpret liquidity provisioning and other events (like SwapExactTokensForETH)
@@ -197,7 +195,7 @@ class MoonbeamScraper:
                                                     "swapExactTokensForETH",    "swapTokensForExactETH",
                                                     "swapExactTokensForTokensSupportingFeeOnTransferTokens",
                                                     "swapExactTokensForETHSupportingFeeOnTransferTokens"}:
-                            token_path = decoded_tx['path']
+                            token_path = decoded_func_params['path']
                             # retrieve and cache the token info for all tokens
                             for token in token_path:
                                 if token not in self.tokens:
@@ -216,11 +214,11 @@ class MoonbeamScraper:
                             if contract_method_name in {"swapExactTokensForTokens", "swapExactTokensForETH",
                                                         "swapExactTokensForTokensSupportingFeeOnTransferTokens",
                                                         "swapExactTokensForETHSupportingFeeOnTransferTokens"}:
-                                amount_in = decoded_tx['amountIn']
-                                amount_out = decoded_tx['amountOutMin']
+                                amount_in = decoded_func_params['amountIn']
+                                amount_out = decoded_func_params['amountOutMin']
                             elif contract_method_name in {"swapTokensForExactTokens", "swapTokensForExactETH"}:
-                                amount_in = decoded_tx['amountInMax']
-                                amount_out = decoded_tx['amountOut']
+                                amount_in = decoded_func_params['amountInMax']
+                                amount_out = decoded_func_params['amountOut']
                             else:
                                 self.logger.error(f'contract method {contract_method_name} not recognized')
                             acct_tx['input_quantity'] = amount_in / (10 ** int(input_token_info['decimals']))
