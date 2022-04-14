@@ -7,8 +7,9 @@ import logging
 from pathlib import Path
 import simplejson as json
 import io
-from eth_utils import keccak, from_wei
+import eth_utils
 from subscrape.decode.decode_evm_transaction import decode_tx
+from subscrape.decode.decode_evm_log import decode_log
 
 
 class MoonbeamScraper:
@@ -160,18 +161,14 @@ class MoonbeamScraper:
             timestamp = transaction['timeStamp']
             acct_tx = {'utcdatetime': str(datetime.utcfromtimestamp(int(timestamp))), 'hash': transaction['hash'],
                        'from': transaction['from'], 'to': transaction['to'], 'valueInWei': transaction['value'],
-                       'value': from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
+                       'value': eth_utils.from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
 
             if 'input' in transaction and len(transaction['input']) >= 8:
                 # assume this was a call to a contract since input data was provided
                 contract_address = transaction['to']
 
-                # retrieve and cache the abi for the contract
-                if contract_address not in self.abis and contract_address != account:
-                    self.abis[contract_address] = self.moonscan_api.get_contract_abi(contract_address)
-                    # if self.abis[contract_address] is not None:
-                    #     self.logger.info(f'Contract abi found for {contract_address}.')
+                self.retrieve_and_cache_contract_abi(contract_address)
 
                 if contract_address in self.abis and self.abis[contract_address] is not None:
                     decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
@@ -183,7 +180,8 @@ class MoonbeamScraper:
                             self.logger.warning(f'Unable to decode contract interaction with contract '
                                                 f'{contract_address} in transaction:\r\n'
                                                 f'{transaction}\r\n\r\n'
-                                                f'{decode_traceback}\r\n')
+                                                f'{decode_traceback}\r\n'
+                                                f'---- Now continuing processing the rest of the transactions ----\r\n')
                     else:
                         # successfully decoded the input data to the contract interaction
                         contract_method_name = decoded_transaction[0]
@@ -224,12 +222,78 @@ class MoonbeamScraper:
                                 amount_out = decoded_func_params['amountOut']
                             else:
                                 self.logger.error(f'contract method {contract_method_name} not recognized')
-                            acct_tx['input_quantity'] = amount_in / (10 ** int(input_token_info['decimals']))
-                            acct_tx['output_quantity'] = amount_out / (10 ** int(output_token_info['decimals']))
+                            requested_input_quantity_float = amount_in / (10 ** int(input_token_info['decimals']))
+                            requested_output_quantity_float = amount_out / (10 ** int(output_token_info['decimals']))
 
-                            #  We only have an estimate so far based on the inputs.
-                            # todo: find the event logs that the dex router emits, to figure out exactly how much was swapped.
+                            #  We only have an estimate so far based on the inputs so far. Use the trace logs to find
+                            #      the exact swap quantities
+                            tx_hash = transaction['hash']
+                            receipt = self.moonscan_api.get_transaction_receipt(tx_hash)
+                            logs = receipt["logs"]
+                            for log in logs:
+                                contract_address = log["address"]
+                                contract_abi = self.retrieve_and_cache_contract_abi(contract_address)
+                                (evt_name, decoded_data, schema) = decode_log(log['data'], log['topics'], contract_abi)
+                                if evt_name == 'Swap':
+                                    decoded_swap_params = json.loads(decoded_data)
+                                    # Assume that there's only one input quantity and output quantity.
+                                    #     The other input/output must be zero.
+                                    exact_amount_in = decoded_swap_params['amount0In']
+                                    if exact_amount_in == 0:
+                                        exact_amount_in = decoded_swap_params['amount1In']
+                                    elif decoded_swap_params['amount1In'] != 0:
+                                        self.logger.warning(f"Expected one of the swap input amounts to be zero for "
+                                                            f"transaction {tx_hash} with contract {contract_address} "
+                                                            f"but amount0In={decoded_swap_params['amount0In']} and "
+                                                            f"amount1In={decoded_swap_params['amount1In']}")
+                                    exact_amount_out = decoded_swap_params['amount0Out']
+                                    if exact_amount_out == 0:
+                                        exact_amount_out = decoded_swap_params['amount1Out']
+                                    elif decoded_swap_params['amount1Out'] != 0:
+                                        self.logger.warning(f"Expected one of the swap output amounts to be zero for "
+                                                            f"transaction {tx_hash} with contract {contract_address} "
+                                                            f"but amount0Out={decoded_swap_params['amount0Out']} and "
+                                                            f"amount1Out={decoded_swap_params['amount1Out']}")
+                                    exact_amount_in_float = exact_amount_in / (10 ** int(input_token_info['decimals']))
+                                    exact_amount_out_float = exact_amount_out \
+                                                             / (10 ** int(output_token_info['decimals']))
+
+                                    # validate that the exact amounts are somewhat similar to the contract input values
+                                    #     (to make sure we're matching up the right values).
+                                    input_tolerance = requested_input_quantity_float * 0.5  # 50% each side
+                                    acct_tx['input_quantity'] = exact_amount_in_float
+                                    if (exact_amount_in_float > requested_input_quantity_float + input_tolerance)\
+                                            and (exact_amount_in_float < requested_input_quantity_float
+                                                                          - input_tolerance):
+                                        self.logger.warning(f"For transaction {tx_hash} with contract "
+                                                            f"{contract_address}, expected log decoded input quantity "
+                                                            f"{exact_amount_in_float} to be within 50% of the tx input"
+                                                            f"quantity {requested_input_quantity_float} but it's not.")
+                                    output_tolerance = requested_output_quantity_float * 0.5    # 50% each side
+                                    acct_tx['output_quantity'] = exact_amount_out_float
+                                    if (exact_amount_out_float > requested_output_quantity_float + output_tolerance)\
+                                            and (exact_amount_out_float < requested_output_quantity_float
+                                                                          - output_tolerance):
+                                        self.logger.warning(f"For transaction {tx_hash} with contract "
+                                                            f"{contract_address}, expected log decoded output quantity "
+                                                            f"{exact_amount_out_float} to be within 50% of the tx "
+                                                            f"output quantity {requested_output_quantity_float} but "
+                                                            f"it's not.")
+
+                                # elif evt_name == 'Withdrawal':
+                                #     decoded_withdrawal_params = json.loads(decoded_data)
 
             self.transactions[account][timestamp] = acct_tx
         return process_transaction_on_account
 
+    def retrieve_and_cache_contract_abi(self, contract_address):
+        """Retrieve and cache the abi for a contract
+
+        :param contract_address: contract address
+        :type contract_address: str
+        """
+        if contract_address not in self.abis:
+            self.abis[contract_address] = self.moonscan_api.get_contract_abi(contract_address)
+            # if self.abis[contract_address] is not None:
+            #     self.logger.info(f'Contract abi found for {contract_address}.')
+        return self.abis[contract_address]

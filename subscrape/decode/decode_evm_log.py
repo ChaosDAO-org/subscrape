@@ -4,22 +4,24 @@ See article explanation: https://towardsdatascience.com/decoding-ethereum-smart-
 """
 
 __author__ = '@yifei_huang'
+__author__ = 'spazcoin@gmail.com @spazvt'
 
 from eth_utils import event_abi_to_log_topic, to_hex
 from functools import lru_cache
 from hexbytes import HexBytes
 import json
+import traceback
 from web3._utils.events import get_event_data
 from web3.auto import w3
 
 # import "decode_evm_transaction.py" for now, which yifeihuang's original script didn't state that it needed to use.
 # Likely refactor its common methods out into a utilities file.
-from decode_evm_transaction import convert_to_hex
+from subscrape.decode.decode_evm_transaction import convert_to_hex
 
 
 @lru_cache(maxsize=None)
 def _get_topic2abi(abi):
-    if isinstance(abi, (str)):
+    if isinstance(abi, str):
         abi = json.loads(abi)
 
     event_abi = [a for a in abi if a['type'] == 'event']
@@ -57,7 +59,8 @@ def decode_log(data, topics, abi):
 
             return (evt_name, json.dumps(decoded_data), json.dumps(target_schema))
         except Exception:
-            return ('decode error', traceback.format_exc(), None)
+            exception_info = traceback.format_exc()
+            return ('decode error', exception_info, None)
         
     else:
         return ('no matching abi', None, None)

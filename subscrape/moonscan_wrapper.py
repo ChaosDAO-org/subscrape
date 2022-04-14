@@ -1,5 +1,5 @@
-__author__ = 'Tommi Enenkel @alice_und_bob'
 __author__ = 'spazcoin@gmail.com @spazvt'
+__author__ = 'Tommi Enenkel @alice_und_bob'
 
 import httpx
 import json
@@ -86,3 +86,18 @@ class MoonscanWrapper:
         else:
             # response_dict['result'] should contain a long string representation of the contract abi.
             return response_dict['result']
+
+    def get_transaction_receipt(self, tx_hash):
+        """Get a transaction's receipt (so that we can get the logs and figure what exactly happened).
+
+        :param tx_hash: transaction hash
+        :type tx_hash: str
+        :returns: dictionary representing the transaction receipt, or None if not retrievable
+        :rtype: dict or None
+        """
+        params = {"module": "proxy", "action": "eth_getTransactionReceipt", "txhash": tx_hash}
+        response = self.query(params)   # will add on the optional API key
+        response_dict = json.loads(response)
+        # response_dict['result'] should contain a long string representation of the tx receipt.
+        return response_dict['result']
+
