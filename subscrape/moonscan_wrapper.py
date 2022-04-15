@@ -17,7 +17,7 @@ class MoonscanWrapper:
         self.api_key = api_key
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=4, period=1)      # API limits us to 5 calls every second
+    @limits(calls=3, period=1)      # API limits us to 5 calls/second. Occasionally rate limit hit with 4calls/sec.
     def query(self, params):
         if self.api_key is not None:
             params["apikey"] = self.api_key
