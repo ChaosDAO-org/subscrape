@@ -338,7 +338,7 @@ class MoonbeamScraper:
                                         and (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
                                     self.logger.warning(f"For transaction {tx_hash} with contract "
                                                         f"{contract_address}, expected log decoded input quantity "
-                                                        f"{exact_amount_in_float} to be within 50% of the tx input"
+                                                        f"{exact_amount_in_float} to be within 20% of the tx input"
                                                         f"quantity {requested_input_quantity_float} but it's not.")
                                 output_tolerance = requested_output_quantity_float * 0.2  # 20% each side
                                 self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
@@ -347,13 +347,12 @@ class MoonbeamScraper:
                                              - output_tolerance):
                                     self.logger.warning(f"For transaction {tx_hash} with contract "
                                                         f"{contract_address}, expected log decoded output quantity "
-                                                        f"{exact_amount_out_float} to be within 50% of the tx "
+                                                        f"{exact_amount_out_float} to be within 20% of the tx "
                                                         f"output quantity {requested_output_quantity_float} but "
                                                         f"it's not.")
 
-            # refactor code into methods
-            # then add liquidity.
-            # then look for any other transactions I need to handle (staking rewards?)
+            # todo: add liquidity.
+            # todo: look for any other transactions I need to handle (staking rewards?)
             # todo: export data in a csv format to easily read into Excel.
 
         return process_transaction_on_account

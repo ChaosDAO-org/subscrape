@@ -1,7 +1,5 @@
 # subscrape
-A Python scraper for substrate chains that uses Subscan.
-
-This is a growing library of facilities to scrape Substrate and Moonbeam-based chains.
+This is a growing library of Python facilities to scrape Substrate and Moonbeam-based chains. Substrate chains are scraped using Subscan while EVM-based chains use Moonscan.io and Blockscout.io.
 
 The basic workflow of `bin/scrape.py` considers the configuration presented in `data/scrape_config.json` 
 to traverse through the given chains and perform the operations for each chain.
@@ -29,10 +27,13 @@ the delta must be deleted and the scraper run again.
 ## Usage
 
 ### Installation
-  pip install -r .\PipRequirements.txt
+> virtualenv venv
+> venv\scripts\activate
+> pip install -Ur .\PipRequirements.txt
+> bin\scrape.py
 
 ### Subscan API Key
-If you have a Subscan API key, drop it in a file named `config/subscan-key`
+If you have a Subscan API key, drop it in a file named `config/subscan-key`. Similarly, if you have a Moonscan.io API key, drop it in a file named  `config/moonscan-key`.
 
 ### Example applications
 Take a look at the `/bin/` folder. There are some sample applications there.
