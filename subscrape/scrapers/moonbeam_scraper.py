@@ -353,6 +353,7 @@ class MoonbeamScraper:
 
             # todo: add liquidity.
             # todo: look for any other transactions I need to handle (staking rewards?)
+            # todo: simple contract token transfers to other accounts
             # todo: export data in a csv format to easily read into Excel.
 
         return process_transaction_on_account
