@@ -1,7 +1,10 @@
-import json
-import requests
+__author__ = 'Tommi Enenkel @alice_und_bob'
+
 from datetime import datetime
+import httpx
+import json
 import logging
+from ratelimit import limits, sleep_and_retry
 
 #import http.client
 #http.client.HTTPConnection.debuglevel = 1
@@ -9,21 +12,31 @@ import logging
 #requests_log.setLevel(logging.DEBUG)
 #requests_log.propagate = True
 
+SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
+SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
+MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
+
 
 class SubscanWrapper:
-
-    def __init__(self, api_key, endpoint):
+    def __init__(self, chain, api_key=None):
         self.logger = logging.getLogger("SubscanWrapper")
+        self.endpoint = f"https://{chain}.api.subscan.io"
         self.api_key = api_key
-        self.endpoint = endpoint
+        global MAX_CALLS_PER_SEC
+        if api_key is not None:
+            MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
+        self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
 
+    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
+    @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     def query(self, method, headers={}, body={}):
         headers["Content-Type"] = "application/json"
-        headers["x-api-key"] = self.api_key
+        if self.api_key is not None:
+            headers["x-api-key"] = self.api_key
         body = json.dumps(body)
         before = datetime.now()
         url = self.endpoint + method
-        response = requests.post(url, headers = headers, data = body)
+        response = httpx.post(url, headers=headers, data=body)
         after = datetime.now()
         self.logger.debug("request took: " + str(after - before))
 

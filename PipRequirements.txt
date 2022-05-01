@@ -1,7 +1,8 @@
 eth_utils
 hexbytes
+httpx[http2]
 pandas
-requests
+ratelimit
 simplejson
 substrate-interface
-web3>5.0
+web3>5.0 

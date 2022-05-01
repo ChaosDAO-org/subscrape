@@ -2,21 +2,15 @@
 https://gist.github.com/yifeihuang/311d60e8c08b9147d25fd8652d0f6029#file-decode_transaction-py
 See article explanation: https://towardsdatascience.com/decoding-ethereum-smart-contract-data-eed513a65f76"""
 
+__author__ = '@yifei_huang'
+__author__ = 'spazcoin@gmail.com @spazvt'
+
+import json
 import traceback
-import sys
 from functools import lru_cache
 from web3 import Web3
 from web3.auto import w3
-from web3.contract import Contract
-from web3._utils.events import get_event_data
-from web3._utils.abi import exclude_indexed_event_inputs, get_abi_input_names, get_indexed_event_inputs, normalize_event_input_types
-from web3.exceptions import MismatchedABI, LogTopicError
-from web3.types import ABIEvent
 from eth_utils import event_abi_to_log_topic, to_hex
-from hexbytes import HexBytes
-
-import json
-import re
 
 
 def decode_tuple(t, target_field):
@@ -24,7 +18,14 @@ def decode_tuple(t, target_field):
     for i in range(len(t)):
         if isinstance(t[i], (bytes, bytearray)):
             output[target_field[i]['name']] = to_hex(t[i])
-        elif isinstance(t[i], (tuple)):
+        elif isinstance(t[i], list) and len(t[i]) > 0:
+            target = [a for a in target_field if 'name' in a and a['name'] == target_field[i]['name']][0]
+            if target['type'] == 'tuple[]':
+                target_list = target['components']
+                output[target_field[i]['name']] = decode_list_tuple(t[i], target_list)
+            else:
+                output[target_field[i]['name']] = decode_list(t[i])
+        elif isinstance(t[i], tuple):
             output[target_field[i]['name']] = decode_tuple(t[i], target_field[i]['components'])
         else:
             output[target_field[i]['name']] = t[i]
@@ -50,20 +51,21 @@ def decode_list(l):
 
 def convert_to_hex(arg, target_schema):
     """
-    utility function to convert byte codes into human readable and json serializable data structures
+    utility function to iterate through a structure converting all byte codes into hex strings, resulting in a
+    human-readable and json serializable data structure.
     """
     output = dict()
     for k in arg:
         if isinstance(arg[k], (bytes, bytearray)):
             output[k] = to_hex(arg[k])
-        elif isinstance(arg[k], (list)) and len(arg[k]) > 0:
+        elif isinstance(arg[k], list) and len(arg[k]) > 0:
             target = [a for a in target_schema if 'name' in a and a['name'] == k][0]
             if target['type'] == 'tuple[]':
                 target_field = target['components']
                 output[k] = decode_list_tuple(arg[k], target_field)
             else:
                 output[k] = decode_list(arg[k])
-        elif isinstance(arg[k], (tuple)):
+        elif isinstance(arg[k], tuple):
             target_field = [a['components'] for a in target_schema if 'name' in a and a['name'] == k][0]
             output[k] = decode_tuple(arg[k], target_field)
         else:
@@ -77,7 +79,7 @@ def _get_contract(address, abi):
     This helps speed up execution of decoding across a large dataset by caching the contract object
     It assumes that we are decoding a small set, on the order of thousands, of target smart contracts
     """
-    if isinstance(abi, (str)):
+    if isinstance(abi, str):
         abi = json.loads(abi)
 
     contract = w3.eth.contract(address=Web3.toChecksumAddress(address), abi=abi)
@@ -92,9 +94,9 @@ def decode_tx(address, input_data, abi):
             target_schema = [a['inputs'] for a in abi if 'name' in a and a['name'] == func_obj.fn_name][0]
             decoded_func_params = convert_to_hex(func_params, target_schema)
             return (func_obj.fn_name, json.dumps(decoded_func_params), json.dumps(target_schema))
-        except:
-            e = sys.exc_info()[0]
-            return ('decode error', repr(e), None)
+        except Exception:
+            exception_info = traceback.format_exc()
+            return ('decode error', exception_info, None)
     else:
         return ('no matching abi', None, None)
 
