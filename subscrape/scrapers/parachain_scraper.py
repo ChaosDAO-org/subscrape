@@ -143,13 +143,13 @@ class ParachainScraper:
         body = {"module": call_module, "call": call_name}
         self.api.iterate_pages(
             method,
-            extrinsics_storage.write_extrinsic,
+            extrinsics_storage.write_item,
             list_key="extrinsics",
             body=body,
             filter=call_config.filter
             )
 
-        extrinsics_storage.flush_extrinsics()
+        extrinsics_storage.flush_sector()
 
 """
 

@@ -36,7 +36,13 @@ class SubscrapeDB:
         self._transfers_dirty = False
 
     def storage_manager_for_extrinsics_call(self, call_module, call_name):
-        return SectorizedStorageManager(self._path, self._parachain, call_module, call_name)
+        """
+        returns a `SectorizedStorageManager` to store and retrieve extrinsics
+        """
+        folder = f"{self._path}extrinsics_{call_module}_{call_name}/"
+        description = f"{self._parachain} {call_module}.{call_name}"
+        index_for_item = lambda item: item["extrinsic_index"]
+        return SectorizedStorageManager(folder, description, index_for_item)
 
     # Transfers
 
