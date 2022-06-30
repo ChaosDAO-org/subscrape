@@ -16,7 +16,8 @@ config = {
 db = SubscrapeDB("Kusama")
 
 def fetch_swaps():
-    extrinsics = db.extrinsics_iter("crowdloan", "contribute")
+    extrinsics_storage = db.storage_manager_for_extrinsics_call("utility", "batch_all")
+    extrinsics = extrinsics_storage.get_iter()
 
     for index, extrinsic in extrinsics:
         params = json.loads(extrinsic["params"])

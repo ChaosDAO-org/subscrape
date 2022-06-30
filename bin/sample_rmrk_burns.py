@@ -40,7 +40,8 @@ def extract_interesting_extrinsic_properties(extrinsic):
     return result
 
 def fetch_burns():
-    extrinsics = db.extrinsics_iter("utility", "batch_all")
+    extrinsics_storage = db.storage_manager_for_extrinsics_call("utility", "batch_all")
+    extrinsics = extrinsics_storage.get_iter()
 
     for index, extrinsic in extrinsics:
         params = json.loads(extrinsic["params"])
