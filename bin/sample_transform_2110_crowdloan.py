@@ -39,7 +39,8 @@ def extract_interesting_extrinsic_properties(extrinsic):
 
 
 def fetch_direct_contributions():
-    extrinsics = db.extrinsics_iter("crowdloan", "contribute")
+    extrinsics_storage = db.storage_manager_for_extrinsics_call("crowdloan", "contribute")
+    extrinsics = extrinsics_storage.extrinsics_iter()
 
     for index, extrinsic in extrinsics:
         params = json.loads(extrinsic["params"])
@@ -53,7 +54,8 @@ def fetch_direct_contributions():
 
 
 def fetch_batch_contributions():
-    extrinsics = db.extrinsics_iter("utility", "batch_all")
+    extrinsics_storage = db.storage_manager_for_extrinsics_call("utility", "batch_all")
+    extrinsics = extrinsics_storage.extrinsics_iter()
 
     for index, extrinsic in extrinsics:
         params = json.loads(extrinsic["params"])

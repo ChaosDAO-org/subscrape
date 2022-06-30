@@ -4,6 +4,7 @@ import logging
 from tkinter import NONE
 from typing import List
 from substrateinterface.utils import ss58
+from subscrape.db.subscrape_db import SubscrapeDB
 
 
 # A generic scraper for parachains
@@ -11,7 +12,7 @@ class ParachainScraper:
 
     def __init__(self, db, api):
         self.logger = logging.getLogger("ParachainScraper")
-        self.db = db
+        self.db:SubscrapeDB = db
         self.api = api
 
     def scrape(self, operations, chain_config):
@@ -133,7 +134,7 @@ class ParachainScraper:
 
         if call_config.digits_per_sector is not None:
             self.db.digits_per_sector = call_config.digits_per_sector
-        self.db.set_active_extrinsics_call(call_module, call_name)
+        extrinsics_storage = self.db.storage_manager_for_extrinsics_call(call_module, call_name)
 
         self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
 
@@ -142,13 +143,13 @@ class ParachainScraper:
         body = {"module": call_module, "call": call_name}
         self.api.iterate_pages(
             method,
-            self.db.write_extrinsic,
+            extrinsics_storage.write_extrinsic,
             list_key="extrinsics",
             body=body,
             filter=call_config.filter
             )
 
-        self.db.flush_extrinsics()
+        extrinsics_storage.flush_extrinsics()
 
 """
 
