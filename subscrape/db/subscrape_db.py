@@ -35,14 +35,21 @@ class SubscrapeDB:
         #: bool: a dirty flag that keeps track of unsaved transfers
         self._transfers_dirty = False
 
-    def storage_manager_for_extrinsics_call(self, call_module, call_name):
+    def storage_manager_for_extrinsics_call(self, module, call):
         """
         returns a `SectorizedStorageManager` to store and retrieve extrinsics
         """
-        folder = f"{self._path}extrinsics_{call_module}_{call_name}/"
-        description = f"{self._parachain} {call_module}.{call_name}"
+        folder = f"{self._path}extrinsics_{module}_{call}/"
+        description = f"{self._parachain} {module}.{call}"
         index_for_item = lambda item: item["extrinsic_index"]
         return SectorizedStorageManager(folder, description, index_for_item)
+
+    def storage_manager_for_events_call(self, module, event):
+        folder = f"{self._path}events_{module}_{event}/"
+        description = f"{self._parachain} {module}.{event}"
+        index_for_item = lambda item: item["event_index"]
+        return SectorizedStorageManager(folder, description, index_for_item)
+
 
     # Transfers
 
