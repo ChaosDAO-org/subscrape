@@ -1,6 +1,7 @@
 # project specific
 
 subscan-key
+moonscan-key
 .vscode/
 data/
 config/scrape_config.json

@@ -1,3 +1,5 @@
+__author__ = 'Tommi Enenkel @alice_und_bob'
+
 import copy
 
 
