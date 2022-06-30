@@ -2,14 +2,24 @@ import logging
 import os
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
+from subscrape.blockscout_wrapper import BlockscoutWrapper
 from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
 
+
 def moonscan_factory(chain):
-    endpoint = f"https://api-{chain}.moonscan.io/api"
-    return MoonscanWrapper(endpoint)
+    moonscan_key = None
+    if os.path.exists("config/moonscan-key"):
+        f = open("config/moonscan-key")
+        moonscan_key = f.read()
+
+    return MoonscanWrapper(chain, moonscan_key)
+
+
+def blockscout_factory(chain):
+    return BlockscoutWrapper(chain)
 
 
 def subscan_factory(chain):
@@ -18,8 +28,7 @@ def subscan_factory(chain):
         f = open("config/subscan-key")
         subscan_key = f.read()
 
-    endpoint = f"https://{chain}.api.subscan.io"
-    return SubscanWrapper(subscan_key, endpoint)
+    return SubscanWrapper(chain, subscan_key)
 
 
 def scraper_factory(name):
@@ -28,13 +37,14 @@ def scraper_factory(name):
         if not os.path.exists(db_path):
             os.makedirs(db_path)
         db_path += f'/{name}_'
-        api = moonscan_factory(name)
-        scraper = MoonbeamScraper(db_path, api)
+        moonscan_api = moonscan_factory(name)
+        blockscout_api = blockscout_factory(name)
+        scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
         return scraper
     else:
         db = SubscrapeDB(name)
-        api = subscan_factory(name)
-        scraper = ParachainScraper(db, api)
+        subscan_api = subscan_factory(name)
+        scraper = ParachainScraper(db, subscan_api)
         return scraper
 
 
@@ -53,7 +63,6 @@ def scrape(chains):
         if chain_config.skip:
             logging.info(f"Config asks to skip chain {chain}")
             continue
-
 
         parachain_scraper = scraper_factory(chain)
         parachain_scraper.scrape(operations, chain_config)

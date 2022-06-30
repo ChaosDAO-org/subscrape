@@ -6,21 +6,15 @@ import json
 import logging
 from ratelimit import limits, sleep_and_retry
 
-# "Powered by https://moonbeam.moonscan.io APIs"
-#https://moonbeam.moonscan.io/apis#contracts
 
-
-class MoonscanWrapper:
-    def __init__(self, chain, api_key=None):
-        self.logger = logging.getLogger("MoonscanWrapper")
-        self.endpoint = f"https://api-{chain}.moonscan.io/api"
-        self.api_key = api_key
+class BlockscoutWrapper:
+    def __init__(self, chain):
+        self.logger = logging.getLogger("BlockscoutWrapper")
+        self.endpoint = f"https://blockscout.{chain}.moonbeam.network/api"
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=3, period=1)      # API limits us to 5 calls/second. Occasionally rate limit hit with 4calls/sec.
+    @limits(calls=5, period=1)      # No API limit stated on Blockscout website, so choose conservative 5 calls/sec
     def query(self, params):
-        if self.api_key is not None:
-            params["apikey"] = self.api_key
         response = httpx.get(self.endpoint, params=params)
         self.logger.debug(response)
         return response.text
@@ -78,7 +72,7 @@ class MoonscanWrapper:
         :rtype: str or None
         """
         params = {"module": "contract", "action": "getabi", "address": contract_address}
-        response = self.query(params)   # will add on the optional API key
+        response = self.query(params)
         response_dict = json.loads(response)
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
             self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"')
@@ -87,17 +81,20 @@ class MoonscanWrapper:
             # response_dict['result'] should contain a long string representation of the contract abi.
             return response_dict['result']
 
-    def get_transaction_receipt(self, tx_hash):
-        """Get a transaction's receipt (so that we can get the logs and figure what exactly happened).
+    def get_token_info(self, token_address):
+        """Get a token's basic info (name, ticker symbol, decimal places)
 
-        :param tx_hash: transaction hash
-        :type tx_hash: str
-        :returns: dictionary representing the transaction receipt, or None if not retrievable
+        :param token_address: token address
+        :type token_address: str
+        :returns: dictionary of values about the token, or None if not retrievable
         :rtype: dict or None
         """
-        params = {"module": "proxy", "action": "eth_getTransactionReceipt", "txhash": tx_hash}
-        response = self.query(params)   # will add on the optional API key
+        params = {"module": "token", "action": "getToken", "contractaddress": token_address}
+        response = self.query(params)
         response_dict = json.loads(response)
-        # response_dict['result'] should contain a long string representation of the tx receipt.
-        return response_dict['result']
-
+        if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
+            self.logger.info(f'Token info not retrievable for {token_address} because "{response_dict["result"]}"')
+            return None
+        else:
+            # response_dict['result'] should contain the info about the token.
+            return response_dict['result']

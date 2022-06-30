@@ -5,6 +5,7 @@ import pandas as pd
 import subscrape
 from subscrape.db.subscrape_db import SubscrapeDB
 
+
 def scrape(addresses, chains):
     logging.info("scraping...")
     for chain in chains:

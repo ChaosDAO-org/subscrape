@@ -2,9 +2,13 @@ from audioop import add
 import logging
 import json
 import os
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 import subscrape
 
 log_level = logging.INFO
+
 
 def main():
     """Loads `config/scrape_config.json and iterates over all chains present in the config.
