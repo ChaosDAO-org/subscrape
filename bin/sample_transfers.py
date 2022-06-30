@@ -20,7 +20,7 @@ def main():
     subscrape.scrape(config)
 
     logging.info("transforming...")
-    db = SubscrapeDB("Kusama")
+    db = SubscrapeDB("kusama")
     transfers = db.transfers_iter(ksm_treasury)
     columns = list(transfers[0].keys())
     rows = []

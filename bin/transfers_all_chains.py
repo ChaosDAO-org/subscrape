@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import pandas as pd
-from substrateinterface.utils import ss58
 import subscrape
 from subscrape.db.subscrape_db import SubscrapeDB
 

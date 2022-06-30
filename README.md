@@ -1,6 +1,8 @@
 # subscrape
 A Python scraper for substrate chains that uses Subscan.
 
+Roadmap: https://app.subsocial.network/@alice_und_bob/subscrape-releasing-v1-0-and-roadmap-for-v2-0-32075
+
 This is a growing library of facilities to scrape Substrate and Moonbeam-based chains.
 
 The basic workflow of `bin/scrape.py` considers the configuration presented in `data/scrape_config.json` 
