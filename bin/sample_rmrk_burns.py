@@ -1,3 +1,7 @@
+#batchall
+#"remark": "RMRK::BURN::2.0.0::12269737-e0b9bdcc456a36497a-KANCHAMP-LNDDC-00006123"
+# address
+
 import csv
 import json
 from subscrape.db.subscrape_db import SubscrapeDB
@@ -8,8 +12,7 @@ import subscrape
 config = {
     "kusama":{
         "extrinsics":{
-            "utility": ["batch_all"],
-            "crowdloan": ["contribute"]
+            "utility": ["batch_all"]
         }
     }
 }
@@ -20,7 +23,6 @@ rows =  [["type", "value", "referral"]]
 rows[0].extend(interesting_rows)
 
 db = SubscrapeDB("Kusama")
-
 
 def unwrap_params(params):
     result = {}
@@ -37,23 +39,7 @@ def extract_interesting_extrinsic_properties(extrinsic):
         result.append(extrinsic[key])
     return result
 
-
-def fetch_direct_contributions():
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("crowdloan", "contribute")
-    extrinsics = extrinsics_storage.get_iter()
-
-    for index, extrinsic in extrinsics:
-        params = json.loads(extrinsic["params"])
-        params = unwrap_params(params)
-        if params["index"] == 2110 and extrinsic["success"] == True:
-            #account_id = extrinsic["account_id"]
-            value = params["value"]
-            row = ["direct", value, ""]
-            row.extend(extract_interesting_extrinsic_properties(extrinsic))
-            rows.append(row)
-
-
-def fetch_batch_contributions():
+def fetch_burns():
     extrinsics_storage = db.storage_manager_for_extrinsics_call("utility", "batch_all")
     extrinsics = extrinsics_storage.get_iter()
 
@@ -61,9 +47,9 @@ def fetch_batch_contributions():
         params = json.loads(extrinsic["params"])
         params = unwrap_params(params)
         calls = params["calls"]
-        if calls is not None:
+        if calls is not None and len(calls) == 2:
             for call in calls:
-                if call["call_module"] == "Crowdloan" and call["call_name"] == "contribute":
+                if call["call_module"] == "System" and call["call_name"] == "remark":
                     if call["params"][0]["value"] == 2110:
                         assert(len(calls) == 2) # make sure we are not missing anything
                         contribute_call = calls[0]
@@ -90,12 +76,12 @@ def main():
     logging.info("scraping")
     subscrape.scrape(config)
     logging.info("transforming")
-    fetch_direct_contributions()
-    fetch_batch_contributions()
-    file_path = "data/transforms/transform.csv"
+    fetch_burns()
+    file_path = "data/transforms/burns.csv"
     with open(file_path, "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(rows)
+
 
 
 if __name__ == "__main__":
