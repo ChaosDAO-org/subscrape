@@ -23,7 +23,7 @@ class SectorizedStorageManager:
         #: bool: a dirty flag that keeps track of unsaved items
         self._dirty = False
         #: int: the number of digits of blocks a sector takes, e.g. 4 -> 1e4 blocks per sector
-        self._digits_per_sector = 4
+        self.digits_per_sector = 4
 
         self._clear_sector_state()
 
@@ -52,9 +52,9 @@ class SectorizedStorageManager:
         # determine the sector
         index = self._index_for_item(item)
         sector = index.split("-")[0]
-        suffix = "x" * self._digits_per_sector
-        if(len(sector) > self._digits_per_sector):
-            sector = sector[:-self._digits_per_sector] + suffix
+        suffix = "x" * self.digits_per_sector
+        if(len(sector) > self.digits_per_sector):
+            sector = sector[:-self.digits_per_sector] + suffix
         else:
             sector = suffix
 

@@ -31,7 +31,10 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                self.scrape_extrinsics(modules, chain_config)
+                self.scrape_module_calls(modules, chain_config, self.fetch_extrinsics)
+            elif operation == "events":
+                modules = operations[operation]
+                self.scrape_module_calls(modules, chain_config, self.fetch_events)
             elif operation == "transfers":
                 accounts = operations[operation]
                 self.scrape_transfers(accounts, chain_config)
@@ -99,7 +102,7 @@ class ParachainScraper:
 
         self.db.flush_transfers()
 
-    def scrape_extrinsics(self, modules, chain_config):
+    def scrape_module_calls(self, modules, chain_config, fetch_function):
         extrinsic_config = chain_config.create_inner_config(modules)
 
         for module in modules:
@@ -127,30 +130,47 @@ class ParachainScraper:
                     continue
 
                 # go
-                self.fetch_extrinsics(module, call, call_config)
+                fetch_function(module, call, call_config)
 
-    def fetch_extrinsics(self, call_module, call_name, call_config):
-        call_string = f"{call_module}_{call_name}"
+    def fetch_extrinsics(self, module, call, config):
+        extrinsics_storage = self.db.storage_manager_for_extrinsics_call(module, call)
+        if config.digits_per_sector is not None:
+            extrinsics_storage.digits_per_sector = config.digits_per_sector
 
-        if call_config.digits_per_sector is not None:
-            self.db.digits_per_sector = call_config.digits_per_sector
-        extrinsics_storage = self.db.storage_manager_for_extrinsics_call(call_module, call_name)
-
-        self.logger.info(f"Fetching extrinsics {call_string} from {self.api.endpoint}")
+        self.logger.info(f"Fetching extrinsic {module}.{call} from {self.api.endpoint}")
 
         method = "/api/scan/extrinsics"
 
-        body = {"module": call_module, "call": call_name}
+        body = {"module": module, "call": call}
         self.api.iterate_pages(
             method,
             extrinsics_storage.write_item,
             list_key="extrinsics",
             body=body,
-            filter=call_config.filter
+            filter=config.filter
             )
 
         extrinsics_storage.flush_sector()
 
+    def fetch_events(self, module, call, config):
+        extrinsics_storage = self.db.storage_manager_for_events_call(module, call)
+        if config.digits_per_sector is not None:
+            extrinsics_storage.digits_per_sector = config.digits_per_sector
+
+        self.logger.info(f"Fetching events {module}.{call} from {self.api.endpoint}")
+
+        method = "/api/scan/events"
+
+        body = {"module": module, "call": call}
+        self.api.iterate_pages(
+            method,
+            extrinsics_storage.write_item,
+            list_key="events",
+            body=body,
+            filter=config.filter
+            )
+
+        extrinsics_storage.flush_sector()
 """
 
     def fetch_addresses(self):
