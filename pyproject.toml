@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "subscrape"
+version = "1.1.0"
+authors = [
+  { name="Tommi Enenkel", email="tommi.enenkel@gmail.com" },
+  { name="spaz", email="spazcoin@gmail.com" }
+]
+description = "A Python scraper for substrate chains"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ChaosDAO-org/subscrape"
+"Bug Tracker" = "https://github.com/ChaosDAO-org/subscrape/issues"
