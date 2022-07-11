@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "subscrape"
-version = "1.1.0"
+version = "1.0.1-rc.1"
 authors = [
   { name="Tommi Enenkel", email="tommi.enenkel@gmail.com" },
   { name="spaz", email="spazcoin@gmail.com" }
@@ -13,6 +13,16 @@ description = "A Python scraper for substrate chains"
 readme = "README.md"
 license = { file="LICENSE" }
 requires-python = ">=3.7"
+dependencies = [
+  "eth_utils",
+  "hexbytes",
+  "httpx[http2]",
+  "pandas",
+  "ratelimit",
+  "simplejson",
+  "substrate-interface",
+  "web3>5.0"
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
