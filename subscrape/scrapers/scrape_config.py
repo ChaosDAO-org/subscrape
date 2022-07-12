@@ -12,6 +12,13 @@ class ScrapeConfig:
         self._set_config(config)
 
     def _set_config(self, config):
+        """
+        Extract metadata from the config file indicating where filtering or skipping should occur. Use that to generate
+        filter methods which will be applied to the list of transactions.
+
+        :param config: JSON dict of the scrape config
+        :type config: dict
+        """
         if type(config) is list:
             return
 
@@ -31,18 +38,33 @@ class ScrapeConfig:
         if digits_per_sector is not None:
             self.digits_per_sector = digits_per_sector
 
-    # creates a config that can be nested to lower layers
     def create_inner_config(self, config):
+        """
+        creates a config that can be nested to lower layers
+
+        :param config: JSON dict of the scrape config
+        :type config: dict
+        """
         result = copy.deepcopy(self)
         result._set_config(config)
         return result
 
-    # returns true if the extrinsic should be skipped because it hits a filter condition
     def _filter_factory(self, conditions):
+        """
+        Generates a filter method based on the conditions passed in (from the config file)
+
+        :param conditions: list of filter conditions to apply
+        :type conditions: list
+        :returns: filter method that returns true if an extrinsic should be skipped because it hits a
+        filter condition
+        """
         if conditions is None:
             return None
 
         def filter(extrinsic):
+            """
+            :returns: true if the extrinsic should be skipped because it hits a filter condition
+            """
             for group in conditions:
                 for key in group:
                     if key not in extrinsic:

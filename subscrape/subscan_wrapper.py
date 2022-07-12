@@ -18,6 +18,7 @@ MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 
 class SubscanWrapper:
+    """Interface for interacting with the API of explorer Subscan.io for the Moonriver and Moonbeam chains."""
     def __init__(self, chain, api_key=None):
         self.logger = logging.getLogger("SubscanWrapper")
         self.endpoint = f"https://{chain}.api.subscan.io"
@@ -30,6 +31,15 @@ class SubscanWrapper:
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     def query(self, method, headers={}, body={}):
+        """Rate limited call to fetch another page of data from the Subscan.io block explorer website
+
+        :param method: Subscan.io API call method.
+        :type method: str
+        :param headers: Subscan.io API call headers.
+        :type headers: list
+        :param headers: Subscan.io API call body. Typically, used to specify each page being requested.
+        :type body: list
+        """
         headers["Content-Type"] = "application/json"
         if self.api_key is not None:
             headers["x-api-key"] = self.api_key
@@ -52,6 +62,19 @@ class SubscanWrapper:
     # iterates through all pages until it processed all elements
     # or gets False from the processor
     def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
+        """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
+        time. Perform post-processing of each transaction using the `element_processor` method provided.
+        :param method: Subscan.io API call method.
+        :type method: str
+        :param element_processor: method to process each transaction as it is received
+        :type element_processor: function
+        :param list_key: whether `events` or `extrinsics` should be looked for
+        :type list_key: str or None
+        :param body: Subscan.io API call body. Typically, used to specify each page being requested.
+        :type body: list
+        :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
+        :type filter: function
+        """
         assert(list_key is not None)
 
         done = False        # keep crunching until we are done

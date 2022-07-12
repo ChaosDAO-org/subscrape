@@ -21,6 +21,12 @@ from subscrape.decode.decode_evm_transaction import convert_to_hex
 
 @lru_cache(maxsize=None)
 def _get_topic2abi(abi):
+    """
+    get a list of topics in the abi
+
+    :param abi: "application binary interface" defines the types in the interface for a contract
+    :type abi: dict
+    """
     if isinstance(abi, str):
         abi = json.loads(abi)
 
@@ -31,11 +37,29 @@ def _get_topic2abi(abi):
 
 @lru_cache(maxsize=None)
 def _get_hex_topic(t):
+    """
+    convert a log topic to a hex string
+
+    :param t: topic to convert to a hex string
+    :type t: bytearray
+    """
     hex_t = HexBytes(t)
     return hex_t
 
 
 def decode_log(data, topics, abi):
+    """
+    This helps speed up execution of decoding across a large dataset by caching the contract object
+    It assumes that we are decoding a small set, on the order of thousands, of target smart contracts
+
+    :param data: event parameter values
+    :type data: HexStr
+    :param topics: first element represents the hashed signature of the event interface definition. Additional
+    elements are usually blockchain addresses involved in the event.
+    :type topics: bytearray
+    :param abi: "application binary interface" defines the types in the interface for a contract
+    :type abi: dict
+    """
     if abi is not None:
         try:
             topic2abi = _get_topic2abi(abi)

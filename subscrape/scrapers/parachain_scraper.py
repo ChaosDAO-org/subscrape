@@ -1,18 +1,17 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import logging
-from tkinter import NONE
-from typing import List
 from substrateinterface.utils import ss58
 from subscrape.db.subscrape_db import SubscrapeDB
 
 
 # A generic scraper for parachains
 class ParachainScraper:
+    """Scrape a substrate-based (non-EVM) chain for transactions/accounts of interest."""
 
     def __init__(self, db, api):
         self.logger = logging.getLogger("ParachainScraper")
-        self.db:SubscrapeDB = db
+        self.db: SubscrapeDB = db
         self.api = api
 
     def scrape(self, operations, chain_config):
@@ -103,6 +102,16 @@ class ParachainScraper:
         self.db.flush_transfers()
 
     def scrape_module_calls(self, modules, chain_config, fetch_function):
+        """
+        Scrapes all module calls that belong to the list of accounts.
+
+        :param modules: dict of extrinsic modules to look for, like `system`, `utility`, etc
+        :type modules: dict
+        :param chain_config: the `ScrapeConfig`
+        :type chain_config: ScrapeConfig
+        :param fetch_function: the method to call to scrape extrinsics vs events etc
+        :type fetch_function: function
+        """
         extrinsic_config = chain_config.create_inner_config(modules)
 
         for module in modules:
@@ -133,6 +142,16 @@ class ParachainScraper:
                 fetch_function(module, call, call_config)
 
     def fetch_extrinsics(self, module, call, config):
+        """
+        Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
+
+        :param module: extrinsic module to look for, like `system`, `utility`, etc
+        :type module: str
+        :param call: extrinsic module's specific 'call' or method, like system's `remark` call.
+        :type call: str
+        :param config: the `ScrapeConfig`
+        :type config: ScrapeConfig
+        """
         extrinsics_storage = self.db.storage_manager_for_extrinsics_call(module, call)
         if config.digits_per_sector is not None:
             extrinsics_storage.digits_per_sector = config.digits_per_sector
@@ -153,6 +172,16 @@ class ParachainScraper:
         extrinsics_storage.flush_sector()
 
     def fetch_events(self, module, call, config):
+        """
+        Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
+
+        :param module: extrinsic module to look for, like `system`, `utility`, etc
+        :type module: str
+        :param call: extrinsic module's specific 'call' or method, like system's `remark` call.
+        :type call: str
+        :param config: the `ScrapeConfig`
+        :type config: ScrapeConfig
+        """
         extrinsics_storage = self.db.storage_manager_for_events_call(module, call)
         if config.digits_per_sector is not None:
             extrinsics_storage.digits_per_sector = config.digits_per_sector

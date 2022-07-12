@@ -4,7 +4,6 @@ __author__ = 'Tommi Enenkel @alice_und_bob'
 from datetime import datetime
 import os
 import logging
-from pathlib import Path
 import simplejson as json
 import io
 import eth_utils
@@ -15,6 +14,7 @@ from subscrape.decode.decode_evm_log import decode_log
 
 
 class MoonbeamScraper:
+    """Scrape the Moonbeam or Moonriver chains for transactions/accounts of interest."""
     def __init__(self, db_path, moonscan_api, blockscout_api):
         self.logger = logging.getLogger("MoonbeamScraper")
         self.db_path = db_path
@@ -26,6 +26,18 @@ class MoonbeamScraper:
         self.tokens = {}  # cache of token contract basic info
 
     def scrape(self, operations, chain_config):
+        """According to the operations specified, parse the blockchain specified to extract useful info/transactions.
+
+        :param operations: a dict of operations specified in the config file. Each operation specifies the type of
+        analysis to perform while scraping data from the chain. Each contains a sub-dictionary specifying options for
+        the operation.
+            operation `transactions` is used to extract all transactions interacting with specific methods of specific
+            smart contracts.
+            operation 'account_transactions' is used to extract all transactions from a specific account.
+        :type operations: dict
+        :param chain_config: structure specifying whether to skip or filter certain sections of the operations to be performed.
+        :type chain_config: object
+        """
         for operation in operations:
             # ignore metadata
             if operation.startswith("_"):
