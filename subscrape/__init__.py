@@ -10,6 +10,12 @@ from subscrape.scrapers.scrape_config import ScrapeConfig
 
 
 def moonscan_factory(chain):
+    """
+    Return a configured Moonscan API interface, including API key to speed up transactions
+
+    :param chain: name of the specific EVM chain
+    :type chain: str
+    """
     moonscan_key = None
     if os.path.exists("config/moonscan-key"):
         f = open("config/moonscan-key")
@@ -19,10 +25,22 @@ def moonscan_factory(chain):
 
 
 def blockscout_factory(chain):
+    """
+    Return a configured Blockscout API interface
+
+    :param chain: name of the specific EVM chain
+    :type chain: str
+    """
     return BlockscoutWrapper(chain)
 
 
 def subscan_factory(chain):
+    """
+    Return a configured Subscan API interface, including API key to speed up transactions
+
+    :param chain: name of the specific substrate chain
+    :type chain: str
+    """
     subscan_key = None
     if os.path.exists("config/subscan-key"):
         f = open("config/subscan-key")
@@ -32,6 +50,12 @@ def subscan_factory(chain):
 
 
 def scraper_factory(name):
+    """
+    Configure and return a configured object ready to scrape one or more Dotsama EVM or substrate-based chains
+
+    :param name: name of the specific chain
+    :type name: str
+    """
     if name == "moonriver" or name == "moonbeam":
         db_path = f"data/parachains"
         if not os.path.exists(db_path):
@@ -49,6 +73,13 @@ def scraper_factory(name):
 
 
 def scrape(chains):
+    """
+    For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
+    on the config file.
+
+    :param chains: list of chains to scrape
+    :type chains: list
+    """
     scrape_config = ScrapeConfig(chains)
 
     for chain in chains:

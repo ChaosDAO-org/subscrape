@@ -7,10 +7,11 @@ import logging
 from ratelimit import limits, sleep_and_retry
 
 # "Powered by https://moonbeam.moonscan.io APIs"
-#https://moonbeam.moonscan.io/apis#contracts
+# https://moonbeam.moonscan.io/apis#contracts
 
 
 class MoonscanWrapper:
+    """Interface for interacting with the API of explorer Moonscan.io for the Moonriver and Moonbeam chains."""
     def __init__(self, chain, api_key=None):
         self.logger = logging.getLogger("MoonscanWrapper")
         self.endpoint = f"https://api-{chain}.moonscan.io/api"
@@ -19,6 +20,11 @@ class MoonscanWrapper:
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     @limits(calls=3, period=1)      # API limits us to 5 calls/second. Occasionally rate limit hit with 4calls/sec.
     def query(self, params):
+        """Rate limited call to fetch another page of data from the Moonscan.io block explorer website
+
+        :param params: Moonscan.io API call params that filter which transactions are returned.
+        :type params: list
+        """
         if self.api_key is not None:
             params["apikey"] = self.api_key
         response = httpx.get(self.endpoint, params=params)
@@ -26,6 +32,13 @@ class MoonscanWrapper:
         return response.text
 
     def iterate_pages(self, element_processor, params={}):
+        """Repeatedly fetch transactions from Moonscan.io matching a set of parameters, iterating one html page at a
+        time. Perform post-processing of each transaction using the `element_processor` method provided.
+        :param element_processor: method to process each transaction as it is received
+        :type element_processor: function
+        :param params: Moonscan.io API call params that filter which transactions are returned.
+        :type params: function
+        """
         done = False            # keep crunching until we are done
         start_block = 0         # iterator for the page we want to query
         previous_block = 0      # to check if the iterator actually moved forward

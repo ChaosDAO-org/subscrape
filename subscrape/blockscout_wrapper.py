@@ -8,6 +8,7 @@ from ratelimit import limits, sleep_and_retry
 
 
 class BlockscoutWrapper:
+    """Interface for interacting with the API of the Blockscout explorer for the Moonriver and Moonbeam chains."""
     def __init__(self, chain):
         self.logger = logging.getLogger("BlockscoutWrapper")
         self.endpoint = f"https://blockscout.{chain}.moonbeam.network/api"
@@ -15,11 +16,23 @@ class BlockscoutWrapper:
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     @limits(calls=5, period=1)      # No API limit stated on Blockscout website, so choose conservative 5 calls/sec
     def query(self, params):
+        """Rate limited call to fetch another page of data from the Blockscout block explorer website
+
+        :param params: Blockscout API call params that filter which transactions are returned.
+        :type params: list
+        """
         response = httpx.get(self.endpoint, params=params)
         self.logger.debug(response)
         return response.text
 
     def iterate_pages(self, element_processor, params={}):
+        """Repeatedly fetch transactions from Blockscout matching a set of parameters, iterating one html page at a
+        time. Perform post-processing of each transaction using the `element_processor` method provided.
+        :param element_processor: method to process each transaction as it is received
+        :type element_processor: function
+        :param params: Blockscout API call params that filter which transactions are returned.
+        :type params: function
+        """
         done = False            # keep crunching until we are done
         start_block = 0         # iterator for the page we want to query
         previous_block = 0      # to check if the iterator actually moved forward

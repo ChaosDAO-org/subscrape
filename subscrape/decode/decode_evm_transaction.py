@@ -14,6 +14,14 @@ from eth_utils import event_abi_to_log_topic, to_hex
 
 
 def decode_tuple(t, target_field):
+    """
+    utility function to convert byte codes into hex strings within a tuple.
+
+    :param t: tuple of items to convert
+    :type t: tuple
+    :param target_field: list of structures from the abi, for determining the human-readable label for data
+    :type target_field: list
+    """
     output = dict()
     for i in range(len(t)):
         if isinstance(t[i], (bytes, bytearray)):
@@ -33,6 +41,14 @@ def decode_tuple(t, target_field):
 
 
 def decode_list_tuple(l, target_field):
+    """
+    utility function to convert byte codes into hex strings within a tuple list.
+
+    :param l: tuple list of items to convert
+    :type l: list
+    :param target_field: list of structures from the abi, for determining the human-readable label for data
+    :type target_field: list
+    """
     output = l
     for i in range(len(l)):
         output[i] = decode_tuple(l[i], target_field)
@@ -40,6 +56,12 @@ def decode_list_tuple(l, target_field):
 
 
 def decode_list(l):
+    """
+    utility function to convert byte codes into hex strings within a list.
+
+    :param l: list of items to convert
+    :type l: list
+    """
     output = l
     for i in range(len(l)):
         if isinstance(l[i], (bytes, bytearray)):
@@ -53,6 +75,11 @@ def convert_to_hex(arg, target_schema):
     """
     utility function to iterate through a structure converting all byte codes into hex strings, resulting in a
     human-readable and json serializable data structure.
+
+    :param arg: list of function params to convert
+    :type arg: list
+    :param target_schema: schema defining contract abi with structure types
+    :type target_schema: dict
     """
     output = dict()
     for k in arg:
@@ -78,6 +105,11 @@ def _get_contract(address, abi):
     """
     This helps speed up execution of decoding across a large dataset by caching the contract object
     It assumes that we are decoding a small set, on the order of thousands, of target smart contracts
+
+    :param address: blockchain address of the contract to examine
+    :type address: str
+    :param abi: "application binary interface" defines the types in the interface for a contract
+    :type abi: dict
     """
     if isinstance(abi, str):
         abi = json.loads(abi)
@@ -87,6 +119,17 @@ def _get_contract(address, abi):
 
 
 def decode_tx(address, input_data, abi):
+    """
+    This helps speed up execution of decoding across a large dataset by caching the contract object
+    It assumes that we are decoding a small set, on the order of thousands, of target smart contracts
+
+    :param address: blockchain address of the contract to examine
+    :type address: str
+    :param input_data: contract call input data which encodes all the method inputs
+    :type input_data: HexStr
+    :param abi: "application binary interface" defines the types in the interface for a contract
+    :type abi: dict
+    """
     if abi is not None:
         try:
             (contract, abi) = _get_contract(address, abi)
