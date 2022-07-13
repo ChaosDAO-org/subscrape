@@ -203,12 +203,13 @@ class MoonbeamScraper:
                         contract_method_name = decoded_transaction[0]
                         decoded_func_params = json.loads(decoded_transaction[1])
 
-                        # todo: add support for "swapETHForTokens" methods (which don't specify an input quantity?)
                         # todo: interpret liquidity provisioning and other events
                         if contract_method_name in {'swapExactTokensForTokens', 'swapTokensForExactTokens',
                                                     'swapExactTokensForETH', 'swapTokensForExactETH',
                                                     'swapExactTokensForTokensSupportingFeeOnTransferTokens',
-                                                    'swapExactTokensForETHSupportingFeeOnTransferTokens'}:
+                                                    'swapExactTokensForETHSupportingFeeOnTransferTokens',
+                                                    'swapETHForTokens', 'swapExactETHForTokens'}:
+                            self.transactions[account][timestamp]['action'] = 'token swap'
                             token_path = decoded_func_params['path']
                             # retrieve and cache the token info for all tokens
                             for token in token_path:
@@ -218,11 +219,11 @@ class MoonbeamScraper:
                             input_token = token_path[0]
                             input_token_info = self.tokens[input_token]
                             self.transactions[account][timestamp]['input_token_name'] = input_token_info['name']
-                            self.transactions[account][timestamp]['input_symbol'] = input_token_info['symbol']
+                            self.transactions[account][timestamp]['input_token_symbol'] = input_token_info['symbol']
                             output_token = token_path[len(token_path) - 1]
                             output_token_info = self.tokens[output_token]
                             self.transactions[account][timestamp]['output_token_name'] = output_token_info['name']
-                            self.transactions[account][timestamp]['output_symbol'] = output_token_info['symbol']
+                            self.transactions[account][timestamp]['output_token_symbol'] = output_token_info['symbol']
                             if contract_method_name in {'swapExactTokensForTokens', 'swapExactTokensForETH',
                                                         'swapExactTokensForTokensSupportingFeeOnTransferTokens',
                                                         'swapExactTokensForETHSupportingFeeOnTransferTokens'}:
@@ -231,6 +232,17 @@ class MoonbeamScraper:
                             elif contract_method_name in {"swapTokensForExactTokens", "swapTokensForExactETH"}:
                                 amount_in = decoded_func_params['amountInMax']
                                 amount_out = decoded_func_params['amountOut']
+                            elif contract_method_name in {"swapETHForTokens"}:
+                                self.logger.warning(f'swapETHForTokens called with acct_tx={acct_tx} and '
+                                                    f'decoded_func_params={decoded_func_params}')
+                                # todo: verify `token_path` available for this Eth tx
+                                return
+                            elif contract_method_name in {"swapExactETHForTokens"}:
+                                self.logger.warning(f'swapExactETHForTokens called with acct_tx={acct_tx} and '
+                                                    f'decoded_func_params={decoded_func_params}')
+                                amount_in = int(transaction['value'])
+                                amount_out = decoded_func_params['amountOutMin']
+                                # todo: verify `token_path` available for this Eth tx
                             else:
                                 self.logger.error(f'contract method {contract_method_name} not recognized')
                             requested_input_quantity_float = amount_in / (10 ** int(input_token_info['decimals']))
@@ -362,6 +374,38 @@ class MoonbeamScraper:
                                                         f"{exact_amount_out_float} to be within 20% of the tx "
                                                         f"output quantity {requested_output_quantity_float} but "
                                                         f"it's not.")
+                        elif contract_method_name in {'addLiquidityEth'}:
+                            self.transactions[account][timestamp]['action'] = 'pool liquidity'
+                            input_token1 = decoded_func_params['token']
+                            if input_token1 not in self.tokens:
+                                self.tokens[input_token1] = self.blockscout_api.get_token_info(input_token1)
+                            input_token1_info = self.tokens[input_token1]
+                            self.transactions[account][timestamp]['input_token1_name'] = input_token1_info['name']
+                            self.transactions[account][timestamp]['input_token1_symbol'] = input_token1_info['symbol']
+                            # todo: for native MOVR token, how to get input_token2 name and symbol?
+                            # input_token2 = decoded_func_params['token']
+                            # if input_token2 not in self.tokens:
+                            #     self.tokens[input_token2] = self.blockscout_api.get_token_info(input_token2)
+                            # input_token2_info = self.tokens[input_token2]
+                            # self.transactions[account][timestamp]['input_token2_name'] = input_token2_info['name']
+                            # self.transactions[account][timestamp]['input_token2_symbol'] = input_token2_info['symbol']
+
+                            # todo: for native MOVR token, how to get input_token2 name and symbol?
+                            if contract_method_name in {'addLiquidityEth'}:
+                                amount_in1 = decoded_func_params['amountTokenDesired']
+                                amount_in2 = decoded_func_params['amountETHMin']
+                            else:
+                                self.logger.error(f'contract method {contract_method_name} not recognized')
+                            requested_input1_quantity_float = amount_in1 / (10 ** int(input_token1_info['decimals']))
+                            # requested_input2_quantity_float = amount_in2 / (10 ** int(input_token2_info['decimals']))
+
+                            #  We only have an estimate based on the inputs so far. Use the trace logs to find
+                            #      the exact swap quantities
+                            # todo: decode logs for liquidity.
+                        else:
+                            if contract_method_name not in {'deposit', 'approve'}:
+                                self.logger.info(f'contract method {contract_method_name} not yet supported for '
+                                                 f'contract {contract_address}.')
 
             # todo: add liquidity.
             # todo: look for any other transactions I need to handle (staking rewards?)
