@@ -208,7 +208,7 @@ class MoonbeamScraper:
                                                     'swapExactTokensForETH', 'swapTokensForExactETH',
                                                     'swapExactTokensForTokensSupportingFeeOnTransferTokens',
                                                     'swapExactTokensForETHSupportingFeeOnTransferTokens',
-                                                    'swapETHForTokens', 'swapExactETHForTokens'}:
+                                                    'swapExactETHForTokens', 'swapETHForExactTokens'}:
                             self.transactions[account][timestamp]['action'] = 'token swap'
                             token_path = decoded_func_params['path']
                             # retrieve and cache the token info for all tokens
@@ -232,17 +232,16 @@ class MoonbeamScraper:
                             elif contract_method_name in {"swapTokensForExactTokens", "swapTokensForExactETH"}:
                                 amount_in = decoded_func_params['amountInMax']
                                 amount_out = decoded_func_params['amountOut']
-                            elif contract_method_name in {"swapETHForTokens"}:
-                                self.logger.warning(f'swapETHForTokens called with acct_tx={acct_tx} and '
-                                                    f'decoded_func_params={decoded_func_params}')
-                                # todo: verify `token_path` available for this Eth tx
-                                return
                             elif contract_method_name in {"swapExactETHForTokens"}:
-                                self.logger.warning(f'swapExactETHForTokens called with acct_tx={acct_tx} and '
-                                                    f'decoded_func_params={decoded_func_params}')
+                                # self.logger.warning(f'swapExactETHForTokens called with acct_tx={acct_tx} and '
+                                #                     f'decoded_func_params={decoded_func_params}')
                                 amount_in = int(transaction['value'])
                                 amount_out = decoded_func_params['amountOutMin']
-                                # todo: verify `token_path` available for this Eth tx
+                            elif contract_method_name in {"swapETHForExactTokens"}:
+                                # self.logger.warning(f'swapETHForExactTokens called with acct_tx={acct_tx} and '
+                                #                     f'decoded_func_params={decoded_func_params}')
+                                amount_in = int(transaction['value'])
+                                amount_out = decoded_func_params['amountOut']
                             else:
                                 self.logger.error(f'contract method {contract_method_name} not recognized')
                             requested_input_quantity_float = amount_in / (10 ** int(input_token_info['decimals']))
@@ -252,9 +251,12 @@ class MoonbeamScraper:
                             #      the exact swap quantities
                             tx_hash = transaction['hash']
                             receipt = self.moonscan_api.get_transaction_receipt(tx_hash)
-                            if type(receipt) is not dict or 'logs' not in receipt:
+                            if type(receipt) is not dict or 'logs' not in receipt or len(receipt['logs']) == 0:
                                 self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no"
-                                                    f" logs/traces present for transaction receipt: {receipt}")
+                                                    f" logs/traces present for transaction receipt: {receipt}\n\r"
+                                                    f"  Therefore defaulting to transaction input/output values.")
+                                self.transactions[account][timestamp]['input_quantity'] = float(amount_in)
+                                self.transactions[account][timestamp]['output_quantity'] = float(amount_out)
                                 return
                             logs = receipt['logs']
                             decoded_logs = []
@@ -289,16 +291,16 @@ class MoonbeamScraper:
                             for (evt_name, decoded_event_data, schema) in decoded_logs:
                                 decoded_event_params = json.loads(decoded_event_data)
 
-                                if evt_name not in {'Transfer', 'Withdrawal'}:
+                                if evt_name not in {'Transfer', 'Withdrawal', 'Deposit'}:
                                     continue
 
                                 # Different DEXs might name their event parameters differently, so we have to be
                                 # flexible in what dictionary keywords we use
                                 keyword_found = False
-                                quantity_keyword = None
+                                decoded_event_quantity_int = 0
                                 for key in event_quantity_keywords:
                                     if key in decoded_event_params:
-                                        quantity_keyword = key
+                                        decoded_event_quantity_int = decoded_event_params[key]
                                         keyword_found = True
                                         continue
                                 if not keyword_found:
@@ -308,12 +310,16 @@ class MoonbeamScraper:
                                                         f" implementation yet."
                                                         f" decoded_event_params={decoded_event_params}")
                                 keyword_found = False
-                                source_address_keyword = None
+                                decoded_event_source_address = None
                                 for key in event_source_address_keywords:
                                     if key in decoded_event_params:
-                                        source_address_keyword = key
+                                        decoded_event_source_address = decoded_event_params[key]
                                         keyword_found = True
                                         continue
+                                if not keyword_found and evt_name == 'Deposit':
+                                    # There's no "source" for the "Deposit" event
+                                    decoded_event_source_address = transaction['from']
+                                    keyword_found = True
                                 if not keyword_found:
                                     self.logger.warning(f"For transaction {tx_hash} with contract {contract_address},"
                                                         f" no event keyword found for source address. This indicates"
@@ -323,10 +329,10 @@ class MoonbeamScraper:
 
                                 if evt_name == 'Transfer':
                                     keyword_found = False
-                                    destination_address_keyword = None
+                                    decoded_event_destination_address = None
                                     for key in event_destination_address_keywords:
                                         if key in decoded_event_params:
-                                            destination_address_keyword = key
+                                            decoded_event_destination_address = decoded_event_params[key]
                                             keyword_found = True
                                             continue
                                     if not keyword_found:
@@ -336,44 +342,49 @@ class MoonbeamScraper:
                                                             f" handle this particular contract implementation yet."
                                                             f" decoded_event_params={decoded_event_params}")
 
-                                    if lower(decoded_event_params[source_address_keyword]) == lower(transaction['from']):
+                                    if lower(decoded_event_source_address) == lower(transaction['from']):
                                         # Transfers from source acct to one or more swap LP pair contracts in
                                         # order to perform swaps
-                                        exact_input_quantity_int += decoded_event_params[quantity_keyword]
-                                    elif lower(decoded_event_params[destination_address_keyword]) == lower(transaction['from']):
+                                        exact_input_quantity_int += decoded_event_quantity_int
+                                    elif lower(decoded_event_destination_address) == lower(transaction['from']):
                                         # Transfers from one or more swap LP pair contracts back to the original
                                         # address (after swap has occurred)
-                                        exact_output_quantity_int += decoded_event_params[quantity_keyword]
+                                        exact_output_quantity_int += decoded_event_quantity_int
+                                elif evt_name == 'Deposit' and \
+                                        lower(decoded_event_source_address) == lower(transaction['from']):
+                                    # Initial deposit tx to contract addr.
+                                    exact_input_quantity_int += decoded_event_quantity_int
                                 elif evt_name == 'Withdrawal' and \
-                                        lower(decoded_event_params[source_address_keyword]) == lower(transaction['to']):
+                                        lower(decoded_event_source_address) == lower(transaction['to']):
                                     # Final withdrawal tx back to source addr. Not used on all DEXs.
-                                    exact_output_quantity_int += decoded_event_params[quantity_keyword]
+                                    exact_output_quantity_int += decoded_event_quantity_int
 
-                                exact_amount_in_float = exact_input_quantity_int / (
-                                            10 ** int(input_token_info['decimals']))
-                                exact_amount_out_float = exact_output_quantity_int / (
-                                            10 ** int(output_token_info['decimals']))
+                                continue
 
-                                # validate that the exact amounts are somewhat similar to the contract input values
-                                #     (to make sure we're matching up the right values).
-                                input_tolerance = requested_input_quantity_float * 0.2  # 20% each side
-                                self.transactions[account][timestamp]['input_quantity'] = exact_amount_in_float
-                                if (exact_amount_in_float > requested_input_quantity_float + input_tolerance) \
-                                        and (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
-                                    self.logger.warning(f"For transaction {tx_hash} with contract "
-                                                        f"{contract_address}, expected log decoded input quantity "
-                                                        f"{exact_amount_in_float} to be within 20% of the tx input"
-                                                        f"quantity {requested_input_quantity_float} but it's not.")
-                                output_tolerance = requested_output_quantity_float * 0.2  # 20% each side
-                                self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
-                                if (exact_amount_out_float > requested_output_quantity_float + output_tolerance) \
-                                        and (exact_amount_out_float < requested_output_quantity_float
-                                             - output_tolerance):
-                                    self.logger.warning(f"For transaction {tx_hash} with contract "
-                                                        f"{contract_address}, expected log decoded output quantity "
-                                                        f"{exact_amount_out_float} to be within 20% of the tx "
-                                                        f"output quantity {requested_output_quantity_float} but "
-                                                        f"it's not.")
+                            exact_amount_in_float = exact_input_quantity_int / (
+                                        10 ** int(input_token_info['decimals']))
+                            exact_amount_out_float = exact_output_quantity_int / (
+                                        10 ** int(output_token_info['decimals']))
+
+                            # validate that the exact amounts are somewhat similar to the contract input values
+                            #     (to make sure we're matching up the right values).
+                            input_tolerance = requested_input_quantity_float * 0.2  # 20% each side
+                            self.transactions[account][timestamp]['input_quantity'] = exact_amount_in_float
+                            if (exact_amount_in_float > requested_input_quantity_float + input_tolerance) \
+                                    or (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
+                                self.logger.warning(f"For transaction {tx_hash} with contract "
+                                                    f"{contract_address}, expected log decoded input quantity "
+                                                    f"{exact_amount_in_float} to be within 20% of the tx input"
+                                                    f"quantity {requested_input_quantity_float} but it's not.")
+                            output_tolerance = requested_output_quantity_float * 0.2  # 20% each side
+                            self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
+                            if (exact_amount_out_float > requested_output_quantity_float + output_tolerance) \
+                                    or (exact_amount_out_float < requested_output_quantity_float - output_tolerance):
+                                self.logger.warning(f"For transaction {tx_hash} with contract "
+                                                    f"{contract_address}, expected log decoded output quantity "
+                                                    f"{exact_amount_out_float} to be within 20% of the tx "
+                                                    f"output quantity {requested_output_quantity_float} but "
+                                                    f"it's not.")
                         elif contract_method_name in {'addLiquidityEth'}:
                             self.transactions[account][timestamp]['action'] = 'pool liquidity'
                             input_token1 = decoded_func_params['token']
@@ -403,12 +414,18 @@ class MoonbeamScraper:
                             #      the exact swap quantities
                             # todo: decode logs for liquidity.
                         else:
-                            if contract_method_name not in {'deposit', 'approve'}:
+                            # todo: handle (and don't ignore) each of these contract methods:
+                                # 'claim' and 'collect' probably remain ignored for DPS.
+                            if contract_method_name not in {'deposit', 'withdraw', 'approve', 'claim', 'collect',
+                                                            'nominate', 'revoke_nomination', 'addLiquidity',
+                                                            'removeLiquidity', 'addLiquidityETH', 'removeLiquidityETH',
+                                                            'removeLiquidityETHWithPermit'}:
                                 self.logger.info(f'contract method {contract_method_name} not yet supported for '
                                                  f'contract {contract_address}.')
 
             # todo: add liquidity.
             # todo: look for any other transactions I need to handle (staking rewards?)
+            # todo: deposit/withdraw single-sided liquidity (like WMOVR pool on Solarbeam)
             # todo: simple contract token transfers to other accounts
             # todo: export data in a csv format to easily read into Excel.
 
