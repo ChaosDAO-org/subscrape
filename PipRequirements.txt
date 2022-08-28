@@ -1,8 +1,9 @@
 eth_utils
 hexbytes
 httpx[http2]
+openpyxl
 pandas
 ratelimit
 simplejson
 substrate-interface
-web3>5.0 
+web3>5.0

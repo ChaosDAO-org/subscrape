@@ -1,12 +1,13 @@
 __author__ = 'spazcoin@gmail.com @spazvt, Tommi Enenkel @alice_und_bob'
 
 from datetime import datetime
-import os
-import logging
-import simplejson as json
-import io
 import eth_utils
+import io
+import logging
 from numpy.core.defchararray import lower
+import os
+import pandas
+import simplejson as json
 
 from subscrape.decode.decode_evm_transaction import decode_tx
 from subscrape.decode.decode_evm_log import decode_log
@@ -80,7 +81,10 @@ class MoonbeamScraper:
                         assert(contract_method not in self.transactions)
                         self.transactions[contract_method] = {}
                         processor = self.process_methods_in_transaction_factory(contract_method, method)
-                        self.fetch_transactions(contract, processor, contract_method)
+                        self.logger.info(f"Fetching transactions for {contract_method} from"
+                                         f" {self.moonscan_api.endpoint}")
+                        self.moonscan_api.fetch_and_process_transactions(contract, processor)
+                        self.export_transactions(contract, contract_method)
 
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
@@ -109,14 +113,16 @@ class MoonbeamScraper:
 
                         self.transactions[account] = {}
                         processor = self.process_transactions_on_account_factory(account)
-                        self.fetch_transactions(account, processor)
+                        self.logger.info(f"Fetching transactions for {account} from {self.moonscan_api.endpoint}")
+                        self.moonscan_api.fetch_and_process_transactions(account, processor)
+                        self.export_transactions(account)
                 else:
                     self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
 
-    def fetch_transactions(self, address, processor, reference=None):
+    def export_transactions(self, address, reference=None):
         """Fetch all transactions for a given address (account/contract) and use the given processor method to filter
         or post-process each transaction as we work through them. Optionally, use 'reference' to uniquely identify this
         set of post-processed transaction data.
@@ -124,10 +130,6 @@ class MoonbeamScraper:
         :param address: the moonriver/moonbeam account number of interest. This could be a basic account, or a contract
         address, depending on the kind of transactions being analyzed.
         :type address: str
-        :param processor: a method that is used to post-process every transaction for the given address as it is
-        retrieved from the API. Processing transactions as they come in, instead of storing all transaction data helps
-        cut down on required storage.
-        :type processor: function
         :param reference: (optional) Unique identifier for this set of post-processed transaction data being created,
         if necessary.
         :type reference: str
@@ -136,18 +138,23 @@ class MoonbeamScraper:
             reference = address
         else:
             reference = reference.replace(" ", "_")
-        file_path = self.db_path + f"{reference}.json"
-        if os.path.exists(file_path):
-            self.logger.warning(f"{file_path} already exists. Skipping.")
-            return
 
-        self.logger.info(f"Fetching transactions for {reference} from {self.moonscan_api.endpoint}")
-        self.moonscan_api.fetch_and_process_transactions(address, processor)
+        # Export the transactions to a JSON file
+        json_file_path = self.db_path + f"{reference}.json"
+        if os.path.exists(json_file_path):
+            self.logger.warning(f"{json_file_path} already exists. Skipping export.")
+        else:
+            payload = json.dumps(self.transactions[reference], indent=4, sort_keys=False)
+            file = io.open(json_file_path, "w")
+            file.write(payload)
+            file.close()
 
-        payload = json.dumps(self.transactions[reference], indent=4, sort_keys=False)
-        file = io.open(file_path, "w")
-        file.write(payload)
-        file.close()
+        # Export the transactions to an XLSX file
+        xlsx_file_path = self.db_path + f"{reference}.xlsx"
+        if os.path.exists(xlsx_file_path):
+            self.logger.warning(f"{xlsx_file_path} already exists. Skipping export.")
+        else:
+            pandas.read_json(json_file_path).transpose().to_excel(xlsx_file_path)
 
     def process_methods_in_transaction_factory(self, contract_method, method):
         def process_method_in_transaction(transaction):
