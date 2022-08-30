@@ -57,7 +57,10 @@ class SubscanWrapper:
         else:
             self.logger.debug(response.headers)
 
-        return response.text
+        self.logger.debug(response.text)
+        # unpack the payload
+        obj = json.loads(response.text)
+        return obj["data"]        
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
@@ -87,12 +90,7 @@ class SubscanWrapper:
 
         while not done:
             body["page"] = page
-            response = self.query(method, body=body)
-            self.logger.debug(response)
-
-            # unpackage the payload
-            obj = json.loads(response)
-            data = obj["data"]
+            data = self.query(method, body=body)
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]

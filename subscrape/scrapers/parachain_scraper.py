@@ -31,6 +31,9 @@ class ParachainScraper:
             if operation == "extrinsics":
                 modules = operations[operation]
                 self.scrape_module_calls(modules, chain_config, self.fetch_extrinsics)
+            elif operation == "extrinsics-list":
+                extrinsics_list = operations[operation]
+                self.scrape_extrinsics_list(extrinsics_list, chain_config)
             elif operation == "events":
                 modules = operations[operation]
                 self.scrape_module_calls(modules, chain_config, self.fetch_events)
@@ -40,66 +43,6 @@ class ParachainScraper:
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
-
-    def scrape_transfers(self, accounts, chain_config):
-        """
-        Scrapes all transfers that belong to the list of accounts.
-        
-        :param accounts: A dict of accounts on their names
-        :type accounts: dict
-        :param chain_config: the `ScrapeConfig`
-        :type chain_config: ScrapeConfig
-        """
-        accounts_config = chain_config.create_inner_config(accounts)
-
-        for account in accounts:
-            # ignore metadata
-            if account.startswith("_"):
-                continue
-            
-            # deduce config
-            if type(account) is dict:
-                account_config = accounts_config.create_inner_config(accounts[account])
-            else:
-                account_config = accounts_config
-
-            # config wants us to skip this call?
-            if account_config.skip:
-                self.logger.info(f"Config asks to skip account {account}")
-                continue
-
-            self.fetch_transfers(account, account_config)
-
-    def fetch_transfers(self, account, call_config):
-        """
-        Fetches the transfers for a single account and writes them to the db.
-
-        :param account: The account to scrape
-        :type account: str
-        :param call_config: The call_config which has the filter set
-        :type call_config: ScrapeConfig
-        """
-
-        # normalize to Substrate address
-        public_key = ss58.ss58_decode(account)
-        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
-
-        self.db.set_active_transfers_account(substrate_address)
-
-        self.logger.info(f"Fetching transfers for {substrate_address} from {self.api.endpoint}")
-
-        method = "/api/scan/transfers"
-
-        body = {"address": substrate_address}
-        self.api.iterate_pages(
-            method,
-            self.db.write_transfer,
-            list_key="transfers",
-            body=body,
-            filter=call_config.filter
-            )
-
-        self.db.flush_transfers()
 
     def scrape_module_calls(self, modules, chain_config, fetch_function):
         """
@@ -200,6 +143,85 @@ class ParachainScraper:
             )
 
         extrinsics_storage.flush_sector()
+
+    def scrape_transfers(self, accounts, chain_config):
+        """
+        Scrapes all transfers that belong to the list of accounts.
+        
+        :param accounts: A dict of accounts on their names
+        :type accounts: dict
+        :param chain_config: the `ScrapeConfig`
+        :type chain_config: ScrapeConfig
+        """
+        accounts_config = chain_config.create_inner_config(accounts)
+
+        for account in accounts:
+            # ignore metadata
+            if account.startswith("_"):
+                continue
+            
+            # deduce config
+            if type(account) is dict:
+                account_config = accounts_config.create_inner_config(accounts[account])
+            else:
+                account_config = accounts_config
+
+            # config wants us to skip this call?
+            if account_config.skip:
+                self.logger.info(f"Config asks to skip account {account}")
+                continue
+
+            self.fetch_transfers(account, account_config)
+
+    def fetch_transfers(self, account, chain_config):
+        """
+        Fetches the transfers for a single account and writes them to the db.
+
+        :param account: The account to scrape
+        :type account: str
+        :param call_config: The call_config which has the filter set
+        :type call_config: ScrapeConfig
+        """
+
+        # normalize to Substrate address
+        public_key = ss58.ss58_decode(account)
+        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
+
+        self.db.set_active_transfers_account(substrate_address)
+
+        self.logger.info(f"Fetching transfers for {substrate_address} from {self.api.endpoint}")
+
+        method = "/api/scan/transfers"
+
+        body = {"address": substrate_address}
+        self.api.iterate_pages(
+            method,
+            self.db.write_transfer,
+            list_key="transfers",
+            body=body,
+            filter=chain_config.filter
+            )
+
+        self.db.flush_transfers()
+
+    def scrape_extrinsics_list(self, extrinsics_list, chain_config):
+        """
+        Scrapes all extrinsics from a list of extrinsic indexes.
+        
+        :param extrinsics_list: A list of extrinsic indexes to scrape
+        :type extrinsics_list: list
+        :param chain_config: the `ScrapeConfig`
+        :type chain_config: ScrapeConfig
+        """
+        for extrinsic_index in extrinsics_list:
+
+            self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.api.endpoint}")
+
+            method = "/api/scan/extrinsic"
+            body = {"extrinsic_index": extrinsic_index}
+            data = self.api.query(method, body=body)
+            self.db.write_extrinsic(data)
+
 """
 
     def fetch_addresses(self):

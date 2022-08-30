@@ -50,6 +50,25 @@ class SubscrapeDB:
         index_for_item = lambda item: item["event_index"]
         return SectorizedStorageManager(folder, description, index_for_item)
 
+    def write_extrinsic(self, data):
+        """
+        Write a single extrinsic to the storage.
+        This might be done expensive when done with a lot of extrinsics,
+        but is the intended approach when the module and call of extrinsics being scraped is unknown
+        ahead of scraping.
+
+        This method will determine the module and call, instantiate a new storage manager for the extrinsic,
+        and write the extrinsic to the storage.
+        """
+
+        # determine the module and call of the extrinsic
+        module = data["call_module"]
+        call = data["call_module_function"]
+
+        # instantiate a new storage manager for the extrinsic
+        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
+        storage_manager.write_item(data)
+        storage_manager.flush_sector()
 
     # Transfers
 
