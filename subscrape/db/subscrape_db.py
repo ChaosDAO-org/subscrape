@@ -33,7 +33,11 @@ class SubscrapeDB:
         self._path = f"data/parachains/{parachain}_"
         #: str: the name of the chain this db represents
         self._parachain = parachain
+        #: SqliteDict: the index of all extrinsics
         self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
+        
+        self._extrinsics_storage_managers = {}
+
 
     """ # Extrinsics """
 
@@ -41,10 +45,15 @@ class SubscrapeDB:
         """
         returns a `SectorizedStorageManager` to store and retrieve extrinsics
         """
+        name = f"{self._parachain}.{module}.{call}"
+        if name in self._extrinsics_storage_managers:
+            return self._extrinsics_storage_managers[name]
+
         path = f"{self._path}extrinsics_{module}_{call}.sqlite"
-        log_description = f"{self._parachain}.{module}.{call}"
         index_for_item = lambda item: item["extrinsic_index"]
-        return SqliteDictWrapper(path, log_description, index_for_item)
+        sm = SqliteDictWrapper(path, name, index_for_item)
+        self._extrinsics_storage_managers[name] = sm
+        return sm
 
     def write_extrinsic(self, data):
         """
