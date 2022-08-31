@@ -31,6 +31,7 @@ class SqliteDictWrapper:
 
         self._write_count += 1
         if self._write_count % 1000 == 0:
+            self.db.commit()
             self.logger.info(f"{self._log_description} - wrote {self._write_count} entries")
 
         return was_new_element

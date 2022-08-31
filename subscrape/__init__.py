@@ -72,14 +72,16 @@ def scraper_factory(name):
         return scraper
 
 
-def scrape(chains):
+def scrape(chains) -> int:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
 
     :param chains: list of chains to scrape
     :type chains: list
+    :return: number of items scraped
     """
+    items_scraped = 0
     scrape_config = ScrapeConfig(chains)
 
     for chain in chains:
@@ -96,4 +98,16 @@ def scrape(chains):
             continue
 
         parachain_scraper = scraper_factory(chain)
-        parachain_scraper.scrape(operations, chain_config)
+        items_scraped += parachain_scraper.scrape(operations, chain_config)
+    return items_scraped
+
+def wipe_storage():
+    """
+    Wipe the complete storage the data folder
+    """
+    if os.path.exists("data"):
+        import shutil
+        logging.info("wiping data folder")
+        shutil.rmtree("data")
+    else:
+        logging.info("data folder does not exist")

@@ -64,7 +64,7 @@ class SubscanWrapper:
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
-    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
+    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None) -> int:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -77,6 +77,7 @@ class SubscanWrapper:
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
         :type filter: function
+        :return: number of items processed
         """
         assert(list_key is not None)
 
@@ -131,3 +132,5 @@ class SubscanWrapper:
                 done = True
 
             page += 1
+
+        return count

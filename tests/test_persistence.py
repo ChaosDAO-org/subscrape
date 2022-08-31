@@ -6,6 +6,9 @@ def test():
         
     config = {
         "kusama":{
+            "extrinsics":{
+                "crowdloan": ["create"]
+            },
             "events":{
                 "crowdloan": ["created"]
             }
@@ -17,14 +20,9 @@ def test():
     logging.info("wiping storage")
     subscrape.wipe_storage()
     logging.info("scraping")
-    subscrape.scrape(config)
-    logging.info("transforming")
-
-    db = SubscrapeDB("kusama")
-    events_storage = db.storage_manager_for_events_call("crowdloan", "created")
-    events = dict(events_storage.get_iter())
-
-    first_crowdloan = events["14215808-27"]
-    assert first_crowdloan["extrinsic_hash"] == '0x9d3430cd00bff235d4cdd595513375e6ceacb5228590a8629a865922d67f056f'
+    items_scraped1 = subscrape.scrape(config)
+    items_scraped2 = subscrape.scrape(config)
+    
+    assert items_scraped1 != items_scraped2
 
 test()

@@ -14,6 +14,8 @@ def test():
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
+    logging.info("wiping storage")
+    subscrape.wipe_storage()
     logging.info("scraping")
     subscrape.scrape(config)
     logging.info("transforming")

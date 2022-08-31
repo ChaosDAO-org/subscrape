@@ -14,7 +14,7 @@ class ParachainScraper:
         self.db: SubscrapeDB = db
         self.api = api
 
-    def scrape(self, operations, chain_config):
+    def scrape(self, operations, chain_config) -> int:
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
         method.
         
@@ -22,7 +22,9 @@ class ParachainScraper:
         :type operations: dict
         :param chain_config: the `ScrapeConfig` to bubble down configuration properties
         :type chain_config: ScrapeConfig
+        :return: the number of items scraped
         """
+        items_scraped = 0
 
         for operation in operations:
             if operation.startswith("_"):
@@ -30,21 +32,23 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                self.scrape_module_calls(modules, chain_config, self.fetch_extrinsics)
+                items_scraped += self.scrape_module_calls(modules, chain_config, self.fetch_extrinsics)
             elif operation == "extrinsics-list":
                 extrinsics_list = operations[operation]
-                self.scrape_extrinsics_list(extrinsics_list, chain_config)
+                items_scraped += self.scrape_extrinsics_list(extrinsics_list, chain_config)
             elif operation == "events":
                 modules = operations[operation]
-                self.scrape_module_calls(modules, chain_config, self.fetch_events)
+                items_scraped += self.scrape_module_calls(modules, chain_config, self.fetch_events)
             elif operation == "transfers":
                 accounts = operations[operation]
-                self.scrape_transfers(accounts, chain_config)
+                items_scraped += self.scrape_transfers(accounts, chain_config)
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
+        
+        return items_scraped
 
-    def scrape_module_calls(self, modules, chain_config, fetch_function):
+    def scrape_module_calls(self, modules, chain_config, fetch_function) -> int:
         """
         Scrapes all module calls that belong to the list of accounts.
 
@@ -54,7 +58,9 @@ class ParachainScraper:
         :type chain_config: ScrapeConfig
         :param fetch_function: the method to call to scrape extrinsics vs events etc
         :type fetch_function: function
+        :return: the number of items scraped
         """
+        items_scraped = 0
         extrinsic_config = chain_config.create_inner_config(modules)
 
         for module in modules:
@@ -82,9 +88,10 @@ class ParachainScraper:
                     continue
 
                 # go
-                fetch_function(module, call, call_config)
+                items_scraped += fetch_function(module, call, call_config)
+        return items_scraped
 
-    def fetch_extrinsics(self, module, call, config):
+    def fetch_extrinsics(self, module, call, config) -> int:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -94,7 +101,9 @@ class ParachainScraper:
         :type call: str
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
+        :return: the number of items scraped
         """
+        items_scraped = 0
         with self.db.storage_manager_for_extrinsics_call(module, call) as extrinsics_storage:
             if config.digits_per_sector is not None:
                 extrinsics_storage.digits_per_sector = config.digits_per_sector
@@ -104,7 +113,7 @@ class ParachainScraper:
             method = "/api/scan/extrinsics"
 
             body = {"module": module, "call": call}
-            self.api.iterate_pages(
+            items_scraped += self.api.iterate_pages(
                 method,
                 extrinsics_storage.write_item,
                 list_key="extrinsics",
@@ -113,8 +122,9 @@ class ParachainScraper:
                 )
 
             extrinsics_storage.flush()
+        return items_scraped
 
-    def fetch_events(self, module, call, config):
+    def fetch_events(self, module, call, config) -> int:
         """
         Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -124,7 +134,9 @@ class ParachainScraper:
         :type call: str
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
+        :return: the number of items scraped
         """
+        items_scraped = 0
         extrinsics_storage = self.db.storage_manager_for_events_call(module, call)
         if config.digits_per_sector is not None:
             extrinsics_storage.digits_per_sector = config.digits_per_sector
@@ -134,7 +146,7 @@ class ParachainScraper:
         method = "/api/scan/events"
 
         body = {"module": module, "call": call}
-        self.api.iterate_pages(
+        items_scraped += self.api.iterate_pages(
             method,
             extrinsics_storage.write_item,
             list_key="events",
@@ -144,7 +156,9 @@ class ParachainScraper:
 
         extrinsics_storage.flush()
 
-    def scrape_transfers(self, accounts, chain_config):
+        return items_scraped
+
+    def scrape_transfers(self, accounts, chain_config) -> int:
         """
         Scrapes all transfers that belong to the list of accounts.
         
@@ -152,7 +166,9 @@ class ParachainScraper:
         :type accounts: dict
         :param chain_config: the `ScrapeConfig`
         :type chain_config: ScrapeConfig
+        :return: the number of items scraped
         """
+        items_scraped = 0
         accounts_config = chain_config.create_inner_config(accounts)
 
         for account in accounts:
@@ -171,9 +187,9 @@ class ParachainScraper:
                 self.logger.info(f"Config asks to skip account {account}")
                 continue
 
-            self.fetch_transfers(account, account_config)
+            items_scraped += self.fetch_transfers(account, account_config)
 
-    def fetch_transfers(self, account, chain_config):
+    def fetch_transfers(self, account, chain_config) -> int:
         """
         Fetches the transfers for a single account and writes them to the db.
 
@@ -181,8 +197,9 @@ class ParachainScraper:
         :type account: str
         :param call_config: The call_config which has the filter set
         :type call_config: ScrapeConfig
+        :return: the number of items scraped
         """
-
+        items_scraped = 0
         # normalize to Substrate address
         public_key = ss58.ss58_decode(account)
         substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
@@ -194,7 +211,7 @@ class ParachainScraper:
         method = "/api/scan/transfers"
 
         body = {"address": substrate_address}
-        self.api.iterate_pages(
+        items_scraped += self.api.iterate_pages(
             method,
             self.db.write_transfer,
             list_key="transfers",
@@ -203,8 +220,9 @@ class ParachainScraper:
             )
 
         self.db.flush_transfers()
+        return items_scraped
 
-    def scrape_extrinsics_list(self, extrinsics_list, chain_config):
+    def scrape_extrinsics_list(self, extrinsics_list, chain_config) -> int:
         """
         Scrapes all extrinsics from a list of extrinsic indexes.
         
@@ -212,7 +230,9 @@ class ParachainScraper:
         :type extrinsics_list: list
         :param chain_config: the `ScrapeConfig`
         :type chain_config: ScrapeConfig
+        :return: the number of items scraped
         """
+        items_scraped = 0
         for extrinsic_index in extrinsics_list:
 
             self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.api.endpoint}")
@@ -221,6 +241,9 @@ class ParachainScraper:
             body = {"extrinsic_index": extrinsic_index}
             data = self.api.query(method, body=body)
             self.db.write_extrinsic(data)
+            items_scraped += 1
+
+        return items_scraped
 
 """
 
