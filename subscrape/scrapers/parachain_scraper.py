@@ -113,7 +113,8 @@ class ParachainScraper:
             method = "/api/scan/extrinsics"
 
             body = {"module": module, "call": call}
-            body.update(config.params)
+            if config.params is not None:
+                body.update(config.params)
 
             items_scraped += self.api.iterate_pages(
                 method,
@@ -148,8 +149,9 @@ class ParachainScraper:
         method = "/api/scan/events"
 
         body = {"module": module, "call": call}
-        body.update(config.params)
-        
+        if config.params is not None:
+            body.update(config.params)
+
         items_scraped += self.api.iterate_pages(
             method,
             extrinsics_storage.write_item,
