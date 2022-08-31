@@ -66,13 +66,15 @@ class SubscrapeDB:
 
         # instantiate a new storage manager for the extrinsic
         storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        storage_manager.write_item(data)
+        was_new_element = storage_manager.write_item(data)
         storage_manager.flush()
 
         self._extrinsics_meta_index[extrinsic_index] = {
             "module": module,
             "call": call
         }
+
+        return was_new_element
 
     def read_extrinsic(self, extrinsic_index):
         """
