@@ -19,7 +19,15 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
                 "batch":{},
                 "batch_all":{}
             }
+        },
+        "events": {
+            "crowdloan": [
+                "created"
+            ]
         }
+        "extrinsics-list":[
+            "14238250-2"
+        ]
     },
     "moonriver": {
         "transactions": {
@@ -40,8 +48,17 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 
 To query extrinsics from Substrate chains, only the module and call is needed. Filters can be applied.
 
-### Scraper: extrinsics
-Scrapes extrinsics by using their `call_module` and `call_name`.
+### Operation: extrinsics
+Scrapes extrinsics by using their `module` and `name`.
+
+### Operations: extrinsics-list
+Scrapes extrinsics by using a list of extrinsic indexes.
+
+### Operation: events
+Scrapes events by using their `module` and `name`.
+
+### Operation: transfers
+Scrapes transfers by using their `address` and a `label`.
 
 ### Config for scraping Moonriver or Moonbeam:
 
