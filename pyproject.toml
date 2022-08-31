@@ -21,8 +21,9 @@ dependencies = [
   "ratelimit",
   "simplejson",
   "substrate-interface",
-  "web3>5.0",
-  "sqlitedict"
+  "sqlitedict",
+  "web3>5.0"
+
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

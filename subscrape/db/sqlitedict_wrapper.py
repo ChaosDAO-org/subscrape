@@ -10,6 +10,7 @@ class SqliteDictWrapper:
         """
         :param path: str: the path to the sqlite database
         :param index_for_item: function: a function that returns the index of an item
+        :param log_description: str: a description of the specific database for logging purposes
         """
         self.logger = logging.getLogger(__name__)
         self._index_for_item = index_for_item

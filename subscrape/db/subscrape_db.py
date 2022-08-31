@@ -49,12 +49,14 @@ class SubscrapeDB:
     def write_extrinsic(self, data):
         """
         Write a single extrinsic to the storage.
-        This might be done expensive when done with a lot of extrinsics,
+        This might be expensive when done with a lot of extrinsics,
         but is the intended approach when the module and call of extrinsics being scraped is unknown
         ahead of scraping.
 
         This method will determine the module and call, instantiate a new storage manager for the extrinsic,
         and write the extrinsic to the storage.
+
+        :param data: The extrinsic to write
         """
 
         # determine the module and call of the extrinsic
@@ -75,6 +77,9 @@ class SubscrapeDB:
     def read_extrinsic(self, extrinsic_index):
         """
         Reads an extrinsic with a given index from the database.
+
+        :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
+        :return: The extrinsic
         """
         obj = self._extrinsics_meta_index[extrinsic_index]
         module = obj["module"]
