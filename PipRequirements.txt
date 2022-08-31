@@ -6,3 +6,4 @@ ratelimit
 simplejson
 substrate-interface
 web3>5.0 
+sqlitedict

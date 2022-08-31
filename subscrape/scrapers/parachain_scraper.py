@@ -95,24 +95,24 @@ class ParachainScraper:
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
         """
-        extrinsics_storage = self.db.storage_manager_for_extrinsics_call(module, call)
-        if config.digits_per_sector is not None:
-            extrinsics_storage.digits_per_sector = config.digits_per_sector
+        with self.db.storage_manager_for_extrinsics_call(module, call) as extrinsics_storage:
+            if config.digits_per_sector is not None:
+                extrinsics_storage.digits_per_sector = config.digits_per_sector
 
-        self.logger.info(f"Fetching extrinsic {module}.{call} from {self.api.endpoint}")
+            self.logger.info(f"Fetching extrinsic {module}.{call} from {self.api.endpoint}")
 
-        method = "/api/scan/extrinsics"
+            method = "/api/scan/extrinsics"
 
-        body = {"module": module, "call": call}
-        self.api.iterate_pages(
-            method,
-            extrinsics_storage.write_item,
-            list_key="extrinsics",
-            body=body,
-            filter=config.filter
-            )
+            body = {"module": module, "call": call}
+            self.api.iterate_pages(
+                method,
+                extrinsics_storage.write_item,
+                list_key="extrinsics",
+                body=body,
+                filter=config.filter
+                )
 
-        extrinsics_storage.flush_sector()
+            extrinsics_storage.flush()
 
     def fetch_events(self, module, call, config):
         """
@@ -142,7 +142,7 @@ class ParachainScraper:
             filter=config.filter
             )
 
-        extrinsics_storage.flush_sector()
+        extrinsics_storage.flush()
 
     def scrape_transfers(self, accounts, chain_config):
         """
