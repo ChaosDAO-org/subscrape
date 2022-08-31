@@ -9,6 +9,7 @@ class ScrapeConfig:
         self.processor_name = None
         self.skip = False
         self.digits_per_sector = None
+        self.params = None
         self._set_config(config)
 
     def _set_config(self, config):
@@ -37,6 +38,10 @@ class ScrapeConfig:
         digits_per_sector = config.get("_digits_per_sector", None)
         if digits_per_sector is not None:
             self.digits_per_sector = digits_per_sector
+
+        params = config.get("_params", None)
+        if params is not None:
+            self.params = params
 
     def create_inner_config(self, config):
         """
