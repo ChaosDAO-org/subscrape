@@ -99,6 +99,7 @@ def scrape(chains) -> int:
 
         parachain_scraper = scraper_factory(chain)
         items_scraped += parachain_scraper.scrape(operations, chain_config)
+    logging.info(f"Scraped {items_scraped} items")
     return items_scraped
 
 def wipe_storage():
@@ -108,6 +109,6 @@ def wipe_storage():
     if os.path.exists("data"):
         import shutil
         logging.info("wiping data folder")
-        shutil.rmtree("data")
+        shutil.rmtree("data/")
     else:
         logging.info("data folder does not exist")

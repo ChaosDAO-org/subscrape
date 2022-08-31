@@ -55,9 +55,10 @@ class SubscanWrapper:
             self.logger.info(response.headers)
             raise Exception()
         else:
-            self.logger.debug(response.headers)
+            #self.logger.debug(response.headers)
+            pass
 
-        self.logger.debug(response.text)
+        #self.logger.debug(response.text)
         # unpack the payload
         obj = json.loads(response.text)
         return obj["data"]        
@@ -109,7 +110,7 @@ class SubscanWrapper:
             # that were already present on the previous page. we try to cope with
             # this by checking if any of the elements on the current page were new
             # and if they were, we continue
-            found_new_elements = False
+            count_new_elements = 0
             for element in elements:
                 if filter is not None:
                     should_skip = filter(element)
@@ -118,11 +119,14 @@ class SubscanWrapper:
                 # process the element and check if we should continue
                 was_new_element = element_processor(element)
                 if was_new_element:
-                    found_new_elements = True
+                    count_new_elements += 1
 
-            if not found_new_elements:
+            if count_new_elements == 0:
                 self.logger.info("We did not find any new elements on the latest page. Stopping.")
                 break
+            else:
+                self.logger.debug(f"Found {count_new_elements} new elements on page {page}.")
+                pass
 
             # update counters and check if we should exit
             count += len(elements)
