@@ -72,28 +72,53 @@ def scraper_factory(name):
         return scraper
 
 
-def scrape(chains):
+def scrape(chains) -> int:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
 
     :param chains: list of chains to scrape
     :type chains: list
+    :return: number of items scraped
     """
-    scrape_config = ScrapeConfig(chains)
+    items_scraped = 0
 
-    for chain in chains:
-        if chain.startswith("_"):
-            if chain == "_version" and chains[chain] != 1:
-                logging.warning("config version != 1. It could contain runtime breaking contents")
-            continue
-        operations = chains[chain]
-        chain_config = scrape_config.create_inner_config(operations)
+    try:
 
-        # check if we should skip this chain
-        if chain_config.skip:
-            logging.info(f"Config asks to skip chain {chain}")
-            continue
+        scrape_config = ScrapeConfig(chains)
 
-        parachain_scraper = scraper_factory(chain)
-        parachain_scraper.scrape(operations, chain_config)
+        for chain in chains:
+            if chain.startswith("_"):
+                if chain == "_version" and chains[chain] != 1:
+                    logging.warning("config version != 1. It could contain runtime breaking contents")
+                continue
+            operations = chains[chain]
+            chain_config = scrape_config.create_inner_config(operations)
+
+            # check if we should skip this chain
+            if chain_config.skip:
+                logging.info(f"Config asks to skip chain {chain}")
+                continue
+
+            parachain_scraper = scraper_factory(chain)
+            items_scraped += parachain_scraper.scrape(operations, chain_config)
+    except Exception as e:
+        logging.error(f"Uncaught error during scraping: {e}")
+        import traceback
+        # log traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        raise e
+
+    logging.info(f"Scraped {items_scraped} items")
+    return items_scraped
+
+def wipe_storage():
+    """
+    Wipe the complete storage the data folder
+    """
+    if os.path.exists("data"):
+        import shutil
+        logging.info("wiping data folder")
+        shutil.rmtree("data/")
+    else:
+        logging.info("data folder does not exist")
