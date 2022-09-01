@@ -22,6 +22,9 @@ class SqliteDictWrapper:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.db.close()
 
+    def __contains__(self, index):
+        return index in self.db
+
     def write_item(self, index, data) -> bool:
         """
         Write a single item to the database.

@@ -293,10 +293,11 @@ class SubscanBase:
 
             method = self._api_method_extrinsic
             body = {"extrinsic_index": extrinsic_index}
-            data = self._query(method, body=body)
-            index = self._extrinsic_index_deducer(data)
-            self.db.write_extrinsic(index, data)
-            items_scraped += 1
+            if not self.db.has_extrinsic(extrinsic_index):
+                data = self._query(method, body=body)
+                index = self._extrinsic_index_deducer(data)
+                self.db.write_extrinsic(index, data)
+                items_scraped += 1
 
         self.db.flush_extrinsics()
 

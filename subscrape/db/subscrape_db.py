@@ -70,7 +70,7 @@ class SubscrapeDB:
         was_new_element = self._extrinsics_storage.write_item(index, extrinsic)
         
         if was_new_element:
-            self.logger.info(f"Extrinsic {index} already exists in the database. Overwriting.")
+            self.logger.warning(f"Extrinsic {index} already exists in the database. This should be prevented by the scraper by checking `has_extrinsic`.")
 
         return was_new_element
 
@@ -79,6 +79,12 @@ class SubscrapeDB:
         Flush the extrinsics to the database.
         """
         self._extrinsics_storage.flush()
+
+    def has_extrinsic(self, extrinsic_index):
+        """
+        Returns true if the extrinsic with the given index is in the database.
+        """
+        return extrinsic_index in self._extrinsics_storage
 
     def read_extrinsic(self, extrinsic_index):
         """
