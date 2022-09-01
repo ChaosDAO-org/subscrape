@@ -10,15 +10,13 @@ def test(scraper):
     
     config = {
         "kusama":{
+            "_scraper": scraper,
             "extrinsics":{
                 "_params": {"address": account_id},
                 "staking": ["bond"]
             }
         }
     }
-
-    if scraper is not None:
-        config["kusama"]["_scraper"] = scraper
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
@@ -33,5 +31,10 @@ def test(scraper):
     extrinsics = dict(extrinsics_storage.get_iter())
 
     first_extrinsic = next(iter(extrinsics.values()))
-    assert first_extrinsic["account_id"] == account_id
+
+    if scraper != "SubscanV2":
+        assert first_extrinsic["account_id"] == account_id
+    else:
+        assert first_extrinsic["account_display"]["address"] == account_id
+
 

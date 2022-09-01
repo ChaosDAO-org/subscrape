@@ -51,10 +51,21 @@ def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
         f = open("config/subscan-key")
         subscan_key = f.read()
 
-    if chain_config.scraper == "SubscanV2":
-        return SubscanV2(chain, db, subscan_key)
+    selected_scraper = chain_config.scraper
+    if selected_scraper is None:
+        selected_scraper = "SubscanV1"
+        logging.info("No scraper specified in the chains `_scraper` param. Assuming SubscanV1. This will change in the future. Please specify a scraper.")
 
-    return SubscanV1(chain, db, subscan_key)
+    if selected_scraper == "SubscanV1":
+        scraper = SubscanV1(chain, db, subscan_key)
+    elif selected_scraper == "SubscanV2":
+        scraper = SubscanV2(chain, db, subscan_key)
+    else:
+        raise Exception(f"Unknown scraper {selected_scraper}")
+
+    return scraper
+
+    return scraper
 
 
 def scraper_factory(name, chain_config: ScrapeConfig):

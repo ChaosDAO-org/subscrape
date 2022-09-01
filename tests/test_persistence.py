@@ -8,6 +8,7 @@ def test(scraper):
         
     config = {
         "kusama":{
+            "_scraper": scraper,
             "extrinsics":{
                 "crowdloan": ["create"]
             },
@@ -16,9 +17,6 @@ def test(scraper):
             }
         },
     }
-
-    if scraper is not None:
-        config["kusama"]["_scraper"] = scraper
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
