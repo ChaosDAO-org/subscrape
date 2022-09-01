@@ -1,4 +1,4 @@
-## Configuration
+## Configuration Example
 
 Users define a `scrape_config.json` file in the `config` folder to instruct `subscrape` what accounts or types of info they are interested in. To get started, just rename `sample_scrape_config.json` to `scrape_config.json` since it already shows you what syntax to use.
 
@@ -6,6 +6,7 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 {
     "_version": 1,
     "kusama": {
+        "_scraper": "SubscanV2",
         "transfers": {
             "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
         },
@@ -44,9 +45,11 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 }
 ```
 
-### Config for scraping Substrate chains:
+## Config for scraping Substrate chains:
 
-To query extrinsics from Substrate chains, only the module and call is needed. Filters can be applied.
+### Param: _scraper
+Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
+In the future, we will change this to `SubscanV2`.
 
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`.
