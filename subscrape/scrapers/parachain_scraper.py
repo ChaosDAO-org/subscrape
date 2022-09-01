@@ -36,6 +36,9 @@ class ParachainScraper:
             elif operation == "events":
                 modules = operations[operation]
                 items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_events_index)
+            elif operation == "events-list":
+                events_list = operations[operation]
+                items_scraped += self.api.fetch_events(events_list)
             elif operation == "transfers":
                 accounts = operations[operation]
                 items_scraped += self.scrape_transfers(accounts, chain_config)

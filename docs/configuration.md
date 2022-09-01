@@ -7,9 +7,6 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
     "_version": 1,
     "kusama": {
         "_api": "SubscanV2",
-        "transfers": {
-            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
-        },
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
@@ -21,14 +18,20 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
                 "batch_all":{}
             }
         },
+        "extrinsics-list":[
+            "14238250-2"
+        ],
         "events": {
             "crowdloan": [
                 "created"
             ]
-        }
-        "extrinsics-list":[
-            "14238250-2"
-        ]
+        },
+        "events-list":[
+            "14238250-39"
+        ],
+        "transfers": {
+            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
+        },
     },
     "moonriver": {
         "transactions": {
@@ -54,11 +57,14 @@ In the future, we will change this to `SubscanV2`.
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`.
 
-### Operations: extrinsics-list
+### Operation: extrinsics-list
 Scrapes extrinsics by using a list of extrinsic indexes.
 
 ### Operation: events
 Scrapes events by using their `module` and `name`.
+
+### Operation: events-list
+Scrapes events by using a list of event indexes.
 
 ### Operation: transfers
 Scrapes transfers by using their `address` and a `label`.

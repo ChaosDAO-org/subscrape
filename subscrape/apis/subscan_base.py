@@ -209,6 +209,32 @@ class SubscanBase:
         return items_scraped
 
 
+    def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
+        """
+        Fetches the extrinsic with the specified index and writes it to the db.
+        :param extrinsic_index: The extrinsix index to fetch
+        :type extrinsic_index: str
+        :param element_processor: The function to process the extrinsic
+        :type element_processor: function
+        :return: the number of items scraped
+        """
+
+        items_scraped = 0
+        self.logger.info(f"Fetching {len(extrinsic_indexes)} extrinsics from {self.endpoint}")
+        
+        for extrinsic_index in extrinsic_indexes:
+
+            method = self._api_method_extrinsic
+            body = {"extrinsic_index": extrinsic_index}
+            if not self.db.has_extrinsic(extrinsic_index):
+                data = self._query(method, body=body)
+                index = self._extrinsic_index_deducer(data)
+                self.db.write_extrinsic(index, data)
+                items_scraped += 1
+
+        self.db.flush_extrinsics()
+
+        return items_scraped
 
     def fetch_events_index(self, module, call, config) -> int:
         """
@@ -245,6 +271,32 @@ class SubscanBase:
 
         return items_scraped
 
+    def fetch_events(self, event_indexes: list) -> int:
+        """
+        Fetches the event with the specified index and writes it to the db.
+        :param event_index: The event index to fetch
+        :type event_index: str
+        :param element_processor: The function to process the event
+        :type element_processor: function
+        :return: the number of items scraped
+        """
+
+        items_scraped = 0
+        self.logger.info(f"Fetching {len(event_indexes)} events from {self.endpoint}")
+        
+        for event_index in event_indexes:
+
+            method = self._api_method_event
+            body = {"event_index": event_index}
+            if not self.db.has_event(event_index):
+                data = self._query(method, body=body)
+                index = self._event_index_deducer(data)
+                self.db.write_event(index, data)
+                items_scraped += 1
+
+        self.db.flush_events()
+
+        return items_scraped
 
     def fetch_transfers(self, account, chain_config) -> int:
         """
@@ -275,30 +327,4 @@ class SubscanBase:
             )
 
         self.db.flush_transfers()
-        return items_scraped
-
-    def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
-        """
-        Fetches the extrinsic with the specified index and writes it to the db.
-        :param extrinsic_index: The extrinsix index to fetch
-        :type extrinsic_index: str
-        :param element_processor: The function to process the extrinsic
-        :type element_processor: function
-        :return: the number of items scraped
-        """
-
-        items_scraped = 0
-        for extrinsic_index in extrinsic_indexes:
-            self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.endpoint}")
-
-            method = self._api_method_extrinsic
-            body = {"extrinsic_index": extrinsic_index}
-            if not self.db.has_extrinsic(extrinsic_index):
-                data = self._query(method, body=body)
-                index = self._extrinsic_index_deducer(data)
-                self.db.write_extrinsic(index, data)
-                items_scraped += 1
-
-        self.db.flush_extrinsics()
-
         return items_scraped

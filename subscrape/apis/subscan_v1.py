@@ -6,8 +6,10 @@ class SubscanV1(SubscanBase):
         super().__init__(chain, db, subscan_key)
         self._extrinsic_index_deducer = lambda ex: f"{ex['extrinsic_index']}"
         self._events_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
+        self._event_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
         self._api_method_extrinsics = "/api/scan/extrinsics"
         self._api_method_extrinsic = "/api/scan/extrinsic"
         self._api_method_events = "/api/scan/events"
+        self._api_method_event = "/api/scan/event"
         self._api_method_transfers = "/api/scan/transfers"
         self._api_method_events_call = "call"

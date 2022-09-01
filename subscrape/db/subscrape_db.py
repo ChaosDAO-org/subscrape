@@ -35,7 +35,9 @@ class SubscrapeDB:
         self._parachain = parachain
         #: SqliteDict: the index of all extrinsics
         self._extrinsics_storage = SqliteDictWrapper(self._path + "extrinsics.sqlite", f"{parachain}.extrinsics")
-        
+        #: SqliteDict: the index of all events
+        self._events_storage = SqliteDictWrapper(self._path + "events.sqlite", f"{parachain}.events")
+
         self._extrinsics_index_managers = {}
 
 
@@ -59,7 +61,7 @@ class SubscrapeDB:
 
     def write_extrinsic(self, index, extrinsic) -> bool:
         """
-        Write hydrated extrinsics to the database.
+        Write extrinsic to the database.
 
         :param index: The index of the extrinsic
         :type index: str
@@ -102,7 +104,43 @@ class SubscrapeDB:
         log_description = f"{self._parachain}.{module}.{event}"
         return SqliteDictWrapper(path, log_description)
 
+    def write_event(self, index, event) -> bool:
+        """
+        Write event to the database.
 
+        :param index: The index of the event
+        :type index: str
+        :param event: The event to write
+        :type event: dict
+        """
+        was_new_element = self._events_storage.write_item(index, event)
+
+        if not was_new_element:
+            self.logger.warning(f"Event {index} already exists in the database. This should be prevented by the scraper by checking `has_event`.")
+
+        return was_new_element
+
+    def flush_events(self):
+        """
+        Flush the events to the database.
+        """
+        self._events_storage.flush()
+
+    def has_event(self, event_index):
+        """
+        Returns true if the event with the given index is in the database.
+        """
+        return event_index in self._events_storage
+
+    def read_event(self, event_index):
+        """
+        Reads an event with a given index from the database.
+
+        :param event_index: The index of the event to read, e.g. "123456-12"
+        :return: The event
+        """
+        return self._events_storage.read_item(event_index)
+    
     # Transfers
 
     def _transfers_folder(self):
