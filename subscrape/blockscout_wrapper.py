@@ -65,11 +65,15 @@ class BlockscoutWrapper:
             previous_block = start_block
 
     def fetch_and_process_transactions(self, address, element_processor):
-        """Fetch all transactions for an address, and then pass them to the processor for processing.
+        """Fetch all transactions for a given address (account/contract) and use the given processor method to filter
+        or post-process each transaction as we work through them.
 
-        :param address: address to retrieve transactions for
+        :param address: the moonriver/moonbeam account number of interest. This could be a basic account, or a contract
+        address, depending on the kind of transactions being analyzed.
         :type address: str
-        :param element_processor: method to process each transaction as it is received
+        :param element_processor: a method that is used to post-process every transaction for the given address as it is
+        retrieved from the API. Processing transactions as they come in, instead of storing all transaction data helps
+        cut down on required storage.
         :type element_processor: function
         """
         params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
@@ -94,11 +98,13 @@ class BlockscoutWrapper:
             # response_dict['result'] should contain a long string representation of the contract abi.
             return response_dict['result']
 
-    def get_token_info(self, token_address):
+    def get_token_info(self, token_address, verbose=True):
         """Get a token's basic info (name, ticker symbol, decimal places)
 
         :param token_address: token address
         :type token_address: str
+        :param verbose: should the "not retrievable" message be printed out?
+        :type verbose: bool
         :returns: dictionary of values about the token, or None if not retrievable
         :rtype: dict or None
         """
@@ -106,7 +112,8 @@ class BlockscoutWrapper:
         response = self.query(params)
         response_dict = json.loads(response)
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
-            self.logger.info(f'Token info not retrievable for {token_address} because "{response_dict["result"]}"')
+            if verbose:
+                self.logger.info(f'Token info not retrievable for {token_address} because "{response_dict["result"]}"')
             return None
         else:
             # response_dict['result'] should contain the info about the token.

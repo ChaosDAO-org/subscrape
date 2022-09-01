@@ -1,6 +1,7 @@
 eth_utils
 hexbytes
 httpx[http2]
+openpyxl
 pandas
 ratelimit
 simplejson
