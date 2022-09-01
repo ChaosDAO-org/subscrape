@@ -55,13 +55,17 @@ class SubscanWrapper:
             self.logger.info(response.headers)
             raise Exception()
         else:
-            self.logger.debug(response.headers)
+            #self.logger.debug(response.headers)
+            pass
 
-        return response.text
+        #self.logger.debug(response.text)
+        # unpack the payload
+        obj = json.loads(response.text)
+        return obj["data"]        
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
-    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None):
+    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None) -> int:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -74,6 +78,7 @@ class SubscanWrapper:
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
         :type filter: function
+        :return: number of items processed
         """
         assert(list_key is not None)
 
@@ -87,12 +92,7 @@ class SubscanWrapper:
 
         while not done:
             body["page"] = page
-            response = self.query(method, body=body)
-            self.logger.debug(response)
-
-            # unpackage the payload
-            obj = json.loads(response)
-            data = obj["data"]
+            data = self.query(method, body=body)
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]
@@ -110,7 +110,7 @@ class SubscanWrapper:
             # that were already present on the previous page. we try to cope with
             # this by checking if any of the elements on the current page were new
             # and if they were, we continue
-            found_new_elements = False
+            count_new_elements = 0
             for element in elements:
                 if filter is not None:
                     should_skip = filter(element)
@@ -119,11 +119,14 @@ class SubscanWrapper:
                 # process the element and check if we should continue
                 was_new_element = element_processor(element)
                 if was_new_element:
-                    found_new_elements = True
+                    count_new_elements += 1
 
-            if not found_new_elements:
+            if count_new_elements == 0:
                 self.logger.info("We did not find any new elements on the latest page. Stopping.")
                 break
+            else:
+                self.logger.debug(f"Found {count_new_elements} new elements on page {page}.")
+                pass
 
             # update counters and check if we should exit
             count += len(elements)
@@ -133,3 +136,5 @@ class SubscanWrapper:
                 done = True
 
             page += 1
+
+        return count

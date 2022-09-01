@@ -5,7 +5,8 @@ import io
 import json
 import logging
 from substrateinterface.utils import ss58
-from subscrape.db.sectorized_storage_manager import SectorizedStorageManager
+from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
+from sqlitedict import SqliteDict
 
 # one DB per Parachain
 class SubscrapeDB:
@@ -23,32 +24,87 @@ class SubscrapeDB:
         # make sure casing is correct
         parachain = parachain.lower()
 
+        # make sure the parachains folder exists
+        folder_path = f"{os.getcwd()}/data/parachains/"
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
         #: str: the root path to this db
         self._path = f"data/parachains/{parachain}_"
         #: str: the name of the chain this db represents
         self._parachain = parachain
+        #: SqliteDict: the index of all extrinsics
+        self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
+        
+        self._extrinsics_storage_managers = {}
 
-        #: str: the account transfers are being store for
-        self._transfers_account = None
-        #: list: the list of transfers we are storing
-        self._transfers = None
-        #: bool: a dirty flag that keeps track of unsaved transfers
-        self._transfers_dirty = False
+
+    """ # Extrinsics """
 
     def storage_manager_for_extrinsics_call(self, module, call):
         """
         returns a `SectorizedStorageManager` to store and retrieve extrinsics
         """
-        folder = f"{self._path}extrinsics_{module}_{call}/"
-        description = f"{self._parachain} {module}.{call}"
+        name = f"{self._parachain}.{module}.{call}"
+        if name in self._extrinsics_storage_managers:
+            return self._extrinsics_storage_managers[name]
+
+        path = f"{self._path}extrinsics_{module}_{call}.sqlite"
         index_for_item = lambda item: item["extrinsic_index"]
-        return SectorizedStorageManager(folder, description, index_for_item)
+        sm = SqliteDictWrapper(path, name, index_for_item)
+        self._extrinsics_storage_managers[name] = sm
+        return sm
+
+    def write_extrinsic(self, data):
+        """
+        Write a single extrinsic to the storage.
+        This might be expensive when done with a lot of extrinsics,
+        but is the intended approach when the module and call of extrinsics being scraped is unknown
+        ahead of scraping.
+
+        This method will determine the module and call, instantiate a new storage manager for the extrinsic,
+        and write the extrinsic to the storage.
+
+        :param data: The extrinsic to write
+        """
+
+        # determine the module and call of the extrinsic
+        module = data["call_module"]
+        call = data["call_module_function"]
+        extrinsic_index = data["extrinsic_index"]
+
+        # instantiate a new storage manager for the extrinsic
+        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
+        was_new_element = storage_manager.write_item(data)
+        storage_manager.flush()
+
+        self._extrinsics_meta_index[extrinsic_index] = {
+            "module": module,
+            "call": call
+        }
+
+        return was_new_element
+
+    def read_extrinsic(self, extrinsic_index):
+        """
+        Reads an extrinsic with a given index from the database.
+
+        :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
+        :return: The extrinsic
+        """
+        obj = self._extrinsics_meta_index[extrinsic_index]
+        module = obj["module"]
+        call = obj["call"]
+        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
+        return storage_manager.read_item(extrinsic_index)
+
+    """ # Events """
 
     def storage_manager_for_events_call(self, module, event):
-        folder = f"{self._path}events_{module}_{event}/"
-        description = f"{self._parachain} {module}.{event}"
-        index_for_item = lambda item: item["event_index"]
-        return SectorizedStorageManager(folder, description, index_for_item)
+        path = f"{self._path}events_{module}_{event}.sqlite"
+        log_description = f"{self._parachain}.{module}.{event}"
+        index_for_item = lambda item: f"{item['block_num']}-{item['event_idx']}"
+        return SqliteDictWrapper(path, log_description, index_for_item)
 
 
     # Transfers
