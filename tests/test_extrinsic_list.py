@@ -1,8 +1,10 @@
 from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
+import pytest
 
-def test():
+@pytest.mark.parametrize("scraper", [None, "SubscanV2"])
+def test(scraper):
     
     extrinsic_idx = "14238250-2"
     
@@ -13,6 +15,9 @@ def test():
             ]
         }
     }
+
+    if scraper is not None:
+        config["kusama"]["_scraper"] = scraper
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -27,4 +32,3 @@ def test():
 
     assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
 
-test()

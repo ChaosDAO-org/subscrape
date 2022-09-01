@@ -50,12 +50,11 @@ class SubscrapeDB:
             return self._extrinsics_storage_managers[name]
 
         path = f"{self._path}extrinsics_{module}_{call}.sqlite"
-        index_for_item = lambda item: item["extrinsic_index"]
-        sm = SqliteDictWrapper(path, name, index_for_item)
+        sm = SqliteDictWrapper(path, name)
         self._extrinsics_storage_managers[name] = sm
         return sm
 
-    def write_extrinsic(self, data):
+    def write_extrinsic(self, index, data):
         """
         Write a single extrinsic to the storage.
         This might be expensive when done with a lot of extrinsics,
@@ -75,7 +74,7 @@ class SubscrapeDB:
 
         # instantiate a new storage manager for the extrinsic
         storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        was_new_element = storage_manager.write_item(data)
+        was_new_element = storage_manager.write_item(index, data)
         storage_manager.flush()
 
         self._extrinsics_meta_index[extrinsic_index] = {
@@ -103,8 +102,7 @@ class SubscrapeDB:
     def storage_manager_for_events_call(self, module, event):
         path = f"{self._path}events_{module}_{event}.sqlite"
         log_description = f"{self._parachain}.{module}.{event}"
-        index_for_item = lambda item: f"{item['block_num']}-{item['event_idx']}"
-        return SqliteDictWrapper(path, log_description, index_for_item)
+        return SqliteDictWrapper(path, log_description)
 
 
     # Transfers

@@ -10,6 +10,7 @@ class ScrapeConfig:
         self.skip = False
         self.digits_per_sector = None
         self.params = None
+        self.scraper = None
         self._set_config(config)
 
     def _set_config(self, config):
@@ -42,6 +43,10 @@ class ScrapeConfig:
         params = config.get("_params", None)
         if params is not None:
             self.params = params
+
+        scraper = config.get("_scraper", None)
+        if scraper is not None:
+            self.scraper = scraper
 
     def create_inner_config(self, config):
         """

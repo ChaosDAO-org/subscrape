@@ -1,7 +1,8 @@
 import logging
 import os
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
-from subscrape.subscan_wrapper import SubscanWrapper
+from subscrape.subscan_v1 import SubscanV1
+from subscrape.subscan_v2 import SubscanV2
 from subscrape.blockscout_wrapper import BlockscoutWrapper
 from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
@@ -34,22 +35,29 @@ def blockscout_factory(chain):
     return BlockscoutWrapper(chain)
 
 
-def subscan_factory(chain):
+def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
     """
     Return a configured Subscan API interface, including API key to speed up transactions
 
     :param chain: name of the specific substrate chain
     :type chain: str
+    :param db: database to use for storing the scraped data
+    :type db: SubscrapeDB
+    :param chain_config: configuration for the specific chain
+    :type chain_config: ScrapeConfig
     """
     subscan_key = None
     if os.path.exists("config/subscan-key"):
         f = open("config/subscan-key")
         subscan_key = f.read()
 
-    return SubscanWrapper(chain, subscan_key)
+    if chain_config.scraper == "SubscanV2":
+        return SubscanV2(chain, db, subscan_key)
+
+    return SubscanV1(chain, db, subscan_key)
 
 
-def scraper_factory(name):
+def scraper_factory(name, chain_config: ScrapeConfig):
     """
     Configure and return a configured object ready to scrape one or more Dotsama EVM or substrate-based chains
 
@@ -67,8 +75,8 @@ def scraper_factory(name):
         return scraper
     else:
         db = SubscrapeDB(name)
-        subscan_api = subscan_factory(name)
-        scraper = ParachainScraper(db, subscan_api)
+        subscan_api = subscan_factory(name, db, chain_config)
+        scraper = ParachainScraper(subscan_api)
         return scraper
 
 
@@ -100,8 +108,8 @@ def scrape(chains) -> int:
                 logging.info(f"Config asks to skip chain {chain}")
                 continue
 
-            parachain_scraper = scraper_factory(chain)
-            items_scraped += parachain_scraper.scrape(operations, chain_config)
+            scraper = scraper_factory(chain, chain_config)
+            items_scraped += scraper.scrape(operations, chain_config)
     except Exception as e:
         logging.error(f"Uncaught error during scraping: {e}")
         import traceback

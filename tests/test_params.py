@@ -1,11 +1,13 @@
 from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
+import pytest
 
-account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"
+@pytest.mark.parametrize("scraper", [None, "SubscanV2"])
+def test(scraper):
 
-def test():
-        
+    account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"    
+    
     config = {
         "kusama":{
             "extrinsics":{
@@ -14,6 +16,9 @@ def test():
             }
         }
     }
+
+    if scraper is not None:
+        config["kusama"]["_scraper"] = scraper
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
@@ -30,4 +35,3 @@ def test():
     first_extrinsic = next(iter(extrinsics.values()))
     assert first_extrinsic["account_id"] == account_id
 
-test()
