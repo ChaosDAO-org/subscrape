@@ -10,14 +10,12 @@ def test(scraper):
     
     config = {
         "kusama":{
+            "_scraper": scraper,
             "extrinsics-list":[
                 extrinsic_idx
             ]
         }
     }
-
-    if scraper is not None:
-        config["kusama"]["_scraper"] = scraper
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
