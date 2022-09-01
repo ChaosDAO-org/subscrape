@@ -13,7 +13,7 @@ def test(api):
             "_api": api,
             "extrinsics-list":[
                 extrinsic_idx
-            ]
+            ],
         }
     }
 
