@@ -54,24 +54,31 @@ class SubscrapeDB:
         self._extrinsics_index_managers[name] = sm
         return sm
 
-    def write_extrinsics(self, extrinsics: dict[str, dict]):
+    def storage_manager_for_extrinsics(self):
+        return self._extrinsics_storage
+
+    def write_extrinsic(self, index, extrinsic) -> bool:
         """
         Write hydrated extrinsics to the database.
 
-        :param extrinsics: The extrinsics to write
+        :param index: The index of the extrinsic
+        :type index: str
+        :param extrinsic: The extrinsic to write
+        :type extrinsic: dict
         """
-
+                
+        was_new_element = self._extrinsics_storage.write_item(index, extrinsic)
         
-        for index in extrinsics:
-            was_new_element = self._extrinsics_storage.write(index, extrinsics[index])
-        storage_manager.flush()
-
-        self._extrinsics_storage[extrinsic_index] = {
-            "module": module,
-            "call": call
-        }
+        if was_new_element:
+            self.logger.info(f"Extrinsic {index} already exists in the database. Overwriting.")
 
         return was_new_element
+
+    def flush_extrinsics(self):
+        """
+        Flush the extrinsics to the database.
+        """
+        self._extrinsics_storage.flush()
 
     def read_extrinsic(self, extrinsic_index):
         """
@@ -80,11 +87,7 @@ class SubscrapeDB:
         :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
         :return: The extrinsic
         """
-        obj = self._extrinsics_storage[extrinsic_index]
-        module = obj["module"]
-        call = obj["call"]
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        return storage_manager.read_item(extrinsic_index)
+        return self._extrinsics_storage.read_item(extrinsic_index)
 
     """ # Events """
 

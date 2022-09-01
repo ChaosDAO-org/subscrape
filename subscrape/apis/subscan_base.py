@@ -36,7 +36,7 @@ class SubscanBase:
         """
         self.logger = logging.getLogger("SubscanWrapper")
         self.endpoint = f"https://{chain}.api.subscan.io"
-        self.db = db
+        self.db: SubscrapeDB = db
         self.api_key = api_key
         global MAX_CALLS_PER_SEC
         if api_key is not None:
@@ -266,7 +266,7 @@ class SubscanBase:
         self.logger.info(f"Fetching transfers for {substrate_address} from {self.api.endpoint}")
 
         body = {"address": substrate_address}
-        items_scraped += self.api.iterate_pages(
+        items_scraped += self.iterate_pages(
             self._api_method_transfers,
             self.db.write_transfer,
             list_key="transfers",
@@ -277,20 +277,27 @@ class SubscanBase:
         self.db.flush_transfers()
         return items_scraped
 
-    def fetch_extrinsic(self, extrinsic_index):
+    def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
         """
         Fetches the extrinsic with the specified index and writes it to the db.
         :param extrinsic_index: The extrinsix index to fetch
         :type extrinsic_index: str
+        :param element_processor: The function to process the extrinsic
+        :type element_processor: function
         :return: the number of items scraped
         """
-        self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.endpoint}")
 
+        items_scraped = 0
+        for extrinsic_index in extrinsic_indexes:
+            self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.endpoint}")
 
+            method = self._api_method_extrinsic
+            body = {"extrinsic_index": extrinsic_index}
+            data = self._query(method, body=body)
+            index = self._extrinsic_index_deducer(data)
+            self.db.write_extrinsic(index, data)
+            items_scraped += 1
 
-        method = self._api_method_extrinsic
-        body = {"extrinsic_index": extrinsic_index}
-        data = self._query(method, body=body)
-        index = self._extrinsic_index_deducer(data)
-        self.db.write_extrinsic(index, data)
-        return 1
+        self.db.flush_extrinsics()
+
+        return items_scraped

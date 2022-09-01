@@ -1,10 +1,10 @@
 import logging
 import os
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
-from subscrape.subscan_v1 import SubscanV1
-from subscrape.subscan_v2 import SubscanV2
-from subscrape.blockscout_wrapper import BlockscoutWrapper
-from subscrape.moonscan_wrapper import MoonscanWrapper
+from subscrape.apis.subscan_v1 import SubscanV1
+from subscrape.apis.subscan_v2 import SubscanV2
+from subscrape.apis.blockscout_wrapper import BlockscoutWrapper
+from subscrape.apis.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig

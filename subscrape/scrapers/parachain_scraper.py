@@ -1,6 +1,7 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import logging
+from subscrape.apis.subscan_base import SubscanBase
 
 # A generic scraper for parachains
 class ParachainScraper:
@@ -8,7 +9,7 @@ class ParachainScraper:
 
     def __init__(self, api):
         self.logger = logging.getLogger("ParachainScraper")
-        self.api = api
+        self.api: SubscanBase = api
 
     def scrape(self, operations, chain_config) -> int:
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
@@ -28,13 +29,13 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsics)
+                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsics_index)
             elif operation == "extrinsics-list":
                 extrinsics_list = operations[operation]
-                items_scraped += self.scrape_extrinsics_list(extrinsics_list, chain_config)
+                items_scraped += self.api.fetch_extrinsics(extrinsics_list)
             elif operation == "events":
                 modules = operations[operation]
-                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_events)
+                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_events_index)
             elif operation == "transfers":
                 accounts = operations[operation]
                 items_scraped += self.scrape_transfers(accounts, chain_config)
@@ -118,21 +119,7 @@ class ParachainScraper:
 
             items_scraped += self.api.fetch_transfers(account, account_config)
 
-    def scrape_extrinsics_list(self, extrinsics_list, chain_config) -> int:
-        """
-        Scrapes all extrinsics from a list of extrinsic indexes.
-        
-        :param extrinsics_list: A list of extrinsic indexes to scrape
-        :type extrinsics_list: list
-        :param chain_config: the `ScrapeConfig`
-        :type chain_config: ScrapeConfig
-        :return: the number of items scraped
-        """
-        items_scraped = 0
-        for extrinsic_index in extrinsics_list:
-            items_scraped += self.api.fetch_extrinsic(extrinsic_index)
 
-        return items_scraped
 
 """
 

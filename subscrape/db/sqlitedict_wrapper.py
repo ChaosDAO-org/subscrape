@@ -42,7 +42,12 @@ class SqliteDictWrapper:
     def flush(self):
         self.db.commit()
 
-    def read_item(self, index):
+    def read_item(self, index: str) -> dict:
+        """
+        Read a single item from the database.
+        :param index: str: the index of the item to read
+        :return: dict: the data at the index
+        """
         return self.db[index]
 
     def get_iter(self):

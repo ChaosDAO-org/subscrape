@@ -37,9 +37,8 @@ def test(api):
     subscrape_config = {chain:{"_api": api, "extrinsics-list":extrinsic_list}}
     subscrape.scrape(subscrape_config)
 
-    extrinsics = extrinsics_storage.get_iter()
-    for index, extrinsic in extrinsics:
-        pass
-
+    index = extrinsic_list[-1]
+    data = db.read_extrinsic(index)
+    assert type(data["params"]) is list
 
 
