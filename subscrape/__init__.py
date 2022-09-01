@@ -51,17 +51,17 @@ def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
         f = open("config/subscan-key")
         subscan_key = f.read()
 
-    selected_scraper = chain_config.scraper
-    if selected_scraper is None:
-        selected_scraper = "SubscanV1"
-        logging.info("No scraper specified in the chains `_scraper` param. Assuming SubscanV1. This will change in the future. Please specify a scraper.")
+    selected_api = chain_config.api
+    if selected_api is None:
+        selected_api = "SubscanV1"
+        logging.info("No scraper specified in the chains `_api` param. Assuming SubscanV1. This will change in the future. Please specify a scraper.")
 
-    if selected_scraper == "SubscanV1":
+    if selected_api == "SubscanV1":
         scraper = SubscanV1(chain, db, subscan_key)
-    elif selected_scraper == "SubscanV2":
+    elif selected_api == "SubscanV2":
         scraper = SubscanV2(chain, db, subscan_key)
     else:
-        raise Exception(f"Unknown scraper {selected_scraper}")
+        raise Exception(f"Unknown scraper {selected_api}")
 
     return scraper
 

@@ -6,7 +6,7 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 {
     "_version": 1,
     "kusama": {
-        "_scraper": "SubscanV2",
+        "_api": "SubscanV2",
         "transfers": {
             "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
         },
@@ -47,7 +47,7 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 
 ## Config for scraping Substrate chains:
 
-### Param: _scraper
+### Param: _api
 Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
 In the future, we will change this to `SubscanV2`.
 

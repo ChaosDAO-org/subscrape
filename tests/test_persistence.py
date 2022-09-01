@@ -3,12 +3,12 @@ import logging
 import subscrape
 import pytest
 
-@pytest.mark.parametrize("scraper", [None, "SubscanV2"])
-def test(scraper):
+@pytest.mark.parametrize("api", [None, "SubscanV2"])
+def test(api):
         
     config = {
         "kusama":{
-            "_scraper": scraper,
+            "_api": api,
             "extrinsics":{
                 "crowdloan": ["create"]
             },

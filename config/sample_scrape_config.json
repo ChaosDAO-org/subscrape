@@ -1,7 +1,7 @@
 {
     "_version": 1,
     "kusama": {
-        "_scraper": "SubscanV2",
+        "_api": "SubscanV2",
         "transfers": {
             "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
         },

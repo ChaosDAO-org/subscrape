@@ -1,4 +1,4 @@
-from subscrape.subscan_base import SubscanBase
+from subscrape.apis.subscan_base import SubscanBase
 from subscrape.db.subscrape_db import SubscrapeDB
 
 class SubscanV2(SubscanBase):

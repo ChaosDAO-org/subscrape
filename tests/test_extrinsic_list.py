@@ -3,14 +3,14 @@ import logging
 import subscrape
 import pytest
 
-@pytest.mark.parametrize("scraper", [None, "SubscanV2"])
-def test(scraper):
+@pytest.mark.parametrize("api", [None, "SubscanV2"])
+def test(api):
     
     extrinsic_idx = "14238250-2"
     
     config = {
         "kusama":{
-            "_scraper": scraper,
+            "_api": api,
             "extrinsics-list":[
                 extrinsic_idx
             ]

@@ -34,50 +34,39 @@ class SubscrapeDB:
         #: str: the name of the chain this db represents
         self._parachain = parachain
         #: SqliteDict: the index of all extrinsics
-        self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
+        self._extrinsics_storage = SqliteDictWrapper(self._path + "extrinsics.sqlite", f"{parachain}.extrinsics")
         
-        self._extrinsics_storage_managers = {}
+        self._extrinsics_index_managers = {}
 
 
     """ # Extrinsics """
 
     def storage_manager_for_extrinsics_call(self, module, call):
         """
-        returns a `SectorizedStorageManager` to store and retrieve extrinsics
+        returns a SqliteDictWrapper to store and retrieve extrinsics
         """
         name = f"{self._parachain}.{module}.{call}"
-        if name in self._extrinsics_storage_managers:
-            return self._extrinsics_storage_managers[name]
+        if name in self._extrinsics_index_managers:
+            return self._extrinsics_index_managers[name]
 
-        path = f"{self._path}extrinsics_{module}_{call}.sqlite"
+        path = f"{self._path}extrinsics_index_{module}_{call}.sqlite"
         sm = SqliteDictWrapper(path, name)
-        self._extrinsics_storage_managers[name] = sm
+        self._extrinsics_index_managers[name] = sm
         return sm
 
-    def write_extrinsic(self, index, data):
+    def write_extrinsics(self, extrinsics: dict[str, dict]):
         """
-        Write a single extrinsic to the storage.
-        This might be expensive when done with a lot of extrinsics,
-        but is the intended approach when the module and call of extrinsics being scraped is unknown
-        ahead of scraping.
+        Write hydrated extrinsics to the database.
 
-        This method will determine the module and call, instantiate a new storage manager for the extrinsic,
-        and write the extrinsic to the storage.
-
-        :param data: The extrinsic to write
+        :param extrinsics: The extrinsics to write
         """
 
-        # determine the module and call of the extrinsic
-        module = data["call_module"]
-        call = data["call_module_function"]
-        extrinsic_index = data["extrinsic_index"]
-
-        # instantiate a new storage manager for the extrinsic
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        was_new_element = storage_manager.write_item(index, data)
+        
+        for index in extrinsics:
+            was_new_element = self._extrinsics_storage.write(index, extrinsics[index])
         storage_manager.flush()
 
-        self._extrinsics_meta_index[extrinsic_index] = {
+        self._extrinsics_storage[extrinsic_index] = {
             "module": module,
             "call": call
         }
@@ -91,7 +80,7 @@ class SubscrapeDB:
         :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
         :return: The extrinsic
         """
-        obj = self._extrinsics_meta_index[extrinsic_index]
+        obj = self._extrinsics_storage[extrinsic_index]
         module = obj["module"]
         call = obj["call"]
         storage_manager = self.storage_manager_for_extrinsics_call(module, call)

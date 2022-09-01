@@ -3,14 +3,14 @@ import logging
 import subscrape
 import pytest
 
-@pytest.mark.parametrize("scraper", [None, "SubscanV2"])
-def test(scraper):
+@pytest.mark.parametrize("api", [None, "SubscanV2"])
+def test(api):
 
     account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"    
     
     config = {
         "kusama":{
-            "_scraper": scraper,
+            "_api": api,
             "extrinsics":{
                 "_params": {"address": account_id},
                 "staking": ["bond"]
@@ -32,7 +32,7 @@ def test(scraper):
 
     first_extrinsic = next(iter(extrinsics.values()))
 
-    if scraper != "SubscanV2":
+    if api != "SubscanV2":
         assert first_extrinsic["account_id"] == account_id
     else:
         assert first_extrinsic["account_display"]["address"] == account_id

@@ -175,7 +175,7 @@ class SubscanBase:
         return process_element
 
 
-    def fetch_extrinsics(self, module, call, config) -> int:
+    def fetch_extrinsics_index(self, module, call, config) -> int:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -189,9 +189,6 @@ class SubscanBase:
         """
         items_scraped = 0
         with self.db.storage_manager_for_extrinsics_call(module, call) as extrinsics_storage:
-            if config.digits_per_sector is not None:
-                extrinsics_storage.digits_per_sector = config.digits_per_sector
-
             self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
 
             body = {"module": module, "call": call}
@@ -213,7 +210,7 @@ class SubscanBase:
 
 
 
-    def fetch_events(self, module, call, config) -> int:
+    def fetch_events_index(self, module, call, config) -> int:
         """
         Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -227,8 +224,6 @@ class SubscanBase:
         """
         items_scraped = 0
         sm = self.db.storage_manager_for_events_call(module, call)
-        if config.digits_per_sector is not None:
-            sm.digits_per_sector = config.digits_per_sector
 
         self.logger.info(f"Fetching events {module}.{call} from {self.endpoint}")
 
@@ -290,6 +285,8 @@ class SubscanBase:
         :return: the number of items scraped
         """
         self.logger.info(f"Fetching extrinsic {extrinsic_index} from {self.endpoint}")
+
+
 
         method = self._api_method_extrinsic
         body = {"extrinsic_index": extrinsic_index}
