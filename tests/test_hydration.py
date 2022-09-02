@@ -3,8 +3,9 @@ import logging
 import subscrape
 import pytest
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-def test(api):
+async def test(api):
         
     chain = "mangatax"
     module = "bootstrap"
@@ -24,7 +25,7 @@ def test(api):
     logging.info("wiping storage")
     subscrape.wipe_storage()
     logging.info("scraping")
-    subscrape.scrape(config)
+    await subscrape.scrape(config)
     logging.info("transforming")
 
     db = SubscrapeDB("mangatax")
@@ -35,7 +36,7 @@ def test(api):
         extrinsic_list.append(index)
 
     subscrape_config = {chain:{"_api": api, "extrinsics-list":extrinsic_list}}
-    subscrape.scrape(subscrape_config)
+    await subscrape.scrape(subscrape_config)
 
     index = extrinsic_list[-1]
     data = db.read_extrinsic(index)

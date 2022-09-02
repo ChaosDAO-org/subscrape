@@ -7,6 +7,7 @@ import logging
 from ratelimit import limits, sleep_and_retry
 from subscrape.db.subscrape_db import SubscrapeDB
 from substrateinterface.utils import ss58
+import asyncio
 
 #import http.client
 #http.client.HTTPConnection.debuglevel = 1
@@ -40,12 +41,13 @@ class SubscanBase:
         self.api_key = api_key
         global MAX_CALLS_PER_SEC
         if api_key is not None:
-            MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
+            MAX_CALLS_PER_SEC = 5
         self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
+        self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
-    def _query(self, method, headers={}, body={}):
+    #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
+    async def _query(self, method, headers={}, body={}, client=None):
         """Rate limited call to fetch another page of data from the Subscan.io block explorer website
 
         :param method: Subscan.io API call method.
@@ -55,20 +57,29 @@ class SubscanBase:
         :param headers: Subscan.io API call body. Typically, used to specify each page being requested.
         :type body: list
         """
+        if client is None:
+            client = httpx.AsyncClient()
+
         headers["Content-Type"] = "application/json"
         if self.api_key is not None:
             headers["x-api-key"] = self.api_key
         body = json.dumps(body)
-        before = datetime.now()
         url = self.endpoint + method
-        response = httpx.post(url, headers=headers, data=body)
+
+        before = datetime.now()
+
+        async with self.semaphore:
+            response = await client.post(url, headers=headers, data=body)
+
         after = datetime.now()
+
         self.logger.debug("request took: " + str(after - before))
+        #await asyncio.sleep(1/MAX_CALLS_PER_SEC)
 
         if response.status_code != 200:
             self.logger.info(f"Status Code: {response.status_code}")
             self.logger.info(response.headers)
-            raise Exception()
+            raise Exception(f"Error: {response.status_code}")
         else:
             #self.logger.debug(response.headers)
             pass
@@ -93,7 +104,7 @@ class SubscanBase:
         return process_element
 
 
-    def fetch_extrinsics_index(self, module, call, config) -> int:
+    async def fetch_extrinsics_index(self, module, call, config) -> int:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -113,7 +124,7 @@ class SubscanBase:
             if config.params is not None:
                 body.update(config.params)
 
-            items_scraped += self._iterate_pages(
+            items_scraped += await self._iterate_pages(
                 self._api_method_extrinsics,
                 self._element_processor(
                     extrinsics_storage.write_item,
@@ -127,7 +138,7 @@ class SubscanBase:
         return items_scraped
 
 
-    def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
+    async def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
         """
         Fetches the extrinsic with the specified index and writes it to the db.
         :param extrinsic_index: The extrinsix index to fetch
@@ -139,24 +150,45 @@ class SubscanBase:
 
         items_scraped = 0
         
+        self.logger.info("Building list of extrinsics to fetch...")
         # build list of extrinsics we need to fetch
         extrinsics_to_fetch = [extrinsic for extrinsic in extrinsic_indexes if not self.db.has_extrinsic(extrinsic)]
         self.logger.info(f"Fetching {len(extrinsics_to_fetch)} extrinsics from {self.endpoint}")
 
         method = self._api_method_extrinsic
 
-        for extrinsic_index in extrinsics_to_fetch:
-            body = {"extrinsic_index": extrinsic_index}
-            data = self._query(method, body=body)
-            index = self._extrinsic_index_deducer(data)
-            self.db.write_extrinsic(index, data)
-            items_scraped += 1
+        async with httpx.AsyncClient() as client:
+            while len(extrinsics_to_fetch) > 0:
+                # take up to 1000 extrinsics at a time
+                batch = extrinsics_to_fetch[:1000]
+                if len(batch) == 0:
+                    break
+                
+                futures = []
+                for extrinsic_index in batch:
+                    body = {"extrinsic_index": extrinsic_index}
+                    task = self._query(method, body=body, client=client)
 
-        self.db.flush_extrinsics()
+                    self.logger.debug(f"Spawning task for {extrinsic_index}")
+                    future = asyncio.ensure_future(task)
+                    await asyncio.sleep(1/MAX_CALLS_PER_SEC)
+                    futures.append(future)
+
+                extrinsics = await asyncio.gather(*futures)
+                
+                for extrinsic in extrinsics:
+                    index = self._extrinsic_index_deducer(extrinsic)
+                    self.db.write_extrinsic(index, extrinsic)
+                    items_scraped += 1
+
+                self.db.flush_extrinsics()
+
+                for index in batch:
+                    extrinsics_to_fetch.remove(index)
 
         return items_scraped
 
-    def fetch_events_index(self, module, call, config) -> int:
+    async def fetch_events_index(self, module, call, config) -> int:
         """
         Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -177,7 +209,7 @@ class SubscanBase:
         if config.params is not None:
             body.update(config.params)
 
-        items_scraped += self._iterate_pages(
+        items_scraped += await self._iterate_pages(
             self._api_method_events,
             self._element_processor(
                 sm.write_item,
@@ -191,7 +223,7 @@ class SubscanBase:
 
         return items_scraped
 
-    def fetch_events(self, event_indexes: list) -> int:
+    async def fetch_events(self, event_indexes: list) -> int:
         """
         Fetches the event with the specified index and writes it to the db.
         :param event_index: The event index to fetch
@@ -203,20 +235,41 @@ class SubscanBase:
 
         items_scraped = 0
         
+        self.logger.info("Building list of events to fetch...")
         # build list of events to fetch
         events_to_fetch = [event for event in event_indexes if not self.db.has_event(event)]
         self.logger.info(f"Fetching {len(events_to_fetch)} events from {self.endpoint}")
 
         method = self._api_method_event
 
-        for event_index in events_to_fetch:
-            body = {"event_index": event_index}
-            data = self._query(method, body=body)
-            index = self._event_index_deducer(data)
-            self.db.write_event(index, data)
-            items_scraped += 1
+        async with httpx.AsyncClient() as client:
+            while len(events_to_fetch) > 0:
+                # take up to 1000 extrinsics at a time
+                batch = events_to_fetch[:1000]
+                if len(batch) == 0:
+                    break
+                
+                futures = []
+                for event_index in batch:
+                    body = {"event_index": event_index}
+                    task = self._query(method, body=body)
+                    
+                    self.logger.debug(f"Spawning task for {event_index}")
+                    future = asyncio.ensure_future(task)
+                    await asyncio.sleep(1/MAX_CALLS_PER_SEC)
+                    futures.append(future)
 
-        self.db.flush_events()
+                events = await asyncio.gather(*futures)
+
+                for event in events:
+                    index = self._events_index_deducer(event)
+                    self.db.write_event(index, event)
+                    items_scraped += 1
+
+                self.db.flush_events()
+
+                for index in batch:
+                    events_to_fetch.remove(index)
 
         return items_scraped
 

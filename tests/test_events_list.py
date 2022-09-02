@@ -3,8 +3,9 @@ import logging
 import subscrape
 import pytest
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-def test(api):
+async def test(api):
     
     event_index = "14238250-39"
     
@@ -22,10 +23,10 @@ def test(api):
     logging.info("wiping storage")
     subscrape.wipe_storage()
     logging.info("scraping")
-    subscrape.scrape(config)
+    await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("Kusama")
+    db = SubscrapeDB("kusama")
     data = db.read_event(event_index)
 
     assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'

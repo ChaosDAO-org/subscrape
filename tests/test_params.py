@@ -3,8 +3,9 @@ import logging
 import subscrape
 import pytest
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-def test(api):
+async def test(api):
 
     account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"    
     
@@ -23,7 +24,7 @@ def test(api):
     logging.info("wiping storage")
     subscrape.wipe_storage()
     logging.info("scraping")
-    subscrape.scrape(config)
+    await subscrape.scrape(config)
     logging.info("transforming")
 
     db = SubscrapeDB("kusama")

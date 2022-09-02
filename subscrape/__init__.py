@@ -91,7 +91,7 @@ def scraper_factory(name, chain_config: ScrapeConfig):
         return scraper
 
 
-def scrape(chains) -> int:
+async def scrape(chains) -> int:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
@@ -120,7 +120,7 @@ def scrape(chains) -> int:
                 continue
 
             scraper = scraper_factory(chain, chain_config)
-            items_scraped += scraper.scrape(operations, chain_config)
+            items_scraped += await scraper.scrape(operations, chain_config)
     except Exception as e:
         logging.error(f"Uncaught error during scraping: {e}")
         import traceback

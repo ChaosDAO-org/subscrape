@@ -16,7 +16,7 @@ class SubscanV1(SubscanBase):
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
-    def _iterate_pages(
+    async def _iterate_pages(
         self,
         method, 
         element_processor, 
@@ -49,7 +49,7 @@ class SubscanV1(SubscanBase):
 
         while not done:
             body["page"] = page
-            data = self._query(method, body=body)
+            data = await self._query(method, body=body)
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]

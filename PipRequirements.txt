@@ -2,6 +2,7 @@ eth_utils
 hexbytes
 httpx[http2]
 pandas
+pytest-asyncio
 ratelimit
 simplejson
 substrate-interface

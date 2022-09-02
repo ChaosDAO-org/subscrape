@@ -11,7 +11,7 @@ class ParachainScraper:
         self.logger = logging.getLogger("ParachainScraper")
         self.api: SubscanBase = api
 
-    def scrape(self, operations, chain_config) -> int:
+    async def scrape(self, operations, chain_config) -> int:
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
         method.
         
@@ -29,26 +29,26 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsics_index)
+                items_scraped += await self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsics_index)
             elif operation == "extrinsics-list":
                 extrinsics_list = operations[operation]
-                items_scraped += self.api.fetch_extrinsics(extrinsics_list)
+                items_scraped += await self.api.fetch_extrinsics(extrinsics_list)
             elif operation == "events":
                 modules = operations[operation]
-                items_scraped += self.scrape_module_calls(modules, chain_config, self.api.fetch_events_index)
+                items_scraped += await self.scrape_module_calls(modules, chain_config, self.api.fetch_events_index)
             elif operation == "events-list":
                 events_list = operations[operation]
-                items_scraped += self.api.fetch_events(events_list)
+                items_scraped += await self.api.fetch_events(events_list)
             elif operation == "transfers":
                 accounts = operations[operation]
-                items_scraped += self.scrape_transfers(accounts, chain_config)
+                items_scraped += await self.scrape_transfers(accounts, chain_config)
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit
         
         return items_scraped
 
-    def scrape_module_calls(self, modules, chain_config, fetch_function) -> int:
+    async def scrape_module_calls(self, modules, chain_config, fetch_function) -> int:
         """
         Scrapes all module calls that belong to the list of accounts.
 
@@ -88,7 +88,7 @@ class ParachainScraper:
                     continue
 
                 # go
-                items_scraped += fetch_function(module, call, call_config)
+                items_scraped += await fetch_function(module, call, call_config)
         return items_scraped
 
     def scrape_transfers(self, accounts, chain_config) -> int:
