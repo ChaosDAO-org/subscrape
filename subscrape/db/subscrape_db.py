@@ -39,6 +39,7 @@ class SubscrapeDB:
         self._events_storage = SqliteDictWrapper(self._path + "events.sqlite", f"{parachain}.events")
 
         self._extrinsics_index_managers = {}
+        self._events_index_managers = {}
 
 
     """ # Extrinsics """
@@ -47,6 +48,8 @@ class SubscrapeDB:
         """
         returns a SqliteDictWrapper to store and retrieve extrinsics
         """
+        module = module.lower()
+        call = call.lower()
         name = f"{self._parachain}.{module}.{call}"
         if name in self._extrinsics_index_managers:
             return self._extrinsics_index_managers[name]
@@ -100,9 +103,19 @@ class SubscrapeDB:
     """ # Events """
 
     def storage_manager_for_events_call(self, module, event):
-        path = f"{self._path}events_{module}_{event}.sqlite"
-        log_description = f"{self._parachain}.{module}.{event}"
-        return SqliteDictWrapper(path, log_description)
+        """
+        returns a SqliteDictWrapper to store and retrieve events
+        """
+        module = module.lower()
+        event = event.lower()
+        name = f"{self._parachain}.{module}.{event}"
+        if name in self._events_index_managers:
+            return self._events_index_managers[name]
+
+        path = f"{self._path}events_index_{module}_{event}.sqlite"
+        sm = SqliteDictWrapper(path, name)
+        self._events_index_managers[name] = sm
+        return sm
 
     def write_event(self, index, event) -> bool:
         """
