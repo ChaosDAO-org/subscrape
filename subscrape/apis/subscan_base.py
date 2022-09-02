@@ -44,6 +44,7 @@ class SubscanBase:
             MAX_CALLS_PER_SEC = 5
         self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
         self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
+        self.lock = asyncio.Lock()
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
@@ -66,23 +67,29 @@ class SubscanBase:
         body = json.dumps(body)
         url = self.endpoint + method
 
-        before = datetime.now()
+        response = None
+        should_request = True
+        while should_request: # loop until we get a response
+            before = datetime.now()
+            async with self.semaphore:
+                response = await client.post(url, headers=headers, data=body)
+            after = datetime.now()
+            self.logger.debug("request took: " + str(after - before))
 
-        async with self.semaphore:
-            response = await client.post(url, headers=headers, data=body)
-
-        after = datetime.now()
-
-        self.logger.debug("request took: " + str(after - before))
-        #await asyncio.sleep(1/MAX_CALLS_PER_SEC)
-
-        if response.status_code != 200:
-            self.logger.info(f"Status Code: {response.status_code}")
-            self.logger.info(response.headers)
-            raise Exception(f"Error: {response.status_code}")
-        else:
-            #self.logger.debug(response.headers)
-            pass
+            # lock to prevent multiple threads from trying to sleep at the same time
+            await self.lock.acquire()
+            try:
+                if response.status_code == 429:
+                    self.logger.warning("API rate limit exceeded. Waiting 1 second and retrying...")
+                    await asyncio.sleep(1)
+                elif response.status_code != 200:
+                    self.logger.info(f"Status Code: {response.status_code}")
+                    self.logger.info(response.headers)
+                    raise Exception(f"Error: {response.status_code}")
+                else:
+                    should_request = False
+            finally:
+                self.lock.release()
 
         #self.logger.debug(response.text)
         # unpack the payload
