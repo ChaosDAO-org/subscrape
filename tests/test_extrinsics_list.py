@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test(api):
+async def test_extrinsics_list(api):
     
     extrinsic_idx = "14238250-2"
     

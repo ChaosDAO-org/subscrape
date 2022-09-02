@@ -262,7 +262,7 @@ class SubscanBase:
                 events = await asyncio.gather(*futures)
 
                 for event in events:
-                    index = self._events_index_deducer(event)
+                    index = self._event_index_deducer(event)
                     self.db.write_event(index, event)
                     items_scraped += 1
 

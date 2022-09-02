@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test(api):
+async def test_events_list(api):
     
     event_index = "14238250-39"
     

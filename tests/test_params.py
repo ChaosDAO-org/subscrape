@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test(api):
+async def test_params(api):
 
     account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"    
     

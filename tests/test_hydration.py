@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test(api):
+async def test_hydration(api):
         
     chain = "mangatax"
     module = "bootstrap"
