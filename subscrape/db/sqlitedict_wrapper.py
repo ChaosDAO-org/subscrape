@@ -12,6 +12,7 @@ class SqliteDictWrapper:
         :param log_description: str: a description of the specific database for logging purposes
         """
         self.logger = logging.getLogger(__name__)
+        logging.getLogger("sqlitedict").setLevel(logging.WARNING)
         self.db = SqliteDict(path)
         self._write_count = 0
         self._log_description = log_description
