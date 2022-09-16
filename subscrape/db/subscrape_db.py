@@ -8,6 +8,7 @@ from substrateinterface.utils import ss58
 from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
 from sqlitedict import SqliteDict
 
+
 # one DB per Parachain
 class SubscrapeDB:
     """
@@ -19,6 +20,7 @@ class SubscrapeDB:
     """
 
     def __init__(self, parachain):
+        self._transfers_dirty = None
         self.logger = logging.getLogger("SubscrapeDB")
 
         # make sure casing is correct
@@ -35,9 +37,8 @@ class SubscrapeDB:
         self._parachain = parachain
         #: SqliteDict: the index of all extrinsics
         self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
-        
-        self._extrinsics_storage_managers = {}
 
+        self._extrinsics_storage_managers = {}
 
     """ # Extrinsics """
 
@@ -106,7 +107,6 @@ class SubscrapeDB:
         index_for_item = lambda item: f"{item['block_num']}-{item['event_idx']}"
         return SqliteDictWrapper(path, log_description, index_for_item)
 
-
     # Transfers
 
     def _transfers_folder(self):
@@ -132,7 +132,7 @@ class SubscrapeDB:
         """
         Clears the internal state of a transfers
         """
-        assert(not self._transfers_dirty)
+        assert (not self._transfers_dirty)
         self._transfers_account = None
         self._transfers = None
 

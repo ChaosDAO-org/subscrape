@@ -38,6 +38,7 @@ class MoonbeamScraper:
         :param chain_config: structure specifying whether to skip or filter certain sections of the operations to be performed.
         :type chain_config: object
         """
+        items_scraped = 0
         for operation in operations:
             # ignore metadata
             if operation.startswith("_"):
@@ -121,6 +122,8 @@ class MoonbeamScraper:
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
+        items_scraped = len(self.transactions[account])
+        return items_scraped
 
     def export_transactions(self, address, reference=None):
         """Fetch all transactions for a given address (account/contract) and use the given processor method to filter
