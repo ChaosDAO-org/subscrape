@@ -1,11 +1,11 @@
 __author__ = 'spazcoin@gmail.com @spazvt, Tommi Enenkel @alice_und_bob'
 
 from datetime import datetime
+from pathlib import Path
+
 import eth_utils
-import io
 import logging
 from numpy.core.defchararray import lower
-import os
 import pandas
 import simplejson as json
 
@@ -15,6 +15,7 @@ from subscrape.decode.decode_evm_log import decode_log
 
 class MoonbeamScraper:
     """Scrape the Moonbeam or Moonriver chains for transactions/accounts of interest."""
+
     def __init__(self, db_path, moonscan_api, blockscout_api):
         self.logger = logging.getLogger("MoonbeamScraper")
         self.db_path = db_path
@@ -145,21 +146,17 @@ class MoonbeamScraper:
             reference = reference.replace(" ", "_")
 
         # Export the transactions to a JSON file
-        json_file_path = self.db_path + f"{reference}.json"
-        if os.path.exists(json_file_path):
-            self.logger.warning(f"{json_file_path} already exists. Skipping export.")
-        else:
-            payload = json.dumps(self.transactions[reference], indent=4, sort_keys=False)
-            file = io.open(json_file_path, "w")
-            file.write(payload)
-            file.close()
+        json_file_path = Path(f"{self.db_path.parent}\\{self.db_path.stem}{reference}.json")
+        if json_file_path.exists():     # delete and recreate the file
+            json_file_path.unlink()
+        with json_file_path.open('w', encoding="UTF-8") as output_file:
+            json.dump(self.transactions[reference], output_file, indent=4, sort_keys=False)
 
         # Export the transactions to an XLSX file
-        xlsx_file_path = self.db_path + f"{reference}.xlsx"
-        if os.path.exists(xlsx_file_path):
-            self.logger.warning(f"{xlsx_file_path} already exists. Skipping export.")
-        else:
-            pandas.read_json(json_file_path).transpose().to_excel(xlsx_file_path)
+        xlsx_file_path = Path(f"{self.db_path.parent}\\{self.db_path.stem}{reference}.xlsx")
+        if xlsx_file_path.exists():     # delete and recreate the file
+            xlsx_file_path.unlink()
+        pandas.read_json(json_file_path).transpose().to_excel(xlsx_file_path)
 
     def process_methods_in_transaction_factory(self, contract_method, method):
         def process_method_in_transaction(transaction):

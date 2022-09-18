@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
 from subscrape.blockscout_wrapper import BlockscoutWrapper
@@ -7,6 +8,8 @@ from subscrape.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
+
+repo_root = Path(__file__).parent.parent.absolute()
 
 
 def moonscan_factory(chain):
@@ -17,9 +20,10 @@ def moonscan_factory(chain):
     :type chain: str
     """
     moonscan_key = None
-    if os.path.exists("config/moonscan-key"):
-        f = open("config/moonscan-key")
-        moonscan_key = f.read()
+    moonscan_key_path = repo_root / 'config' / 'moonscan-key'
+    if moonscan_key_path.exists():
+        with moonscan_key_path.open(encoding="UTF-8", mode='r') as source:
+            moonscan_key = source.read()
 
     return MoonscanWrapper(chain, moonscan_key)
 
@@ -42,9 +46,10 @@ def subscan_factory(chain):
     :type chain: str
     """
     subscan_key = None
-    if os.path.exists("config/subscan-key"):
-        f = open("config/subscan-key")
-        subscan_key = f.read()
+    subscan_key_path = repo_root / 'config' / 'subscan-key'
+    if subscan_key_path.exists():
+        with subscan_key_path.open(encoding="UTF-8", mode='r') as source:
+            subscan_key = source.read()
 
     return SubscanWrapper(chain, subscan_key)
 
@@ -57,10 +62,10 @@ def scraper_factory(name):
     :type name: str
     """
     if name == "moonriver" or name == "moonbeam":
-        db_path = f"data/parachains"
-        if not os.path.exists(db_path):
-            os.makedirs(db_path)
-        db_path += f'/{name}_'
+        db_path = repo_root / 'data' / 'parachains'
+        if not db_path.exists():
+            db_path.mkdir()
+        db_path = db_path / f'{name}_'
         moonscan_api = moonscan_factory(name)
         blockscout_api = blockscout_factory(name)
         scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
@@ -112,13 +117,16 @@ def scrape(chains) -> int:
     logging.info(f"Scraped {items_scraped} items")
     return items_scraped
 
+
 def wipe_storage():
     """
-    Wipe the complete storage the data folder
+    Delete everything in the 'data' folder
     """
-    if os.path.exists("data"):
+    data_path = repo_root / 'data'
+    if data_path.exists():
         import shutil
         logging.info("wiping data folder")
-        shutil.rmtree("data/")
+        shutil.rmtree(data_path)
     else:
         logging.info("data folder does not exist")
+

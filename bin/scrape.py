@@ -18,13 +18,13 @@ def main():
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # load config
-    config_path = "config/scrape_config.json"
-    if not os.path.exists(config_path):
+    repo_root = Path(__file__).parent.parent.absolute()
+    config_path = repo_root / 'config' / 'scrape_config.json'
+    if not config_path.exists():
         logging.error("missing scrape config. Exiting")
         exit
-    f = open(config_path)
-    raw_config = f.read()
-    chains = json.loads(raw_config)
+    with open(str(config_path), encoding='UTF-8', mode='r') as config_file:
+        chains = json.load(config_file)
     subscrape.scrape(chains)
 
 

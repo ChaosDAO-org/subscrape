@@ -4,9 +4,12 @@ import os
 import io
 import json
 import logging
+from pathlib import Path
 from substrateinterface.utils import ss58
 from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
 from sqlitedict import SqliteDict
+
+repo_root = Path(__file__).parent.parent.absolute()
 
 
 # one DB per Parachain
@@ -27,12 +30,12 @@ class SubscrapeDB:
         parachain = parachain.lower()
 
         # make sure the parachains folder exists
-        folder_path = f"{os.getcwd()}/data/parachains/"
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        parachain_data_path = str(repo_root / 'data' / 'parachains')
+        if not os.path.exists(parachain_data_path):
+            os.makedirs(parachain_data_path)
 
         #: str: the root path to this db
-        self._path = f"data/parachains/{parachain}_"
+        self._path = f"{parachain_data_path}/{parachain}_"
         #: str: the name of the chain this db represents
         self._parachain = parachain
         #: SqliteDict: the index of all extrinsics
