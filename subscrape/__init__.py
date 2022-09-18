@@ -68,7 +68,7 @@ def scraper_factory(name):
         db_path = db_path / f'{name}_'
         moonscan_api = moonscan_factory(name)
         blockscout_api = blockscout_factory(name)
-        scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
+        scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api, name)
         return scraper
     else:
         db = SubscrapeDB(name)
