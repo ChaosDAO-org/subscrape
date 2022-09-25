@@ -105,7 +105,7 @@ class MoonscanWrapper:
             return response_dict['result']
 
     def get_transaction_receipt(self, tx_hash):
-        """Get a transaction's receipt (so that we can get the logs and figure what exactly happened).
+        """Get a transaction's receipt (so that we can get the logs and figure out what exactly happened).
 
         :param tx_hash: transaction hash
         :type tx_hash: str

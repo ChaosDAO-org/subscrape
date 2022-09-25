@@ -98,6 +98,29 @@ class BlockscoutWrapper:
             # response_dict['result'] should contain a long string representation of the contract abi.
             return response_dict['result']
 
+    def get_transaction_receipt(self, tx_hash, verbose=True):
+        """Get a transaction's info, including the logs to figure out what exactly happened.
+
+        :param tx_hash: transaction hash
+        :type tx_hash: str
+        :param verbose: should the "not retrievable" message be printed out?
+        :type verbose: bool
+        :returns: dictionary representing the transaction receipt, or None if not retrievable
+        :rtype: dict or None
+        """
+        params = {"module": "transaction", "action": "gettxinfo", "txhash": tx_hash}
+        response = self.query(params)   # will add on the optional API key
+        response_dict = json.loads(response)
+        # response_dict['logs'] should contain a long string representation of the tx receipt.
+        # return response_dict['logs']
+        if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
+            if verbose:
+                self.logger.info(f'Transaction logs not retrievable for {tx_hash} because "{response_dict["result"]}"')
+            return None
+        else:
+            # response_dict['result'] should contain the info about the token.
+            return response_dict['result']
+
     def get_token_info(self, token_address, verbose=True):
         """Get a token's basic info (name, ticker symbol, decimal places)
 
