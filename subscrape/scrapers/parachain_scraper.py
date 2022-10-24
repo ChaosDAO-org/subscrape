@@ -91,7 +91,7 @@ class ParachainScraper:
                 items_scraped += await fetch_function(module, call, call_config)
         return items_scraped
 
-    def scrape_transfers(self, accounts, chain_config) -> int:
+    async def scrape_transfers(self, accounts, chain_config) -> int:
         """
         Scrapes all transfers that belong to the list of accounts.
         
@@ -120,9 +120,8 @@ class ParachainScraper:
                 self.logger.info(f"Config asks to skip account {account}")
                 continue
 
-            items_scraped += self.api.fetch_transfers(account, account_config)
-
-
+            items_scraped += await self.api.fetch_transfers(account, account_config)
+        return items_scraped
 
 """
 

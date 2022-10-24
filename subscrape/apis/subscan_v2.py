@@ -4,9 +4,12 @@ from subscrape.db.subscrape_db import SubscrapeDB
 class SubscanV2(SubscanBase):
     def __init__(self, chain, db: SubscrapeDB, subscan_key):
         super().__init__(chain, db, subscan_key)
-        self._extrinsic_index_deducer = lambda ex: ex["extrinsic_index"]
-        self._events_index_deducer = lambda ex: f"{ex['event_index']}"
-        self._event_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
+        self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
+        self._events_index_deducer = lambda e: f"{e['event_index']}"
+        self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._last_id_deducer = lambda e: e["id"]
+        self._last_transfer_id_deducer = lambda e: [e["block_num"], e["event_idx"]]
         self._api_method_extrinsics = "/api/v2/scan/extrinsics"
         self._api_method_extrinsic = "/api/scan/extrinsic"
         self._api_method_events = "/api/v2/scan/events"
@@ -21,7 +24,8 @@ class SubscanV2(SubscanBase):
         self,
         method, 
         element_processor, 
-        list_key=None, 
+        list_key,
+        last_id_deducer,
         body={}, 
         filter=None) -> int:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
@@ -30,15 +34,16 @@ class SubscanV2(SubscanBase):
         :type method: str
         :param element_processor: method to process each transaction as it is received
         :type element_processor: function
-        :param list_key: whether `events` or `extrinsics` should be looked for
-        :type list_key: str or None
+        :param list_key: what's the subkey in the response that contains the list of elements
+        :type list_key: str
+        :param last_id_deducer: method to deduce the last id from the last element in the list
+        :type last_id_deducer: function
         :param body: Subscan.io API call body. Typically, used to specify each page being requested.
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
         :type filter: function
         :return: number of items processed
         """
-        assert(list_key is not None)
 
         done = False        # keep crunching until we are done
         rows_per_page = 100 # constant for the rows per page to query
@@ -85,6 +90,6 @@ class SubscanV2(SubscanBase):
 
             self.logger.debug(f"Last ID: {last_id}")
 
-            last_id = elements[-1]["id"]
+            last_id = last_id_deducer(elements[-1])
 
         return count

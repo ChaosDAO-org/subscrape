@@ -7,6 +7,9 @@ class SubscanV1(SubscanBase):
         self._extrinsic_index_deducer = lambda ex: f"{ex['extrinsic_index']}"
         self._events_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
         self._event_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
+        self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._last_id_deducer = lambda e: None
+        self._last_transfer_id_deducer = lambda e: None
         self._api_method_extrinsics = "/api/scan/extrinsics"
         self._api_method_extrinsic = "/api/scan/extrinsic"
         self._api_method_events = "/api/scan/events"
@@ -20,7 +23,8 @@ class SubscanV1(SubscanBase):
         self,
         method, 
         element_processor, 
-        list_key=None, 
+        list_key, 
+        last_id_deducer=None,
         body={}, 
         filter=None) -> int:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
@@ -31,6 +35,8 @@ class SubscanV1(SubscanBase):
         :type element_processor: function
         :param list_key: whether `events` or `extrinsics` should be looked for
         :type list_key: str or None
+        :param last_id_deducer: not used, only for forward compatibility
+        :type last_id_deducer: function or None
         :param body: Subscan.io API call body. Typically, used to specify each page being requested.
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results

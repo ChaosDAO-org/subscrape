@@ -6,7 +6,7 @@ import json
 import logging
 from substrateinterface.utils import ss58
 from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
-from sqlitedict import SqliteDict
+import sqlite3
 
 # one DB per Parachain
 class SubscrapeDB:
@@ -40,6 +40,7 @@ class SubscrapeDB:
 
         self._extrinsics_index_managers = {}
         self._events_index_managers = {}
+        self._transfers_index_managers = {}
 
 
     """ # Extrinsics """
@@ -154,91 +155,59 @@ class SubscrapeDB:
         """
         return self._events_storage.read_item(event_index)
     
-    # Transfers
+    """ # Transfers """
 
-    def _transfers_folder(self):
+    def storage_manager_for_transfers(self, address):
         """
-        Returns the folder where transfers are stored.
+        returns a SqliteDictWrapper to store and retrieve transfers
         """
-        return f"{self._path}transfers/"
+        address = ss58.ss58_decode(address)
+        address = ss58.ss58_encode(address, 42)
+        name = f"{self._parachain}.transfers.{address}"
+        if name in self._transfers_index_managers:
+            return self._transfers_index_managers[name]
 
-    def _transfers_account_file(self, account):
-        """
-        Will return the storage path for an account.
-        The address is normalized to the Substrate address format.
+        path = f"{self._path}transfers_index_{address}.sqlite"
+        sm = SqliteDictWrapper(path, name)
+        self._transfers_index_managers[name] = sm
+        return sm
 
-        :param account: The account
-        :type account: str
+    def write_transfer(self, index, transfer) -> bool:
         """
-        public_key = ss58.ss58_decode(account)
-        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
-        file_path = self._transfers_folder() + substrate_address + ".json"
-        return file_path
+        Write transfer to the database.
 
-    def _clear_transfers_state(self):
-        """
-        Clears the internal state of a transfers
-        """
-        assert(not self._transfers_dirty)
-        self._transfers_account = None
-        self._transfers = None
-
-    def set_active_transfers_account(self, account):
-        """
-        Sets the active transfers account for the upcoming scrape.
-
-        :param account: The account we are about to scrape
-        :type account: str
-        """
-        self._clear_transfers_state()
-        self._transfers_account = account
-        self._transfers = []
-
-        # make sure folder exists
-        folder_path = self._transfers_folder()
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-    def write_transfer(self, transfer):
-        """
-        Write a new transfer object to the state.
-
+        :param index: The index of the transfer
+        :type index: str
         :param transfer: The transfer to write
         :type transfer: dict
         """
-        self._transfers.append(transfer)
-        self._transfers_dirty = True
-        return True
+        sm = self.storage_manager_for_transfers(transfer["address"])
+        was_new_element = sm.write_item(index, transfer)
+
+        if not was_new_element:
+            self.logger.warning(f"Transfer {index} already exists in the database.")
+
+        return was_new_element
 
     def flush_transfers(self):
         """
-        Flushes the unsaved transfers to disk.
+        Flush the transfers to the database.
         """
-        if not self._transfers_dirty:
-            return
+        for sm in self._transfers_index_managers.values():
+            sm.flush()
 
-        payload = json.dumps(self._transfers)
-
-        file_path = self._transfers_account_file(self._transfers_account)
-        self.logger.info(f"Writing {len(self._transfers)} entries")
-        file = io.open(file_path, "w")
-        file.write(payload)
-        file.close()
-
-        self._transfers_dirty = False
-
-    def transfers_iter(self, account):
+    def has_transfer(self, transfer_index):
         """
-        Returns an iterable object of transfers for the given account.
-
-        :param account: The account to read transfers for
-        :type account: str
+        Returns true if the transfer with the given index is in the database.
         """
-        file_path = self._transfers_account_file(account)
-        if os.path.exists(file_path):
-            file = io.open(file_path)
-            file_payload = file.read()
-            return json.loads(file_payload)
-        else:
-            self.logger.warning(f"transfers from account {account} have been requested but do not exist on disk.")
-            return None
+        return transfer_index in self._transfers_storage
+
+    def read_transfer(self, transfer_index):
+        """
+        Reads an transfer with a given index from the database.
+
+        :param transfer_index: The index of the transfer to read, e.g. "123456-12"
+        :return: The transfer
+        """
+        return self._transfers_storage.read_item(transfer_index)
+

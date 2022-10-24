@@ -136,6 +136,7 @@ class SubscanBase:
                 self._element_processor(
                     extrinsics_storage.write_item,
                     self._extrinsic_index_deducer),
+                last_id_deducer=self._last_id_deducer,
                 list_key="extrinsics",
                 body=body,
                 filter=config.filter
@@ -221,10 +222,11 @@ class SubscanBase:
             self._element_processor(
                 sm.write_item,
                 self._events_index_deducer),
+            last_id_deducer=self._last_id_deducer,
             list_key="events",
             body=body,
             filter=config.filter
-            )
+        )
 
         sm.flush()
 
@@ -280,33 +282,37 @@ class SubscanBase:
 
         return items_scraped
 
-    def fetch_transfers(self, account, chain_config) -> int:
+    async def fetch_transfers(self, address, config) -> int:
         """
-        Fetches the transfers for a single account and writes them to the db.
+        Fetches the transfers for a single address and writes them to the db.
 
-        :param account: The account to scrape
-        :type account: str
-        :param call_config: The call_config which has the filter set
-        :type call_config: ScrapeConfig
+        :param address: The address to scrape
+        :type address: str
+        :param config: the `ScrapeConfig`
+        :type config: ScrapeConfig
         :return: the number of items scraped
         """
         items_scraped = 0
-        # normalize to Substrate address
-        public_key = ss58.ss58_decode(account)
-        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
+        sm = self.db.storage_manager_for_transfers(address)
 
-        self.db.set_active_transfers_account(substrate_address)
+        self.logger.info(f"Fetching transfers for {address} from {self.endpoint}")
 
-        self.logger.info(f"Fetching transfers for {substrate_address} from {self.api.endpoint}")
+        body = {"address": address}
+        if config.params is not None:
+            body.update(config.params)
 
-        body = {"address": substrate_address}
-        items_scraped += self.iterate_pages(
+        items_scraped += await self._iterate_pages(
             self._api_method_transfers,
-            self.db.write_transfer,
+            self._element_processor(
+                sm.write_item,
+                self._transfers_index_deducer),
+            last_id_deducer=self._last_transfer_id_deducer,
             list_key="transfers",
             body=body,
-            filter=chain_config.filter
-            )
+            filter=config.filter
+        )
 
-        self.db.flush_transfers()
+        sm.flush()
+
         return items_scraped
+
