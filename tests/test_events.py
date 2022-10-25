@@ -11,7 +11,10 @@ async def test_events(api):
         "kusama":{
             "_api": api,
             "events":{
-                "crowdloan": ["created"]
+                "council": ["proposed"],
+                "_params": {
+                    "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
+                }
             }
         }
     }
@@ -25,8 +28,9 @@ async def test_events(api):
     logging.info("transforming")
 
     db = SubscrapeDB("kusama")
-    events_storage = db.storage_manager_for_events_call("crowdloan", "created")
+    events_storage = db.storage_manager_for_events_call("council", "proposed")
     events = dict(events_storage.get_iter())
 
-    first_crowdloan = events["14215808-27"]
-    assert first_crowdloan["extrinsic_hash"] == '0x9d3430cd00bff235d4cdd595513375e6ceacb5228590a8629a865922d67f056f'
+    assert "15038335-25" not in events # created by another address
+    proposal_event = events["7608975-2"]
+    assert proposal_event["extrinsic_hash"] == '0x2e8d37a0ec4613b445dfd08d927710c6ad4938bc17b7c9ced8467652ed9835ab'
