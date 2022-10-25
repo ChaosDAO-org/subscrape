@@ -11,7 +11,7 @@ async def test_events(api):
         "kusama":{
             "_api": api,
             "events":{
-                "council": ["proposed"],
+                "council": None,
                 "_params": {
                     "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
                 }

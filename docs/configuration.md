@@ -55,13 +55,13 @@ Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, 
 In the future, we will change this to `SubscanV2`.
 
 ### Operation: extrinsics
-Scrapes extrinsics by using their `module` and `name`.
+Scrapes extrinsics by using their `module` and `name`. `name` can also be `None` to scrape all extrinsics of a module.
 
 ### Operation: extrinsics-list
 Scrapes extrinsics by using a list of extrinsic indexes.
 
 ### Operation: events
-Scrapes events by using their `module` and `name`.
+Scrapes events by using their `module` and `name`. `name` can also be `None` to scrape all events of a module.
 
 ### Operation: events-list
 Scrapes events by using a list of event indexes.

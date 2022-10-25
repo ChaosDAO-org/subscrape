@@ -1,6 +1,8 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
+from email.policy import strict
 import logging
+import string
 from subscrape.apis.subscan_base import SubscanBase
 
 # A generic scraper for parachains
@@ -71,9 +73,13 @@ class ParachainScraper:
             calls = modules[module]
             module_config = extrinsic_config.create_inner_config(calls)
             
+            # if we want to scrape all calls, calls is None. In this case, let's wrap it in a list
+            if calls is None:
+                calls = [None]
+
             for call in calls:
                 # ignore metadata
-                if call.startswith("_"):
+                if type(call) is string and call.startswith("_"):
                     continue
 
                 # deduce config

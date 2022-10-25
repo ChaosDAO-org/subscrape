@@ -45,6 +45,7 @@ class SubscanBase:
         self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
         self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
         self.lock = asyncio.Lock()
+        self.storage_managers_to_flush = set()
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
@@ -96,7 +97,7 @@ class SubscanBase:
         obj = json.loads(response.text)
         return obj["data"]        
 
-    def _element_processor(self, element_processor, index_decucer):
+    def _extrinsic_processor(self, index_decucer):
         """
         Factory method for creating a function that can be used to process an element in the list.
         :param element_processor: The element processor function
@@ -106,8 +107,42 @@ class SubscanBase:
         :return: The function that can be used to process an element in the list
         """
         def process_element(element):
+            sm = self.db.storage_manager_for_extrinsics_call(element["call_module"], element["call_module_function"])
+            self.storage_managers_to_flush.add(sm)
             index = index_decucer(element)
-            return element_processor(index, element)
+            return sm.write_item(index, element)
+        return process_element
+
+    def _event_processor(self, index_decucer):
+        """
+        Factory method for creating a function that can be used to process an element in the list.
+        :param element_processor: The element processor function
+        :type element_processor: function
+        :param index_decucer: The index decucer function
+        :type index_decucer: function
+        :return: The function that can be used to process an element in the list
+        """
+        def process_element(element):
+            sm = self.db.storage_manager_for_events_call(element["module_id"], element["event_id"])
+            self.storage_managers_to_flush.add(sm)
+            index = index_decucer(element)
+            return sm.write_item(index, element)
+        return process_element
+
+    def _transfer_processor(self, address, index_decucer):
+        """
+        Factory method for creating a function that can be used to process an element in the list.
+        :param element_processor: The element processor function
+        :type element_processor: function
+        :param index_decucer: The index decucer function
+        :type index_decucer: function
+        :return: The function that can be used to process an element in the list
+        """
+        def process_element(element):
+            sm = self.db.storage_manager_for_transfers(address)
+            self.storage_managers_to_flush.add(sm)
+            index = index_decucer(element)
+            return sm.write_item(index, element)
         return process_element
 
 
@@ -124,25 +159,26 @@ class SubscanBase:
         :return: the number of items scraped
         """
         items_scraped = 0
-        with self.db.storage_manager_for_extrinsics_call(module, call) as extrinsics_storage:
-            self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
+        self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
 
-            body = {"module": module, "call": call}
-            if config.params is not None:
-                body.update(config.params)
+        body = {"module": module, "call": call}
+        if config.params is not None:
+            body.update(config.params)
 
-            items_scraped += await self._iterate_pages(
-                self._api_method_extrinsics,
-                self._element_processor(
-                    extrinsics_storage.write_item,
-                    self._extrinsic_index_deducer),
-                last_id_deducer=self._last_id_deducer,
-                list_key="extrinsics",
-                body=body,
-                filter=config.filter
-                )
+        items_scraped += await self._iterate_pages(
+            self._api_method_extrinsics,
+            self._extrinsic_processor(self._extrinsic_index_deducer),
+            last_id_deducer=self._last_id_deducer,
+            list_key="extrinsics",
+            body=body,
+            filter=config.filter
+            )
 
-            extrinsics_storage.flush()
+        for sm in self.storage_managers_to_flush:
+            sm.flush()
+        self.storage_managers_to_flush.clear()
+
+
         return items_scraped
 
 
@@ -209,7 +245,6 @@ class SubscanBase:
         :return: the number of items scraped
         """
         items_scraped = 0
-        sm = self.db.storage_manager_for_events_call(module, call)
 
         self.logger.info(f"Fetching events {module}.{call} from {self.endpoint}")
 
@@ -219,16 +254,16 @@ class SubscanBase:
 
         items_scraped += await self._iterate_pages(
             self._api_method_events,
-            self._element_processor(
-                sm.write_item,
-                self._events_index_deducer),
+            self._event_processor(self._events_index_deducer),
             last_id_deducer=self._last_id_deducer,
             list_key="events",
             body=body,
             filter=config.filter
         )
 
-        sm.flush()
+        for sm in self.storage_managers_to_flush:
+            sm.flush()
+        self.storage_managers_to_flush.clear()
 
         return items_scraped
 
@@ -303,16 +338,16 @@ class SubscanBase:
 
         items_scraped += await self._iterate_pages(
             self._api_method_transfers,
-            self._element_processor(
-                sm.write_item,
-                self._transfers_index_deducer),
+            self._transfer_processor(address, self._transfers_index_deducer),
             last_id_deducer=self._last_transfer_id_deducer,
             list_key="transfers",
             body=body,
             filter=config.filter
         )
 
-        sm.flush()
+        for sm in self.storage_managers_to_flush:
+            sm.flush()
+        self.storage_managers_to_flush.clear()
 
         return items_scraped
 

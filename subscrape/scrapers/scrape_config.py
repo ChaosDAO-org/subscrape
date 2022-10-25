@@ -23,6 +23,9 @@ class ScrapeConfig:
         if type(config) is list:
             return
 
+        if config is None:
+            return
+
         filter_conditions = config.get("_filter", None)
         if filter_conditions is not None:
             self.filter = self._filter_factory(filter_conditions)

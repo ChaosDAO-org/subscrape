@@ -11,7 +11,7 @@ async def test_extrinsics(api):
         "kusama":{
             "_api": api,
             "extrinsics":{
-                "crowdloan": ["create"]
+                "bounties": None
             }
         }
     }
@@ -25,9 +25,9 @@ async def test_extrinsics(api):
     logging.info("transforming")
 
     db = SubscrapeDB("kusama")
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("crowdloan", "create")
+    extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
     extrinsics = dict(extrinsics_storage.get_iter())
 
-    first_crowdloan = extrinsics["8974101-2"]
-    assert first_crowdloan["extrinsic_hash"] == '0xee88a0694a88435c11b5f5d2ac971ab026180467ab215887b6608731c4679051'
+    first_crowdloan = extrinsics["12935940-3"]
+    assert first_crowdloan["extrinsic_hash"] == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
 
