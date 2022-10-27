@@ -1,4 +1,4 @@
-## Configuration
+## Configuration Example
 
 Users define a `scrape_config.json` file in the `config` folder to instruct `subscrape` what accounts or types of info they are interested in. To get started, just rename `sample_scrape_config.json` to `scrape_config.json` since it already shows you what syntax to use.
 
@@ -6,9 +6,7 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 {
     "_version": 1,
     "kusama": {
-        "transfers": {
-            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
-        },
+        "_api": "SubscanV2",
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
@@ -20,14 +18,20 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
                 "batch_all":{}
             }
         },
+        "extrinsics-list":[
+            "14238250-2"
+        ],
         "events": {
             "crowdloan": [
                 "created"
             ]
-        }
-        "extrinsics-list":[
-            "14238250-2"
-        ]
+        },
+        "events-list":[
+            "14238250-39"
+        ],
+        "transfers": {
+            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
+        },
     },
     "moonriver": {
         "transactions": {
@@ -44,18 +48,23 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 }
 ```
 
-### Config for scraping Substrate chains:
+## Config for scraping Substrate chains:
 
-To query extrinsics from Substrate chains, only the module and call is needed. Filters can be applied.
+### Param: _api
+Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
+In the future, we will change this to `SubscanV2`.
 
 ### Operation: extrinsics
-Scrapes extrinsics by using their `module` and `name`.
+Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.
 
-### Operations: extrinsics-list
+### Operation: extrinsics-list
 Scrapes extrinsics by using a list of extrinsic indexes.
 
 ### Operation: events
-Scrapes events by using their `module` and `name`.
+Scrapes events by using their `module` and `name`. `module` can be `None` to scrape all events. `name` can also be `None` to scrape all events of a module.
+
+### Operation: events-list
+Scrapes events by using a list of event indexes.
 
 ### Operation: transfers
 Scrapes transfers by using their `address` and a `label`.
@@ -78,6 +87,9 @@ Will skip the current scope of the config.
 
 #### Filter: _filter
 `"_filter": [{"block_timestamp": [{"<":1644796800}]}],`
+
+### Params: _params
+This allows you to set params which are sent to the API. For example, you can set the `address` param to a specific address to start scraping all extrinsics or events for that address.
 
 #### `_version` identifier
 This will be useful in the future if breaking changes are needed. But for now, just leave it as `1`.

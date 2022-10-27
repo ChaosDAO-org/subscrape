@@ -1,13 +1,17 @@
 from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
+import pytest
 
-account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"
+@pytest.mark.asyncio
+@pytest.mark.parametrize("api", [None, "SubscanV2"])
+async def test_params(api):
 
-def test():
-        
+    account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"    
+    
     config = {
         "kusama":{
+            "_api": api,
             "extrinsics":{
                 "_params": {"address": account_id},
                 "staking": ["bond"]
@@ -20,7 +24,7 @@ def test():
     logging.info("wiping storage")
     subscrape.wipe_storage()
     logging.info("scraping")
-    subscrape.scrape(config)
+    await subscrape.scrape(config)
     logging.info("transforming")
 
     db = SubscrapeDB("kusama")
@@ -28,6 +32,10 @@ def test():
     extrinsics = dict(extrinsics_storage.get_iter())
 
     first_extrinsic = next(iter(extrinsics.values()))
-    assert first_extrinsic["account_id"] == account_id
 
-test()
+    if api != "SubscanV2":
+        assert first_extrinsic["account_id"] == account_id
+    else:
+        assert first_extrinsic["account_display"]["address"] == account_id
+
+

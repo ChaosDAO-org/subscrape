@@ -6,7 +6,7 @@ import json
 import logging
 from substrateinterface.utils import ss58
 from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
-from sqlitedict import SqliteDict
+import sqlite3
 
 # one DB per Parachain
 class SubscrapeDB:
@@ -34,56 +34,63 @@ class SubscrapeDB:
         #: str: the name of the chain this db represents
         self._parachain = parachain
         #: SqliteDict: the index of all extrinsics
-        self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
-        
-        self._extrinsics_storage_managers = {}
+        self._extrinsics_storage = SqliteDictWrapper(self._path + "extrinsics.sqlite", f"{parachain}.extrinsics")
+        #: SqliteDict: the index of all events
+        self._events_storage = SqliteDictWrapper(self._path + "events.sqlite", f"{parachain}.events")
+
+        self._extrinsics_index_managers = {}
+        self._events_index_managers = {}
+        self._transfers_index_managers = {}
 
 
     """ # Extrinsics """
 
     def storage_manager_for_extrinsics_call(self, module, call):
         """
-        returns a `SectorizedStorageManager` to store and retrieve extrinsics
+        returns a SqliteDictWrapper to store and retrieve extrinsics
         """
+        module = module.lower()
+        call = call.lower()
         name = f"{self._parachain}.{module}.{call}"
-        if name in self._extrinsics_storage_managers:
-            return self._extrinsics_storage_managers[name]
+        if name in self._extrinsics_index_managers:
+            return self._extrinsics_index_managers[name]
 
-        path = f"{self._path}extrinsics_{module}_{call}.sqlite"
-        index_for_item = lambda item: item["extrinsic_index"]
-        sm = SqliteDictWrapper(path, name, index_for_item)
-        self._extrinsics_storage_managers[name] = sm
+        path = f"{self._path}extrinsics_index_{module}_{call}.sqlite"
+        sm = SqliteDictWrapper(path, name)
+        self._extrinsics_index_managers[name] = sm
         return sm
 
-    def write_extrinsic(self, data):
+    def storage_manager_for_extrinsics(self):
+        return self._extrinsics_storage
+
+    def write_extrinsic(self, index, extrinsic) -> bool:
         """
-        Write a single extrinsic to the storage.
-        This might be expensive when done with a lot of extrinsics,
-        but is the intended approach when the module and call of extrinsics being scraped is unknown
-        ahead of scraping.
+        Write extrinsic to the database.
 
-        This method will determine the module and call, instantiate a new storage manager for the extrinsic,
-        and write the extrinsic to the storage.
-
-        :param data: The extrinsic to write
+        :param index: The index of the extrinsic
+        :type index: str
+        :param extrinsic: The extrinsic to write
+        :type extrinsic: dict
         """
-
-        # determine the module and call of the extrinsic
-        module = data["call_module"]
-        call = data["call_module_function"]
-        extrinsic_index = data["extrinsic_index"]
-
-        # instantiate a new storage manager for the extrinsic
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        was_new_element = storage_manager.write_item(data)
-        storage_manager.flush()
-
-        self._extrinsics_meta_index[extrinsic_index] = {
-            "module": module,
-            "call": call
-        }
+                
+        was_new_element = self._extrinsics_storage.write_item(index, extrinsic)
+        
+        if not was_new_element:
+            self.logger.warning(f"Extrinsic {index} already exists in the database. This should be prevented by the scraper by checking `has_extrinsic`.")
 
         return was_new_element
+
+    def flush_extrinsics(self):
+        """
+        Flush the extrinsics to the database.
+        """
+        self._extrinsics_storage.flush()
+
+    def has_extrinsic(self, extrinsic_index):
+        """
+        Returns true if the extrinsic with the given index is in the database.
+        """
+        return extrinsic_index in self._extrinsics_storage
 
     def read_extrinsic(self, extrinsic_index):
         """
@@ -92,106 +99,115 @@ class SubscrapeDB:
         :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
         :return: The extrinsic
         """
-        obj = self._extrinsics_meta_index[extrinsic_index]
-        module = obj["module"]
-        call = obj["call"]
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        return storage_manager.read_item(extrinsic_index)
+        return self._extrinsics_storage.read_item(extrinsic_index)
 
     """ # Events """
 
     def storage_manager_for_events_call(self, module, event):
-        path = f"{self._path}events_{module}_{event}.sqlite"
-        log_description = f"{self._parachain}.{module}.{event}"
-        index_for_item = lambda item: f"{item['block_num']}-{item['event_idx']}"
-        return SqliteDictWrapper(path, log_description, index_for_item)
-
-
-    # Transfers
-
-    def _transfers_folder(self):
         """
-        Returns the folder where transfers are stored.
+        returns a SqliteDictWrapper to store and retrieve events
         """
-        return f"{self._path}transfers/"
+        module = module.lower()
+        event = event.lower()
+        name = f"{self._parachain}.{module}.{event}"
+        if name in self._events_index_managers:
+            return self._events_index_managers[name]
 
-    def _transfers_account_file(self, account):
+        path = f"{self._path}events_index_{module}_{event}.sqlite"
+        sm = SqliteDictWrapper(path, name)
+        self._events_index_managers[name] = sm
+        return sm
+
+    def write_event(self, index, event) -> bool:
         """
-        Will return the storage path for an account.
-        The address is normalized to the Substrate address format.
+        Write event to the database.
 
-        :param account: The account
-        :type account: str
+        :param index: The index of the event
+        :type index: str
+        :param event: The event to write
+        :type event: dict
         """
-        public_key = ss58.ss58_decode(account)
-        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
-        file_path = self._transfers_folder() + substrate_address + ".json"
-        return file_path
+        was_new_element = self._events_storage.write_item(index, event)
 
-    def _clear_transfers_state(self):
+        if not was_new_element:
+            self.logger.warning(f"Event {index} already exists in the database. This should be prevented by the scraper by checking `has_event`.")
+
+        return was_new_element
+
+    def flush_events(self):
         """
-        Clears the internal state of a transfers
+        Flush the events to the database.
         """
-        assert(not self._transfers_dirty)
-        self._transfers_account = None
-        self._transfers = None
+        self._events_storage.flush()
 
-    def set_active_transfers_account(self, account):
+    def has_event(self, event_index):
         """
-        Sets the active transfers account for the upcoming scrape.
-
-        :param account: The account we are about to scrape
-        :type account: str
+        Returns true if the event with the given index is in the database.
         """
-        self._clear_transfers_state()
-        self._transfers_account = account
-        self._transfers = []
+        return event_index in self._events_storage
 
-        # make sure folder exists
-        folder_path = self._transfers_folder()
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-    def write_transfer(self, transfer):
+    def read_event(self, event_index):
         """
-        Write a new transfer object to the state.
+        Reads an event with a given index from the database.
 
+        :param event_index: The index of the event to read, e.g. "123456-12"
+        :return: The event
+        """
+        return self._events_storage.read_item(event_index)
+    
+    """ # Transfers """
+
+    def storage_manager_for_transfers(self, address):
+        """
+        returns a SqliteDictWrapper to store and retrieve transfers
+        """
+        address = ss58.ss58_decode(address)
+        address = ss58.ss58_encode(address, 42)
+        name = f"{self._parachain}.transfers.{address}"
+        if name in self._transfers_index_managers:
+            return self._transfers_index_managers[name]
+
+        path = f"{self._path}transfers_index_{address}.sqlite"
+        sm = SqliteDictWrapper(path, name)
+        self._transfers_index_managers[name] = sm
+        return sm
+
+    def write_transfer(self, index, transfer) -> bool:
+        """
+        Write transfer to the database.
+
+        :param index: The index of the transfer
+        :type index: str
         :param transfer: The transfer to write
         :type transfer: dict
         """
-        self._transfers.append(transfer)
-        self._transfers_dirty = True
-        return True
+        sm = self.storage_manager_for_transfers(transfer["address"])
+        was_new_element = sm.write_item(index, transfer)
+
+        if not was_new_element:
+            self.logger.warning(f"Transfer {index} already exists in the database.")
+
+        return was_new_element
 
     def flush_transfers(self):
         """
-        Flushes the unsaved transfers to disk.
+        Flush the transfers to the database.
         """
-        if not self._transfers_dirty:
-            return
+        for sm in self._transfers_index_managers.values():
+            sm.flush()
 
-        payload = json.dumps(self._transfers)
-
-        file_path = self._transfers_account_file(self._transfers_account)
-        self.logger.info(f"Writing {len(self._transfers)} entries")
-        file = io.open(file_path, "w")
-        file.write(payload)
-        file.close()
-
-        self._transfers_dirty = False
-
-    def transfers_iter(self, account):
+    def has_transfer(self, transfer_index):
         """
-        Returns an iterable object of transfers for the given account.
-
-        :param account: The account to read transfers for
-        :type account: str
+        Returns true if the transfer with the given index is in the database.
         """
-        file_path = self._transfers_account_file(account)
-        if os.path.exists(file_path):
-            file = io.open(file_path)
-            file_payload = file.read()
-            return json.loads(file_payload)
-        else:
-            self.logger.warning(f"transfers from account {account} have been requested but do not exist on disk.")
-            return None
+        return transfer_index in self._transfers_storage
+
+    def read_transfer(self, transfer_index):
+        """
+        Reads an transfer with a given index from the database.
+
+        :param transfer_index: The index of the transfer to read, e.g. "123456-12"
+        :return: The transfer
+        """
+        return self._transfers_storage.read_item(transfer_index)
+

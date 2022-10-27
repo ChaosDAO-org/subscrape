@@ -3,6 +3,7 @@ hexbytes
 httpx[http2]
 openpyxl
 pandas
+pytest-asyncio
 ratelimit
 simplejson
 substrate-interface

@@ -1,71 +1,32 @@
-__author__ = 'Tommi Enenkel @alice_und_bob'
+from subscrape.apis.subscan_base import SubscanBase
+from subscrape.db.subscrape_db import SubscrapeDB
 
-from datetime import datetime
-import httpx
-import json
-import logging
-from ratelimit import limits, sleep_and_retry
-
-#import http.client
-#http.client.HTTPConnection.debuglevel = 1
-#requests_log = logging.getLogger("requests.packages.urllib3")
-#requests_log.setLevel(logging.DEBUG)
-#requests_log.propagate = True
-
-SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
-SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
-MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
-
-
-class SubscanWrapper:
-    """Interface for interacting with the API of explorer Subscan.io for the Moonriver and Moonbeam chains."""
-    def __init__(self, chain, api_key=None):
-        self.logger = logging.getLogger("SubscanWrapper")
-        self.endpoint = f"https://{chain}.api.subscan.io"
-        self.api_key = api_key
-        global MAX_CALLS_PER_SEC
-        if api_key is not None:
-            MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
-        self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
-
-    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
-    def query(self, method, headers={}, body={}):
-        """Rate limited call to fetch another page of data from the Subscan.io block explorer website
-
-        :param method: Subscan.io API call method.
-        :type method: str
-        :param headers: Subscan.io API call headers.
-        :type headers: list
-        :param headers: Subscan.io API call body. Typically, used to specify each page being requested.
-        :type body: list
-        """
-        headers["Content-Type"] = "application/json"
-        if self.api_key is not None:
-            headers["x-api-key"] = self.api_key
-        body = json.dumps(body)
-        before = datetime.now()
-        url = self.endpoint + method
-        response = httpx.post(url, headers=headers, data=body)
-        after = datetime.now()
-        self.logger.debug("request took: " + str(after - before))
-
-        if response.status_code != 200:
-            self.logger.info(f"Status Code: {response.status_code}")
-            self.logger.info(response.headers)
-            raise Exception()
-        else:
-            #self.logger.debug(response.headers)
-            pass
-
-        #self.logger.debug(response.text)
-        # unpack the payload
-        obj = json.loads(response.text)
-        return obj["data"]        
+class SubscanV1(SubscanBase):
+    def __init__(self, chain, db: SubscrapeDB, subscan_key):
+        super().__init__(chain, db, subscan_key)
+        self._extrinsic_index_deducer = lambda ex: f"{ex['extrinsic_index']}"
+        self._events_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
+        self._event_index_deducer = lambda ex: f"{ex['block_num']}-{ex['event_idx']}"
+        self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._last_id_deducer = lambda e: None
+        self._last_transfer_id_deducer = lambda e: None
+        self._api_method_extrinsics = "/api/scan/extrinsics"
+        self._api_method_extrinsic = "/api/scan/extrinsic"
+        self._api_method_events = "/api/scan/events"
+        self._api_method_event = "/api/scan/event"
+        self._api_method_transfers = "/api/scan/transfers"
+        self._api_method_events_call = "call"
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
-    def iterate_pages(self, method, element_processor, list_key=None, body={}, filter=None) -> int:
+    async def _iterate_pages(
+        self,
+        method, 
+        element_processor, 
+        list_key, 
+        last_id_deducer=None,
+        body={}, 
+        filter=None) -> int:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -74,6 +35,8 @@ class SubscanWrapper:
         :type element_processor: function
         :param list_key: whether `events` or `extrinsics` should be looked for
         :type list_key: str or None
+        :param last_id_deducer: not used, only for forward compatibility
+        :type last_id_deducer: function or None
         :param body: Subscan.io API call body. Typically, used to specify each page being requested.
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
@@ -92,7 +55,7 @@ class SubscanWrapper:
 
         while not done:
             body["page"] = page
-            data = self.query(method, body=body)
+            data = await self._query(method, body=body)
             # determine the limit on the first run
             if limit == 0: 
                 limit = data["count"]
@@ -122,14 +85,14 @@ class SubscanWrapper:
                     count_new_elements += 1
 
             if count_new_elements == 0:
-                self.logger.info("We did not find any new elements on the latest page. Stopping.")
+                self.logger.debug("We did not find any new elements on the latest page. Stopping.")
                 break
             else:
                 self.logger.debug(f"Found {count_new_elements} new elements on page {page}.")
                 pass
 
             # update counters and check if we should exit
-            count += len(elements)
+            count += count_new_elements
             self.logger.debug(count)
 
             if count >= limit:
