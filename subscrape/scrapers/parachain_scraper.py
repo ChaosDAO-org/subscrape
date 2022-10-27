@@ -65,21 +65,30 @@ class ParachainScraper:
         items_scraped = 0
         extrinsic_config = chain_config.create_inner_config(modules)
 
+        # if we want to scrape all extrinsics, modules is None. In that case, we just set it to a list containing None
+        if modules is None:
+            modules = [None]
+
         for module in modules:
             # ignore metadata
-            if module.startswith("_"):
+            if (type(module) is string or type(module) is str) and module.startswith("_"):
                 continue
 
-            calls = modules[module]
+            # if we want to scrape all extrinsics, we set call to None, otherwise we take the list of calls from the module
+            if module == None:
+                calls = None
+            else:
+                calls = modules[module]
+
             module_config = extrinsic_config.create_inner_config(calls)
             
-            # if we want to scrape all calls, calls is None. In this case, let's wrap it in a list
+            # if we want to scrape all calls, calls is None. In that case, we just set it to a list containing None
             if calls is None:
                 calls = [None]
 
             for call in calls:
                 # ignore metadata
-                if type(call) is string and call.startswith("_"):
+                if (type(call) is string or type(call) is str) and call.startswith("_"):
                     continue
 
                 # deduce config

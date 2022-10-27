@@ -55,13 +55,13 @@ Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, 
 In the future, we will change this to `SubscanV2`.
 
 ### Operation: extrinsics
-Scrapes extrinsics by using their `module` and `name`. `name` can also be `None` to scrape all extrinsics of a module.
+Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.
 
 ### Operation: extrinsics-list
 Scrapes extrinsics by using a list of extrinsic indexes.
 
 ### Operation: events
-Scrapes events by using their `module` and `name`. `name` can also be `None` to scrape all events of a module.
+Scrapes events by using their `module` and `name`. `module` can be `None` to scrape all events. `name` can also be `None` to scrape all events of a module.
 
 ### Operation: events-list
 Scrapes events by using a list of event indexes.
@@ -87,6 +87,9 @@ Will skip the current scope of the config.
 
 #### Filter: _filter
 `"_filter": [{"block_timestamp": [{"<":1644796800}]}],`
+
+### Params: _params
+This allows you to set params which are sent to the API. For example, you can set the `address` param to a specific address to start scraping all extrinsics or events for that address.
 
 #### `_version` identifier
 This will be useful in the future if breaking changes are needed. But for now, just leave it as `1`.
