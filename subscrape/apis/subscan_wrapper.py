@@ -5,7 +5,7 @@ import httpx
 import json
 import logging
 from ratelimit import limits, sleep_and_retry
-from subscrape.db.subscrape_db import SubscrapeDB, Extrinsic, Event
+from subscrape.db.subscrape_db import SubscrapeDB, ExtrinsicMetadata, Extrinsic, EventMetadata, Event
 from substrateinterface.utils import ss58
 import asyncio
 
@@ -19,8 +19,45 @@ SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
 SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
 MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
+def extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata):
+    return ExtrinsicMetadata(
+        id=raw_extrinsic_metadata["extrinsic_index"],
+        block_number=raw_extrinsic_metadata["block_num"],
+        index=raw_extrinsic_metadata["extrinsic_idx"],
+    )
 
-class SubscanBase:
+def extrinsic_from_raw_dict(raw_extrinsic):
+    return Extrinsic(
+        id=raw_extrinsic["extrinsic_index"],
+        block_number=raw_extrinsic["block_num"],
+        index=raw_extrinsic["extrinsic_idx"],
+    )
+
+def event_metadata_from_raw_dict(raw_event_metadata):
+    # block_number is the the string until the hyphen
+    block_number = int(raw_event_metadata["event_index"].split("-")[0])
+    return EventMetadata(
+        id=raw_event_metadata["event_index"],
+        block_number=block_number,
+        extrinsic_id=raw_event_metadata["extrinsic_index"],
+        module=raw_event_metadata["module_id"],
+        event=raw_event_metadata["event_id"],
+        finalized=raw_event_metadata["finalized"],
+    )
+
+def event_from_raw_dict(raw_event):
+    return Event(
+        id=raw_event["event_index"],
+        block_number=raw_event["block_num"],
+        event_index=raw_event["event_idx"],
+        extrinsic_index=raw_event["extrinsic_idx"],
+        module=raw_event["module_id"],
+        event=raw_event["event_id"],
+        params=raw_event["params"],
+        finalized=raw_event["finalized"],
+    )
+
+class SubscanWrapper:
     """
     Interface for interacting with the API of explorer Subscan.io for the Moonriver and Moonbeam chains.
     """
@@ -45,7 +82,20 @@ class SubscanBase:
         self.logger.info(f'Subscan rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
         self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
         self.lock = asyncio.Lock()
-        self.storage_managers_to_flush = set()
+
+        #self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
+        #self._events_index_deducer = lambda e: f"{e['event_index']}"
+        #self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        #self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._last_id_deducer = lambda e: e["id"]
+        self._last_transfer_id_deducer = lambda e: [e["block_num"], e["event_idx"]]
+        self._api_method_extrinsics = "/api/v2/scan/extrinsics"
+        self._api_method_extrinsic = "/api/scan/extrinsic"
+        self._api_method_events = "/api/v2/scan/events"
+        self._api_method_event = "/api/scan/event"
+        self._api_method_transfers = "/api/v2/scan/transfers"
+        self._api_method_events_call = "event_id"
+
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
@@ -97,37 +147,103 @@ class SubscanBase:
         obj = json.loads(response.text)
         return obj["data"]        
 
-    def _extrinsic_processor(self, index_decucer):
-        """
-        Factory method for creating a function that can be used to process an element in the list.
-        :param element_processor: The element processor function
+    # iterates through all pages until it processed all elements
+    # or gets False from the processor
+    async def _iterate_pages(
+        self,
+        method, 
+        element_processor, 
+        list_key,
+        last_id_deducer,
+        body={}, 
+        filter=None) -> int:
+        """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
+        time. Perform post-processing of each transaction using the `element_processor` method provided.
+        :param method: Subscan.io API call method.
+        :type method: str
+        :param element_processor: method to process each transaction as it is received
         :type element_processor: function
-        :param index_decucer: The index decucer function
-        :type index_decucer: function
-        :return: The function that can be used to process an element in the list
+        :param list_key: what's the subkey in the response that contains the list of elements
+        :type list_key: str
+        :param last_id_deducer: method to deduce the last id from the last element in the list
+        :type last_id_deducer: function
+        :param body: Subscan.io API call body. Typically, used to specify each page being requested.
+        :type body: list
+        :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
+        :type filter: function
+        :return: number of items processed
         """
-        def process_element(element):
-            sm = self.db.storage_manager_for_extrinsics_call(element["call_module"], element["call_module_function"])
-            self.storage_managers_to_flush.add(sm)
-            index = index_decucer(element)
-            return sm.write_item(index, element)
-        return process_element
 
-    def _event_processor(self, index_decucer):
+        done = False        # keep crunching until we are done
+        rows_per_page = 100 # constant for the rows per page to query
+        count = 0           # counter for how many items we queried already
+        limit = 0           # max amount of items to be queried. to be determined after the first call
+
+        body["row"] = rows_per_page
+        last_id = None
+
+        while not done:
+            if last_id is not None:
+                body["after_id"] = last_id
+
+            data = await self._query(method, body=body)
+            # determine the limit on the first run
+            if limit == 0: 
+                limit = data["count"]
+                self.logger.info(f"About to fetch {limit} entries.")
+                if limit == 0:
+                    break
+            elements = data[list_key]
+
+            if elements is None:
+                self.logger.info("elements was empty. Stopping.")
+                break
+
+            count_new_elements = 0
+            for element in elements:
+                if filter is not None and filter(element):
+                    continue
+                was_new_element = element_processor(element)
+                if was_new_element:
+                    count_new_elements += 1
+                else:
+                    done = True
+                    break
+
+            # update counters and check if we should exit
+            count += count_new_elements
+            self.logger.debug(count)
+
+            if count >= limit:
+                done = True
+
+            self.logger.debug(f"Last ID: {last_id}")
+
+            last_id = last_id_deducer(elements[-1])
+
+        return count
+
+    def _extrinsic_metadata_processor(self, raw_extrinsic_metadata):
         """
-        Factory method for creating a function that can be used to process an element in the list.
-        :param element_processor: The element processor function
-        :type element_processor: function
-        :param index_decucer: The index decucer function
-        :type index_decucer: function
+        Processes extrinsic metadata and stores it in the database.
+        :param raw_extrinsic_metadata: raw extrinsic metadata
+        :type raw_extrinsic_metadata: dict
         :return: The function that can be used to process an element in the list
         """
-        def process_element(element):
-            sm = self.db.storage_manager_for_events_call(element["module_id"], element["event_id"])
-            self.storage_managers_to_flush.add(sm)
-            index = index_decucer(element)
-            return sm.write_item(index, element)
-        return process_element
+        extrinsic = extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata)
+        self.db.write_item(extrinsic)
+        return 1
+
+    def _event_metadata_processor(self, raw_event_metadata):
+        """
+        Processes event metadata and stores it in the database.
+        :param raw_event_metadata: raw event metadata
+        :type raw_event_metadata: dict
+        :return: The function that can be used to process an element in the list
+        """
+        event = event_metadata_from_raw_dict(raw_event_metadata)
+        self.db.write_item(event)
+        return 1
 
     def _transfer_processor(self, address, index_decucer):
         """
@@ -232,7 +348,7 @@ class SubscanBase:
 
         return items_scraped
 
-    async def fetch_events_index(self, module, call, config) -> int:
+    async def fetch_event_metadata(self, module, call, config) -> int:
         """
         Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -254,17 +370,14 @@ class SubscanBase:
 
         items_scraped += await self._iterate_pages(
             self._api_method_events,
-            self._event_processor(self._events_index_deducer),
+            self._event_metadata_processor,
             last_id_deducer=self._last_id_deducer,
             list_key="events",
             body=body,
             filter=config.filter
         )
 
-        for sm in self.storage_managers_to_flush:
-            sm.flush()
-        self.storage_managers_to_flush.clear()
-
+        self.db.flush()
         return items_scraped
 
     async def fetch_events(self, event_indexes: list) -> int:
@@ -306,18 +419,8 @@ class SubscanBase:
                 raw_events = await asyncio.gather(*futures)
 
                 for raw_event in raw_events:
-                    event_id = self._event_index_deducer(raw_event)
-                    event = Event(
-                        id=event_id,
-                        block_number=raw_event["block_num"],
-                        event_index=raw_event["event_idx"],
-                        extrinsic_index=raw_event["extrinsic_idx"],
-                        module=raw_event["module_id"],
-                        event=raw_event["event_id"],
-                        params=raw_event["params"],
-                        finalized=raw_event["finalized"],
-                    )
-                    self.db.write_event(event)
+                    event = event_from_raw_dict(raw_event)
+                    self.db.write_item(event)
                     items_scraped += 1
 
                 self.db.flush()

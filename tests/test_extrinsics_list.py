@@ -4,14 +4,12 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test_extrinsics_list(api):
+async def test_extrinsics_list():
     
     extrinsic_idx = "14238250-2"
     
     config = {
         "kusama":{
-            "_api": api,
             "extrinsics-list":[
                 extrinsic_idx
             ],
@@ -26,7 +24,7 @@ async def test_extrinsics_list(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_extrinsics_list.db")
+    db = SubscrapeDB()
     data = db.read_extrinsic(extrinsic_idx)
 
     assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'

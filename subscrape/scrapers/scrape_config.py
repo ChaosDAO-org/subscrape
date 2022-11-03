@@ -9,7 +9,6 @@ class ScrapeConfig:
         self.processor_name = None
         self.skip = False
         self.params = None
-        self.api = None
         self.db_connection_string = None
         self._set_config(config)
 
@@ -42,11 +41,6 @@ class ScrapeConfig:
         params = config.get("_params", None)
         if params is not None:
             self.params = params
-
-        # _api is only relevant on the chain level
-        api = config.get("_api", None)
-        if api is not None:
-            self.api = api
 
         # _db_path is only relevant on the chain level
         db_connection_string = config.get("_db_connection_string", None)

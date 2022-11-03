@@ -1,13 +1,12 @@
 import logging
 import os
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
-from subscrape.apis.subscan_v1 import SubscanV1
-from subscrape.apis.subscan_v2 import SubscanV2
 from subscrape.apis.blockscout_wrapper import BlockscoutWrapper
 from subscrape.apis.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
+from subscrape.apis.subscan_wrapper import SubscanWrapper
 
 
 def moonscan_factory(chain):
@@ -51,20 +50,7 @@ def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
         f = open("config/subscan-key")
         subscan_key = f.read()
 
-    selected_api = chain_config.api
-    if selected_api is None:
-        selected_api = "SubscanV1"
-        logging.info("No scraper specified in the chains `_api` param. Assuming SubscanV1. This will change in the future. Please specify a scraper.")
-
-    if selected_api == "SubscanV1":
-        scraper = SubscanV1(chain, db, subscan_key)
-    elif selected_api == "SubscanV2":
-        scraper = SubscanV2(chain, db, subscan_key)
-    else:
-        raise Exception(f"Unknown scraper {selected_api}")
-
-    return scraper
-
+    scraper = SubscanWrapper(chain, db, subscan_key)
     return scraper
 
 
@@ -76,18 +62,18 @@ def scraper_factory(name, chain_config: ScrapeConfig):
     :type name: str
     """
     if name == "moonriver" or name == "moonbeam":
-        db_path = f"data/parachains"
-        if not os.path.exists(db_path):
-            os.makedirs(db_path)
-        db_path += f'/{name}_'
+        db_connection_string = f"data/parachains"
+        if not os.path.exists(db_connection_string):
+            os.makedirs(db_connection_string)
+        db_connection_string += f'/{name}_'
         moonscan_api = moonscan_factory(name)
         blockscout_api = blockscout_factory(name)
-        scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
+        scraper = MoonbeamScraper(db_connection_string, moonscan_api, blockscout_api)
         return scraper
     else:
         if chain_config.db_connection_string is None:
-            db_path = f"data/cache/default.db"
-            db = SubscrapeDB.sqliteInstanceForPath(db_path)
+            db_connection_string = "sqlite:///data/cache/default.db"
+            db = SubscrapeDB(db_connection_string)
         else:
             db = SubscrapeDB(chain_config.db_connection_string)
         subscan_api = subscan_factory(name, db, chain_config)

@@ -5,14 +5,12 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", ["SubscanV2"])
-async def test_transfers(api):
+async def test_transfers():
     
     address = "DGaHm71gRHJGQVF2ubunkx37qgLpno2gYibq2WHoDJpFMt6"
 
     config = {
         "kusama":{
-            "_api": api,
             "transfers":{
                 address : address
             }
@@ -27,7 +25,7 @@ async def test_transfers(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_transfers.db")
+    db = SubscrapeDB()
     transfers_storage = db.storage_manager_for_transfers(address)
     transfers = dict(transfers_storage.get_iter())
 

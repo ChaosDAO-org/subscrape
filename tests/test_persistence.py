@@ -4,12 +4,10 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test_persistence(api):
+async def test_persistence():
         
     config = {
         "kusama":{
-            "_api": api,
             "extrinsics":{
                 "crowdloan": ["create"]
             },
@@ -29,7 +27,7 @@ async def test_persistence(api):
     
     assert items_scraped1 != items_scraped2
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_persistence.db")
+    db = SubscrapeDB()
     extrinsics_storage = db.storage_manager_for_extrinsics_call("crowdloan", "create")
     extrinsics = extrinsics_storage.get_iter()
     extrinsic_list = []
@@ -38,7 +36,6 @@ async def test_persistence(api):
     
     subscrape_config = {
         "kusama":{
-            "_api": api,
             "extrinsics-list":extrinsic_list
         }
     }

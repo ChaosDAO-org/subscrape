@@ -14,11 +14,26 @@ class Block(Base):
     __tablename__ = "blocks"
     block_number = Column(Integer, unique=True, primary_key=True)
 
+class ExtrinsicMetadata(Base):
+    __tablename__ = 'extrinsics_metadata'
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    index = Column(Integer)
+
 class Extrinsic(Base):
     __tablename__ = 'extrinsics'
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
     index = Column(Integer)
+
+class EventMetadata(Base):
+    __tablename__ = 'events_metadata'
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    extrinsic_id = Column(String(20), ForeignKey('extrinsics.id'))
+    module = Column(String(100))
+    event = Column(String(100))
+    finalized = Column(Boolean)
 
 class Event(Base):
     __tablename__ = 'events'
@@ -40,7 +55,7 @@ class SubscrapeDB:
     At the end of the process, flush_<type>() is called to make sure the state is properly saved.
     """
 
-    def __init__(self, connection_string):
+    def __init__(self, connection_string="sqlite:///data/cache/default.db"):
         self.logger = logging.getLogger("SubscrapeDB")
         self._engine = create_engine(connection_string)
 
@@ -59,67 +74,63 @@ class SubscrapeDB:
         Base.metadata.create_all(self._engine)
         
 
-    """ # Extrinsics """
-
     def flush(self):
         """
         Flush the extrinsics to the database.
         """
         self._session.commit()
 
-    def write_extrinsic(self, index, extrinsic) -> bool:
+    def close(self):
         """
-        Write extrinsic to the database.
-
-        :param index: The index of the extrinsic
-        :type index: str
-        :param extrinsic: The extrinsic to write
-        :type extrinsic: dict
+        Close the database connection.
         """
-        raise NotImplementedError()
-        was_new_element = self._extrinsics_storage.write_item(index, extrinsic)
-        
-        if not was_new_element:
-            self.logger.warning(f"Extrinsic {index} already exists in the database. This should be prevented by the scraper by checking `has_extrinsic`.")
+        self._session.close()
 
-        return was_new_element
-
-    def read_extrinsics(self):
+    def write_item(self, item: Base):
         """
-        Reads all extrinsics from the database.
+        Write this item to the database.
 
-        :return: The extrinsics
+        :param item: The item to write
+        :type item: Base
         """
-        raise NotImplementedError()
+        self._session.add(item)
 
 
-    def has_extrinsic(self, extrinsic_index):
-        """
-        Returns true if the extrinsic with the given index is in the database.
-        """
-        raise NotImplementedError()
+    """ # Extrinsics """
 
-    def read_extrinsic(self, extrinsic_index):
+    def extrinsics_query(self, module=None, call=None):
         """
-        Reads an extrinsic with a given index from the database.
+        Returns a query object for extrinsics.
 
-        :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
-        :return: The extrinsic
+        :param module: The module to filter for
+        :type module: str
+        :param call: The call to filter for
+        :type call: str
         """
-        raise NotImplementedError()
+        query = self._session.query(Extrinsic)
+        if module is not None:
+            query = query.filter(Extrinsic.module == module)
+        if call is not None:
+            query = query.filter(Extrinsic.call == call)
+        return query
 
     """ # Events """
 
-    def write_event(self, event: Event):
+    def events_query(self, module=None, event=None):        
         """
-        Write event to the database.
+        Returns a query object for events.
 
-        :param index: The index of the event
-        :type index: str
-        :param event: The event to write
-        :type event: Event
+        :param module: The module to filter for
+        :type module: str
+        :param event: The event to filter for
+        :type event: str
         """
-        self._session.add(event)
+        query = self._session.query(EventMetadata)
+        if module is not None:
+            query = query.filter(EventMetadata.module == module)
+        if event is not None:
+            query = query.filter(EventMetadata.event == event)
+        return query
 
     def read_events(self):
         """
@@ -139,18 +150,18 @@ class SubscrapeDB:
         """
         Returns a list of all events that are not in the database.
         """
-        matches = self._session.query(Event).filter(Event.id.in_(index_list)).all()
+        matches = self._session.query(EventMetadata).filter(EventMetadata.id.in_(index_list)).all()
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
 
-    def read_event(self, event_id) -> Event:
+    def read_event(self, event_id) -> EventMetadata:
         """
         Reads an event with a given id from the database.
 
         :param event_id: The id of the event to read, e.g. "123456-12"
         :return: The event
         """
-        result = self._session.query(Event).get(event_id)
+        result = self._session.query(EventMetadata).get(event_id)
         return result
     
     """ # Transfers """

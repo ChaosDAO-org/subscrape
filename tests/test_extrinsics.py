@@ -4,12 +4,10 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test_extrinsics(api):
+async def test_extrinsics():
         
     config = {
         "kusama":{
-            "_api": api,
             "extrinsics":{
                 "bounties": ["propose_bounty"]
             }
@@ -24,7 +22,7 @@ async def test_extrinsics(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_extrinsics.db")
+    db = SubscrapeDB()
     extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
     extrinsics = dict(extrinsics_storage.get_iter())
 
@@ -52,7 +50,7 @@ async def test_fetch_all_extrinsics_from_module(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_extrinsics_from_module.db")
+    db = SubscrapeDB()
 
     extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
     extrinsics = dict(extrinsics_storage.get_iter())
@@ -86,7 +84,7 @@ async def test_fetch_all_extrinsics_from_address(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_extrinsics_from_address.db")
+    db = SubscrapeDB()
     extrinsics_storage = db.storage_manager_for_extrinsics_call("balances", "transfer_keep_alive")
     extrinsics = dict(extrinsics_storage.get_iter())
 

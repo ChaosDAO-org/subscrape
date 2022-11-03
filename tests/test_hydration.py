@@ -4,7 +4,6 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [None, "SubscanV2"])
 async def test_hydration(api):
         
     chain = "mangatax"
@@ -13,7 +12,6 @@ async def test_hydration(api):
 
     config = {
         chain:{
-            "_api": api,
             "extrinsics":{
                 module: [call]
             }
@@ -28,7 +26,7 @@ async def test_hydration(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_hydration.db")
+    db = SubscrapeDB()
     extrinsics_storage = db.storage_manager_for_extrinsics_call(module, call)
     extrinsics = extrinsics_storage.get_iter()
     extrinsic_list = []

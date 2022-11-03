@@ -5,8 +5,11 @@ from substrateinterface.utils import ss58
 import logging
 import subscrape
 
+db_connection_string = "sqlite:///data/cache/sample_transform_2110_crowdloan.db"
+
 config = {
     "kusama":{
+        "_db_connection_string": db_connection_string,
         "extrinsics":{
             "utility": ["batch_all"],
             "crowdloan": ["contribute"]
@@ -19,8 +22,7 @@ interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_
 rows =  [["type", "value", "referral"]]
 rows[0].extend(interesting_rows)
 
-db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transform_2110_crowdloan.db")
-
+db = SubscrapeDB(db_connection_string)
 
 def unwrap_params(params):
     result = {}

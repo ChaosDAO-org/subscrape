@@ -4,8 +4,7 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [None, "SubscanV2"])
-async def test_events_list(api):
+async def test_events_list():
     
     event_index = "14238250-39"
     
@@ -13,7 +12,6 @@ async def test_events_list(api):
 
     config = {
         "kusama":{
-            "_api": api,
             "_db_connection_string": db_connection_string,
             "events-list":[
                 event_index

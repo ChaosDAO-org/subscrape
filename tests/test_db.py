@@ -5,7 +5,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_db():
     subscrape.wipe_cache()
-    file_path = "data/cache/test_db.db"
-    db = SubscrapeDB.sqliteInstanceForPath(file_path)
+    db_connection_string = "sqlite:///data/cache/test_db.db"
+    db = SubscrapeDB(db_connection_string)
     
 

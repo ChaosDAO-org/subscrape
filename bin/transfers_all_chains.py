@@ -31,6 +31,8 @@ def main():
     config = json.loads(raw_config)
     addresses = config["addresses"]
     chains = config["chains"]
+    db_connection_string = "sqlite:///data/cache/sample_transfers_all_chains.db"
+    config["_db_connection_string"] = db_connection_string
 
     scrape(addresses, chains)
 
@@ -38,7 +40,7 @@ def main():
 
     chain_dfs = []
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transfers_all_chains.db")
+    db = SubscrapeDB(db_connection_string)
 
     for chain in chains:
         address_dfs = []

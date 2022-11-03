@@ -8,15 +8,19 @@ import logging
 import subscrape
 import datetime
 
+
+db_connection_string = "sqlite:///data/cache/sample_transform_mangatax.db"
+
 config = {
     "mangatax":{
+        "_db_connection_string": db_connection_string,
         "extrinsics":{
             "bootstrap": ["provision"]
         }
     }
 }
 
-db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transform_mangatax.db")
+db = SubscrapeDB(db_connection_string)
 
 def unwrap_event_params(params):
     result = []

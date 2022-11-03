@@ -3,7 +3,7 @@ __author__ = 'Tommi Enenkel @alice_und_bob'
 from email.policy import strict
 import logging
 import string
-from subscrape.apis.subscan_base import SubscanBase
+from subscrape.apis.subscan_wrapper import SubscanWrapper
 
 # A generic scraper for parachains
 class ParachainScraper:
@@ -11,7 +11,7 @@ class ParachainScraper:
 
     def __init__(self, api):
         self.logger = logging.getLogger("ParachainScraper")
-        self.api: SubscanBase = api
+        self.api: SubscanWrapper = api
 
     async def scrape(self, operations, chain_config) -> int:
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
@@ -37,7 +37,7 @@ class ParachainScraper:
                 items_scraped += await self.api.fetch_extrinsics(extrinsics_list)
             elif operation == "events":
                 modules = operations[operation]
-                items_scraped += await self.scrape_module_calls(modules, chain_config, self.api.fetch_events_index)
+                items_scraped += await self.scrape_module_calls(modules, chain_config, self.api.fetch_event_metadata)
             elif operation == "events-list":
                 events_list = operations[operation]
                 items_scraped += await self.api.fetch_events(events_list)
