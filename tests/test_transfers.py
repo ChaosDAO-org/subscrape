@@ -22,12 +22,12 @@ async def test_transfers(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_transfers.db")
     transfers_storage = db.storage_manager_for_transfers(address)
     transfers = dict(transfers_storage.get_iter())
 

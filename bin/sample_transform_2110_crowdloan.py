@@ -19,7 +19,7 @@ interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_
 rows =  [["type", "value", "referral"]]
 rows[0].extend(interesting_rows)
 
-db = SubscrapeDB("Kusama")
+db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transform_2110_crowdloan.db")
 
 
 def unwrap_params(params):

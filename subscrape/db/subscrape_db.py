@@ -1,11 +1,29 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import os
-import io
-import json
 import logging
 from substrateinterface.utils import ss58
-import sqlite3
+from sqlalchemy import create_engine, Table, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy.orm import Session	
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Block(Base):
+    __tablename__ = "blocks"
+    block_number = Column(Integer, unique=True, primary_key=True)
+
+class Extrinsic(Base):
+    __tablename__ = 'extrinsics'
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    index = Column(Integer)
+
+class Event(Base):
+    __tablename__ = 'events'
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    index = Column(Integer)
 
 class SubscrapeDB:
     """
@@ -16,9 +34,19 @@ class SubscrapeDB:
     At the end of the process, flush_<type>() is called to make sure the state is properly saved.
     """
 
-    def __init__(self, path):
+    def __init__(self, connection_string):
         self.logger = logging.getLogger("SubscrapeDB")
+        self._engine = create_engine(connection_string)
+        self._session = Session(bind=self._engine)
+        self._setup_db()
 
+    @staticmethod
+    def sqliteInstanceForPath(path):
+        """
+        Creates a new instance of SubscrapeDB with a SQLite connection string.
+        :param path: Path to the SQLite database file.
+        :return: SubscrapeDB instance.
+        """
         # make sure the parachains folder exists
         folder_path = f"{os.getcwd()}/{path}"
         # remove the file name
@@ -26,9 +54,14 @@ class SubscrapeDB:
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        #: str: the root path to this db
-        self._path = path
-        self._connection = sqlite3.connect(self._path)
+        return SubscrapeDB(f"sqlite:///{path}")
+
+    def _setup_db(self):
+        """
+        Creates the database tables if they do not exist.
+        """
+        Base.metadata.create_all(self._engine)
+        
 
     """ # Extrinsics """
 
@@ -113,6 +146,14 @@ class SubscrapeDB:
         Returns true if the event with the given index is in the database.
         """
         raise NotImplementedError()
+
+    def missing_events_from_index_list(self, index_list):
+        """
+        Returns a list of all events that are not in the database.
+        """
+        matches = self._session.query(Event).filter(Event.id.in_(index_list)).all()
+        # find all indices that are not in the matches
+        return [index for index in index_list if index not in [match.id for match in matches]]
 
     def read_event(self, event_index):
         """

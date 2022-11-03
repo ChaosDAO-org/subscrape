@@ -20,7 +20,7 @@ def main():
     subscrape.scrape(config)
 
     logging.info("transforming...")
-    db = SubscrapeDB("mangatax")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_events.db")
     highest_event_index = 0
     highest_event_index_block = None
     highest_tx_index = 0

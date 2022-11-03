@@ -30,10 +30,9 @@ the delta must be deleted and the scraper run again.
 ## Usage
 
 ### Installation
-> virtualenv venv
-> venv\scripts\activate
-> pip install -Ur .\PipRequirements.txt
-> bin\scrape.py
+ virtualenv venv
+ venv\scripts\activate
+ pip install -Ur .\PipRequirements.txt
 
 ### Subscan API Key
 If you have a Subscan API key, drop it in a file named `config/subscan-key`. Similarly, if you have a Moonscan.io API key, drop it in a file named  `config/moonscan-key`.

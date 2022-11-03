@@ -19,12 +19,12 @@ async def test_events(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_events.db")
     events_storage = db.storage_manager_for_events_call("council", "proposed")
     events = dict(events_storage.get_iter())
     proposal_event = events["7608975-2"]
@@ -46,12 +46,12 @@ async def test_fetch_all_events_from_module(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_events_from_module.db")
 
     events_storage = db.storage_manager_for_events_call("council", "proposed")
     events = dict(events_storage.get_iter())
@@ -80,12 +80,12 @@ async def test_fetch_all_events_from_module(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_events_from_module.db")
 
     events_storage = db.storage_manager_for_events_call("society", "defendervote")
     events = dict(events_storage.get_iter())

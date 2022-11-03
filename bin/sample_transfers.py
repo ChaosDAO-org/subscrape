@@ -21,7 +21,7 @@ def main():
     subscrape.scrape(config)
 
     logging.info("transforming...")
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transfers.db")
     transfers = db.transfers_iter(ksm_treasury)
     columns = list(transfers[0].keys())
     rows = []

@@ -281,7 +281,7 @@ class SubscanBase:
         
         self.logger.info("Building list of events to fetch...")
         # build list of events to fetch
-        events_to_fetch = [event for event in event_indexes if not self.db.has_event(event)]
+        events_to_fetch = self.db.missing_events_from_index_list(event_indexes)
         self.logger.info(f"Fetching {len(events_to_fetch)} events from {self.endpoint}")
 
         method = self._api_method_event

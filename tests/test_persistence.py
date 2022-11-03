@@ -22,14 +22,14 @@ async def test_persistence(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     items_scraped1 = await subscrape.scrape(config)
     items_scraped2 = await subscrape.scrape(config)
     
     assert items_scraped1 != items_scraped2
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_persistence.db")
     extrinsics_storage = db.storage_manager_for_extrinsics_call("crowdloan", "create")
     extrinsics = extrinsics_storage.get_iter()
     extrinsic_list = []

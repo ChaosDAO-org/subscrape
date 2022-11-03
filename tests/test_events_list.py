@@ -21,12 +21,12 @@ async def test_events_list(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_events_list.db")
     data = db.read_event(event_index)
 
     assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'

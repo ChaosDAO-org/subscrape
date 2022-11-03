@@ -20,8 +20,8 @@ dependencies = [
   "pandas",
   "ratelimit",
   "simplejson",
+  "sqlalchemy",
   "substrate-interface",
-  "sqlitedict",
   "web3>5.0"
 
 ]

@@ -85,8 +85,11 @@ def scraper_factory(name, chain_config: ScrapeConfig):
         scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
         return scraper
     else:
-        db_path = chain_config.db_path if chain_config.db_path is not None else f"data/substrate.sqlite"
-        db = SubscrapeDB(db_path)
+        if chain_config.db_connection_string is None:
+            db_path = f"data/cache/default.db"
+            db = SubscrapeDB.sqliteInstanceForPath(db_path)
+        else:
+            db = SubscrapeDB(chain_config.db_connection_string)
         subscan_api = subscan_factory(name, db, chain_config)
         scraper = ParachainScraper(subscan_api)
         return scraper
@@ -132,13 +135,13 @@ async def scrape(chains) -> int:
     logging.info(f"Scraped {items_scraped} items")
     return items_scraped
 
-def wipe_storage():
+def wipe_cache():
     """
-    Wipe the complete storage the data folder
+    Wipe the cache folder
     """
-    if os.path.exists("data"):
+    if os.path.exists("data/cache"):
         import shutil
-        logging.info("wiping data folder")
-        shutil.rmtree("data/")
+        logging.info("wiping cache folder")
+        shutil.rmtree("data/cache/")
     else:
-        logging.info("data folder does not exist")
+        logging.info("cache folder does not exist")

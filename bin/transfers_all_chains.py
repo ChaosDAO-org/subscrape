@@ -38,8 +38,9 @@ def main():
 
     chain_dfs = []
 
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transfers_all_chains.db")
+
     for chain in chains:
-        db = SubscrapeDB(chain)
         address_dfs = []
         for address in addresses:
             transfers = db.transfers_iter(address)

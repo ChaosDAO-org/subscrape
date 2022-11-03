@@ -19,12 +19,12 @@ async def test_extrinsics(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_extrinsics.db")
     extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
     extrinsics = dict(extrinsics_storage.get_iter())
 
@@ -47,12 +47,12 @@ async def test_fetch_all_extrinsics_from_module(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_extrinsics_from_module.db")
 
     extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
     extrinsics = dict(extrinsics_storage.get_iter())
@@ -81,12 +81,12 @@ async def test_fetch_all_extrinsics_from_address(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/test_fetch_all_extrinsics_from_address.db")
     extrinsics_storage = db.storage_manager_for_extrinsics_call("balances", "transfer_keep_alive")
     extrinsics = dict(extrinsics_storage.get_iter())
 

@@ -16,7 +16,7 @@ config = {
     }
 }
 
-db = SubscrapeDB("mangatax")
+db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_transform_mangatax.db")
 
 def unwrap_event_params(params):
     result = []
