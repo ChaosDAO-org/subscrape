@@ -7,6 +7,7 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
     "_version": 1,
     "kusama": {
         "_api": "SubscanV2",
+        "_db_path": "data/example.sqlite",
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
@@ -53,6 +54,9 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 ### Param: _api
 Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
 In the future, we will change this to `SubscanV2`.
+
+### Param: _db_path
+Defines the path to the database file. If the file and path does not exist, it will be created. The default path is `data\substrate.sqlite`.
 
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.

@@ -10,6 +10,7 @@ class ScrapeConfig:
         self.skip = False
         self.params = None
         self.api = None
+        self.db_path = None
         self._set_config(config)
 
     def _set_config(self, config):
@@ -42,9 +43,15 @@ class ScrapeConfig:
         if params is not None:
             self.params = params
 
+        # _api is only relevant on the chain level
         api = config.get("_api", None)
         if api is not None:
             self.api = api
+
+        # _db_path is only relevant on the chain level
+        db_path = config.get("_db_path", None)
+        if db_path is not None:
+            self.db_path = db_path
 
     def create_inner_config(self, config):
         """

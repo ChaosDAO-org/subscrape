@@ -7,5 +7,4 @@ pytest-asyncio
 ratelimit
 simplejson
 substrate-interface
-sqlitedict
 web3>5.0 

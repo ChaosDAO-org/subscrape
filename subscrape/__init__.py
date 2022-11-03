@@ -85,7 +85,8 @@ def scraper_factory(name, chain_config: ScrapeConfig):
         scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api)
         return scraper
     else:
-        db = SubscrapeDB(name)
+        db_path = chain_config.db_path if chain_config.db_path is not None else f"data/substrate.sqlite"
+        db = SubscrapeDB(db_path)
         subscan_api = subscan_factory(name, db, chain_config)
         scraper = ParachainScraper(subscan_api)
         return scraper
