@@ -5,7 +5,7 @@ import httpx
 import json
 import logging
 from ratelimit import limits, sleep_and_retry
-from subscrape.db.subscrape_db import SubscrapeDB
+from subscrape.db.subscrape_db import SubscrapeDB, Extrinsic, Event
 from substrateinterface.utils import ss58
 import asyncio
 
@@ -303,17 +303,27 @@ class SubscanBase:
                     await asyncio.sleep(1/MAX_CALLS_PER_SEC)
                     futures.append(future)
 
-                events = await asyncio.gather(*futures)
+                raw_events = await asyncio.gather(*futures)
 
-                for event in events:
-                    index = self._event_index_deducer(event)
-                    self.db.write_event(index, event)
+                for raw_event in raw_events:
+                    event_id = self._event_index_deducer(raw_event)
+                    event = Event(
+                        id=event_id,
+                        block_number=raw_event["block_num"],
+                        event_index=raw_event["event_idx"],
+                        extrinsic_index=raw_event["extrinsic_idx"],
+                        module=raw_event["module_id"],
+                        event=raw_event["event_id"],
+                        params=raw_event["params"],
+                        finalized=raw_event["finalized"],
+                    )
+                    self.db.write_event(event)
                     items_scraped += 1
 
-                self.db.flush_events()
+                self.db.flush()
 
-                for index in batch:
-                    events_to_fetch.remove(index)
+                for id in batch:
+                    events_to_fetch.remove(id)
 
         return items_scraped
 

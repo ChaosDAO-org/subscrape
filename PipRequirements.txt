@@ -7,5 +7,6 @@ pytest-asyncio
 ratelimit
 simplejson
 sqlalchemy
+sqlalchemy-utils
 substrate-interface
 web3>5.0 

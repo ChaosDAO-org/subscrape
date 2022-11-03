@@ -9,9 +9,12 @@ async def test_events_list(api):
     
     event_index = "14238250-39"
     
+    db_connection_string = f"sqlite:///data/cache/test_events_list.db"
+
     config = {
         "kusama":{
             "_api": api,
+            "_db_connection_string": db_connection_string,
             "events-list":[
                 event_index
             ]
@@ -26,9 +29,9 @@ async def test_events_list(api):
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB.sqliteInstanceForPath("sqlite:///data/cache/sample_events_list.db")
+    db = SubscrapeDB(db_connection_string)
     data = db.read_event(event_index)
 
-    assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
-    assert type(data["params"]) is list
+    assert data.id == event_index
+    assert type(data.params) is list
     

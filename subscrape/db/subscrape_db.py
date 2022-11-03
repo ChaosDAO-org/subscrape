@@ -6,6 +6,7 @@ from substrateinterface.utils import ss58
 from sqlalchemy import create_engine, Table, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import Session	
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy_utils import database_exists, create_database
 
 Base = declarative_base()
 
@@ -23,7 +24,12 @@ class Event(Base):
     __tablename__ = 'events'
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    index = Column(Integer)
+    event_index = Column(Integer)
+    extrinsic_index = Column(Integer)
+    module = Column(String(100))
+    event = Column(String(100))
+    params = Column(JSON)
+    finalized = Column(Boolean)
 
 class SubscrapeDB:
     """
@@ -37,24 +43,14 @@ class SubscrapeDB:
     def __init__(self, connection_string):
         self.logger = logging.getLogger("SubscrapeDB")
         self._engine = create_engine(connection_string)
+
+        if not database_exists(self._engine.url):
+            # ensure that the folder exists
+            os.makedirs(os.path.dirname(connection_string.replace("sqlite:///", "")), exist_ok=True)
+            create_database(self._engine.url)
+            self._setup_db()
+
         self._session = Session(bind=self._engine)
-        self._setup_db()
-
-    @staticmethod
-    def sqliteInstanceForPath(path):
-        """
-        Creates a new instance of SubscrapeDB with a SQLite connection string.
-        :param path: Path to the SQLite database file.
-        :return: SubscrapeDB instance.
-        """
-        # make sure the parachains folder exists
-        folder_path = f"{os.getcwd()}/{path}"
-        # remove the file name
-        folder_path = os.path.dirname(folder_path)
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        return SubscrapeDB(f"sqlite:///{path}")
 
     def _setup_db(self):
         """
@@ -69,7 +65,7 @@ class SubscrapeDB:
         """
         Flush the extrinsics to the database.
         """
-        raise NotImplementedError()
+        self._session.commit()
 
     def write_extrinsic(self, index, extrinsic) -> bool:
         """
@@ -114,24 +110,16 @@ class SubscrapeDB:
 
     """ # Events """
 
-    def write_event(self, index, event) -> bool:
+    def write_event(self, event: Event):
         """
         Write event to the database.
 
         :param index: The index of the event
         :type index: str
         :param event: The event to write
-        :type event: dict
+        :type event: Event
         """
-
-        raise NotImplementedError()
-
-        was_new_element = self._events_storage.write_item(index, event)
-
-        if not was_new_element:
-            self.logger.warning(f"Event {index} already exists in the database. This should be prevented by the scraper by checking `has_event`.")
-
-        return was_new_element
+        self._session.add(event)
 
     def read_events(self):
         """
@@ -155,14 +143,15 @@ class SubscrapeDB:
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
 
-    def read_event(self, event_index):
+    def read_event(self, event_id) -> Event:
         """
-        Reads an event with a given index from the database.
+        Reads an event with a given id from the database.
 
-        :param event_index: The index of the event to read, e.g. "123456-12"
+        :param event_id: The id of the event to read, e.g. "123456-12"
         :return: The event
         """
-        raise NotImplementedError()
+        result = self._session.query(Event).get(event_id)
+        return result
     
     """ # Transfers """
 
