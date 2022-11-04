@@ -28,9 +28,20 @@ def extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata):
 
 def extrinsic_from_raw_dict(raw_extrinsic):
     return Extrinsic(
-        id=raw_extrinsic["extrinsic_index"],
-        block_number=raw_extrinsic["block_num"],
-        index=raw_extrinsic["extrinsic_idx"],
+        id = raw_extrinsic["extrinsic_index"],
+        block_number = raw_extrinsic["block_num"],
+        module = raw_extrinsic["call_module"],
+        call = raw_extrinsic["call_module_function"],
+        address = raw_extrinsic["account_id"],
+        nonce = raw_extrinsic["nonce"],
+        extrinsic_hash = raw_extrinsic["extrinsic_hash"],
+        success = raw_extrinsic["success"],
+        params = raw_extrinsic["params"],
+        fee = raw_extrinsic["fee"],
+        fee_used = raw_extrinsic["fee_used"],
+        error = raw_extrinsic["error"],
+        finalized = raw_extrinsic["finalized"],
+        tip = raw_extrinsic["tip"],
     )
 
 def event_metadata_from_raw_dict(raw_event_metadata):
@@ -233,7 +244,7 @@ class SubscanWrapper:
         """
         extrinsic = extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata)
         self.db.write_item(extrinsic)
-        return 1
+        return extrinsic
 
     def _event_metadata_processor(self, raw_event_metadata):
         """
@@ -244,7 +255,7 @@ class SubscanWrapper:
         """
         event = event_metadata_from_raw_dict(raw_event_metadata)
         self.db.write_item(event)
-        return 1
+        return event
 
     def _transfer_processor(self, address, index_decucer):
         """

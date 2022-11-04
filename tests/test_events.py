@@ -64,12 +64,10 @@ async def test_fetch_all_events_from_module():
     db.close()
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [(None), ("SubscanV2")])
-async def test_fetch_all_events_from_module(api):
+async def test_fetch_all_events_from_module():
     
     config = {
         "kusama":{
-            "_api": api,
             "events": None,
             "_params": {
                 "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"

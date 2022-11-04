@@ -18,13 +18,25 @@ class ExtrinsicMetadata(Base):
     __tablename__ = 'extrinsics_metadata'
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    index = Column(Integer)
 
 class Extrinsic(Base):
     __tablename__ = 'extrinsics'
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    index = Column(Integer)
+    module = Column(String(100))
+    call = Column(String(100))
+    address = Column(String(100))
+    nonce = Column(Integer)
+    extrinsic_hash = Column(String(100))
+    success = Column(Boolean)
+    params = Column(JSON)
+    # event
+    # event_count
+    fee = Column(Integer)
+    fee_used = Column(Integer)
+    error = Column(String(100))
+    finalized = Column(Boolean)
+    tip = Column(Integer)
 
 class EventMetadata(Base):
     __tablename__ = 'events_metadata'
@@ -123,6 +135,15 @@ class SubscrapeDB:
         matches = self._session.query(ExtrinsicMetadata).filter(ExtrinsicMetadata.id.in_(index_list)).all()
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
+
+    def read_extrinsic(self, extrinsic_id):
+        """
+        Returns the extrinsic with the given id.
+
+        :param extrinsic_id: The id of the extrinsic
+        :type extrinsic_id: str
+        """
+        return self._session.query(Extrinsic).get(extrinsic_id)
 
     """ # Events """
 

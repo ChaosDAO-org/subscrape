@@ -52,7 +52,7 @@ class ParachainScraper:
         
         return items
 
-    async def scrape_module_calls(self, modules, chain_config, fetch_function) -> int:
+    async def scrape_module_calls(self, modules, chain_config, fetch_function) -> list:
         """
         Scrapes all module calls that belong to the list of accounts.
 
@@ -62,9 +62,10 @@ class ParachainScraper:
         :type chain_config: ScrapeConfig
         :param fetch_function: the method to call to scrape extrinsics vs events etc
         :type fetch_function: function
-        :return: the number of items scraped
+        :return: the scraped items
+        :rtype: list
         """
-        items_scraped = 0
+        items = []
         extrinsic_config = chain_config.create_inner_config(modules)
 
         # if we want to scrape all extrinsics, modules is None. In that case, we just set it to a list containing None
@@ -105,8 +106,9 @@ class ParachainScraper:
                     continue
 
                 # go
-                items_scraped += await fetch_function(module, call, call_config)
-        return items_scraped
+                new_items = await fetch_function(module, call, call_config)
+                items.extend(new_items)
+        return items
 
     async def scrape_transfers(self, accounts, chain_config) -> int:
         """
