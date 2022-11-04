@@ -31,4 +31,4 @@ async def test_extrinsics_list():
     assert type(data["params"]) is list
     assert type(data["event"]) is list
     
-
+    db.close()

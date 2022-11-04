@@ -21,15 +21,15 @@ async def test_events_list():
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    logging.info("wiping storage")
     subscrape.wipe_cache()
-    logging.info("scraping")
-    await subscrape.scrape(config)
-    logging.info("transforming")
+    items = await subscrape.scrape(config)
+
+    assert len(items) == 1, "There should be one item in the list"
 
     db = SubscrapeDB(db_connection_string)
-    data = db.read_event(event_index)
+    event = db.read_event(event_index)
 
-    assert data.id == event_index
-    assert type(data.params) is list
+    assert event is not None
+    assert event.id == event_index
+    assert type(event.params) is list
     

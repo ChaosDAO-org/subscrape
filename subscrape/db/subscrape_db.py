@@ -39,10 +39,12 @@ class Event(Base):
     __tablename__ = 'events'
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    event_index = Column(Integer)
-    extrinsic_index = Column(Integer)
+    extrinsic_id = Column(Integer)
     module = Column(String(100))
     event = Column(String(100))
+    # In the Subscan API, `params` is only delivered in the `events call of
+    # API v1 and in the `event` call. When using the `events` call of API v2,
+    # we need to make sure we hydrate them by calling `event` for each event.
     params = Column(JSON)
     finalized = Column(Boolean)
 
@@ -114,6 +116,14 @@ class SubscrapeDB:
             query = query.filter(Extrinsic.call == call)
         return query
 
+    def missing_extrinsics_from_index_list(self, index_list):
+        """
+        Returns a list of all extrinsics that are not in the database.
+        """
+        matches = self._session.query(ExtrinsicMetadata).filter(ExtrinsicMetadata.id.in_(index_list)).all()
+        # find all indices that are not in the matches
+        return [index for index in index_list if index not in [match.id for match in matches]]
+
     """ # Events """
 
     def events_query(self, module=None, event=None):        
@@ -140,12 +150,6 @@ class SubscrapeDB:
         """
         raise NotImplementedError()
 
-    def has_event(self, event_index):
-        """
-        Returns true if the event with the given index is in the database.
-        """
-        raise NotImplementedError()
-
     def missing_events_from_index_list(self, index_list):
         """
         Returns a list of all events that are not in the database.
@@ -154,7 +158,7 @@ class SubscrapeDB:
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
 
-    def read_event(self, event_id) -> EventMetadata:
+    def read_event_metadata(self, event_id) -> EventMetadata:
         """
         Reads an event with a given id from the database.
 
@@ -163,7 +167,18 @@ class SubscrapeDB:
         """
         result = self._session.query(EventMetadata).get(event_id)
         return result
-    
+
+    def read_event(self, event_id) -> EventMetadata:
+        """
+        Reads an event with a given id from the database.
+
+        :param event_id: The id of the event to read, e.g. "123456-12"
+        :return: The event
+        """
+        result = self._session.query(Event).get(event_id)
+        return result
+
+
     """ # Transfers """
 
     def write_transfer(self, index, transfer) -> bool:

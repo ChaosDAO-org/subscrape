@@ -47,10 +47,11 @@ def event_metadata_from_raw_dict(raw_event_metadata):
 
 def event_from_raw_dict(raw_event):
     return Event(
-        id=raw_event["event_index"],
+        # Subscan API is delivering the extrinsic id instead of the event id 
+        # in the event_index field. So let's work around that.
+        id=f'{raw_event["block_num"]}-{raw_event["event_idx"]}',
         block_number=raw_event["block_num"],
-        event_index=raw_event["event_idx"],
-        extrinsic_index=raw_event["extrinsic_idx"],
+        extrinsic_id=f'{raw_event["block_num"]}-{raw_event["extrinsic_idx"]}',
         module=raw_event["module_id"],
         event=raw_event["event_id"],
         params=raw_event["params"],
@@ -156,7 +157,7 @@ class SubscanWrapper:
         list_key,
         last_id_deducer,
         body={}, 
-        filter=None) -> int:
+        filter=None) -> list:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -171,12 +172,12 @@ class SubscanWrapper:
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
         :type filter: function
-        :return: number of items processed
+        :return: the items processed
         """
 
         done = False        # keep crunching until we are done
         rows_per_page = 100 # constant for the rows per page to query
-        count = 0           # counter for how many items we queried already
+        items = []          # the items we will return
         limit = 0           # max amount of items to be queried. to be determined after the first call
 
         body["row"] = rows_per_page
@@ -199,29 +200,29 @@ class SubscanWrapper:
                 self.logger.info("elements was empty. Stopping.")
                 break
 
-            count_new_elements = 0
             for element in elements:
                 if filter is not None and filter(element):
                     continue
-                was_new_element = element_processor(element)
-                if was_new_element:
-                    count_new_elements += 1
+                item = element_processor(element)
+                if item:
+                    items.append(item)
                 else:
-                    done = True
-                    break
+                    raise Exception("we recently refactored the code and this case needs to be reavaluated")
+                    # it is likely going to happen because we did not properly check if
+                    # the item exists in the db already. Maybe we also made the assumption
+                    # that it is okay to just throw new items here. Let's revisit our life decisions.
 
-            # update counters and check if we should exit
-            count += count_new_elements
-            self.logger.debug(count)
+            num_items = len(items)
+            self.logger.debug(num_items)
 
-            if count >= limit:
+            if num_items >= limit:
                 done = True
 
             self.logger.debug(f"Last ID: {last_id}")
 
             last_id = last_id_deducer(elements[-1])
 
-        return count
+        return items
 
     def _extrinsic_metadata_processor(self, raw_extrinsic_metadata):
         """
@@ -262,7 +263,7 @@ class SubscanWrapper:
         return process_element
 
 
-    async def fetch_extrinsics_index(self, module, call, config) -> int:
+    async def fetch_extrinsics_index(self, module, call, config) -> list:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -272,16 +273,16 @@ class SubscanWrapper:
         :type call: str
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
-        :return: the number of items scraped
+        :return: the extrinsics
+        :rtype: list
         """
-        items_scraped = 0
         self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
 
         body = {"module": module, "call": call}
         if config.params is not None:
             body.update(config.params)
 
-        items_scraped += await self._iterate_pages(
+        items = await self._iterate_pages(
             self._api_method_extrinsics,
             self._extrinsic_processor(self._extrinsic_index_deducer),
             last_id_deducer=self._last_id_deducer,
@@ -290,29 +291,27 @@ class SubscanWrapper:
             filter=config.filter
             )
 
-        for sm in self.storage_managers_to_flush:
-            sm.flush()
-        self.storage_managers_to_flush.clear()
+        self.db.flush()
+
+        return items
 
 
-        return items_scraped
-
-
-    async def fetch_extrinsics(self, extrinsic_indexes: list) -> int:
+    async def fetch_extrinsics(self, extrinsic_indexes: list) -> list:
         """
         Fetches the extrinsic with the specified index and writes it to the db.
         :param extrinsic_index: The extrinsix index to fetch
         :type extrinsic_index: str
         :param element_processor: The function to process the extrinsic
         :type element_processor: function
-        :return: the number of items scraped
+        :return: The extrinsics
+        :rtype: list
         """
 
-        items_scraped = 0
+        items = []
         
         self.logger.info("Building list of extrinsics to fetch...")
         # build list of extrinsics we need to fetch
-        extrinsics_to_fetch = [extrinsic for extrinsic in extrinsic_indexes if not self.db.has_extrinsic(extrinsic)]
+        extrinsics_to_fetch = self.db.missing_extrinsics_from_index_list(extrinsic_indexes)
         self.logger.info(f"Fetching {len(extrinsics_to_fetch)} extrinsics from {self.endpoint}")
 
         method = self._api_method_extrinsic
@@ -334,21 +333,21 @@ class SubscanWrapper:
                     await asyncio.sleep(1/MAX_CALLS_PER_SEC)
                     futures.append(future)
 
-                extrinsics = await asyncio.gather(*futures)
+                raw_extrinsics = await asyncio.gather(*futures)
                 
-                for extrinsic in extrinsics:
-                    index = self._extrinsic_index_deducer(extrinsic)
-                    self.db.write_extrinsic(index, extrinsic)
-                    items_scraped += 1
+                for raw_extrinsic in raw_extrinsics:
+                    extrinsic = extrinsic_from_raw_dict(raw_extrinsic)
+                    self.db.write_item(extrinsic)
+                    items.append(extrinsic)
 
-                self.db.flush_extrinsics()
+                self.db.flush()
 
                 for index in batch:
                     extrinsics_to_fetch.remove(index)
 
-        return items_scraped
+        return items
 
-    async def fetch_event_metadata(self, module, call, config) -> int:
+    async def fetch_event_metadata(self, module, call, config) -> list:
         """
         Scrapes all events matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -358,9 +357,10 @@ class SubscanWrapper:
         :type call: str
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
-        :return: the number of items scraped
+        :return: the events
+        :rtype: list
         """
-        items_scraped = 0
+        items = []
 
         self.logger.info(f"Fetching events {module}.{call} from {self.endpoint}")
 
@@ -368,7 +368,7 @@ class SubscanWrapper:
         if config.params is not None:
             body.update(config.params)
 
-        items_scraped += await self._iterate_pages(
+        items = await self._iterate_pages(
             self._api_method_events,
             self._event_metadata_processor,
             last_id_deducer=self._last_id_deducer,
@@ -378,19 +378,20 @@ class SubscanWrapper:
         )
 
         self.db.flush()
-        return items_scraped
+        return items
 
-    async def fetch_events(self, event_indexes: list) -> int:
+    async def fetch_events(self, event_indexes: list) -> list:
         """
         Fetches the event with the specified index and writes it to the db.
         :param event_index: The event index to fetch
         :type event_index: str
         :param element_processor: The function to process the event
         :type element_processor: function
-        :return: the number of items scraped
+        :return: The events
+        :rtype: list
         """
 
-        items_scraped = 0
+        items = []
         
         self.logger.info("Building list of events to fetch...")
         # build list of events to fetch
@@ -421,14 +422,14 @@ class SubscanWrapper:
                 for raw_event in raw_events:
                     event = event_from_raw_dict(raw_event)
                     self.db.write_item(event)
-                    items_scraped += 1
+                    items.append(event)
 
                 self.db.flush()
 
                 for id in batch:
                     events_to_fetch.remove(id)
 
-        return items_scraped
+        return items
 
     async def fetch_transfers(self, address, config) -> int:
         """
