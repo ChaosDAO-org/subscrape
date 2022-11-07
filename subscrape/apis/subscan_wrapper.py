@@ -21,9 +21,17 @@ MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 def extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata):
     return ExtrinsicMetadata(
-        id=raw_extrinsic_metadata["extrinsic_index"],
-        block_number=raw_extrinsic_metadata["block_num"],
-        index=raw_extrinsic_metadata["extrinsic_idx"],
+        id = raw_extrinsic_metadata["extrinsic_index"],
+        block_number = raw_extrinsic_metadata["block_num"],
+        module = raw_extrinsic_metadata["call_module"],
+        call = raw_extrinsic_metadata["call_module_function"],
+        address = raw_extrinsic_metadata["account_display"]["address"],
+        nonce = raw_extrinsic_metadata["nonce"],
+        extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
+        success = raw_extrinsic_metadata["success"],
+        fee = raw_extrinsic_metadata["fee"],
+        fee_used = raw_extrinsic_metadata["fee_used"],
+        finalized = raw_extrinsic_metadata["finalized"],
     )
 
 def extrinsic_from_raw_dict(raw_extrinsic):
@@ -274,7 +282,7 @@ class SubscanWrapper:
         return process_element
 
 
-    async def fetch_extrinsics_index(self, module, call, config) -> list:
+    async def fetch_extrinsic_metadata(self, module, call, config) -> list:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -295,7 +303,7 @@ class SubscanWrapper:
 
         items = await self._iterate_pages(
             self._api_method_extrinsics,
-            self._extrinsic_processor(self._extrinsic_index_deducer),
+            self._extrinsic_metadata_processor,
             last_id_deducer=self._last_id_deducer,
             list_key="extrinsics",
             body=body,

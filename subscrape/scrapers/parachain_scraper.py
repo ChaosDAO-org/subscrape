@@ -31,7 +31,7 @@ class ParachainScraper:
 
             if operation == "extrinsics":
                 modules = operations[operation]
-                new_items = await self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsics_index)
+                new_items = await self.scrape_module_calls(modules, chain_config, self.api.fetch_extrinsic_metadata)
             elif operation == "extrinsics-list":
                 extrinsics_list = operations[operation]
                 new_items = await self.api.fetch_extrinsics(extrinsics_list)

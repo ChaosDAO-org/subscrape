@@ -23,11 +23,11 @@ async def test_extrinsics():
     logging.info("transforming")
 
     db = SubscrapeDB()
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
-    extrinsics = dict(extrinsics_storage.get_iter())
-
-    extrinsic = extrinsics["12935940-3"]
-    assert extrinsic["extrinsic_hash"] == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
+    extrinsic = db.read_extrinsic_metadata("12935940-3")
+    assert extrinsic is not None
+    assert extrinsic.extrinsic_hash == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
+    
+    db.close()
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
@@ -51,16 +51,10 @@ async def test_fetch_all_extrinsics_from_module(api):
     logging.info("transforming")
 
     db = SubscrapeDB()
+    extrinsic = db.read_extrinsic_metadata("12935940-3")
+    assert extrinsic.extrinsic_hash == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
 
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "propose_bounty")
-    extrinsics = dict(extrinsics_storage.get_iter())
-    extrinsic = extrinsics["12935940-3"]
-    assert extrinsic["extrinsic_hash"] == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
-
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("bounties", "extend_bounty_expiry")
-    extrinsics = dict(extrinsics_storage.get_iter())
-    extrinsic = extrinsics["14534356-3"]
-    assert extrinsic["extrinsic_hash"] == '0xf02b930789a35b4b942006c60ae6c83daee4d87237e213bab4ce0e7d93cfb0f4'
+    db.close()
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api", [None, "SubscanV2"])
@@ -85,9 +79,7 @@ async def test_fetch_all_extrinsics_from_address(api):
     logging.info("transforming")
 
     db = SubscrapeDB()
-    extrinsics_storage = db.storage_manager_for_extrinsics_call("balances", "transfer_keep_alive")
-    extrinsics = dict(extrinsics_storage.get_iter())
+    extrinsic = db.read_extrinsic_metadata("14815834-2")
+    assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
 
-    assert "15067802-4" not in extrinsics
-    extrinsic = extrinsics["14815834-2"]
-    assert extrinsic["extrinsic_hash"] == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
+    db.close()
