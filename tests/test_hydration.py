@@ -33,7 +33,7 @@ async def test_hydration():
     for index, extrinsic in extrinsics:
         extrinsic_list.append(index)
 
-    subscrape_config = {chain:{"_api": api, "extrinsics-list":extrinsic_list}}
+    subscrape_config = {chain:{"extrinsics-list":extrinsic_list}}
     await subscrape.scrape(subscrape_config)
 
     index = extrinsic_list[-1]

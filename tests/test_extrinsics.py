@@ -19,7 +19,7 @@ async def test_extrinsics():
     logging.info("wiping storage")
     subscrape.wipe_cache()
     logging.info("scraping")
-    await subscrape.scrape(config)
+    scrape_result = await subscrape.scrape(config)
     logging.info("transforming")
 
     db = SubscrapeDB()
@@ -53,12 +53,18 @@ async def test_fetch_all_extrinsics_from_module():
     logging.info("transforming")
 
     db = SubscrapeDB()
-    extrinsic = db.extrinsics_query("bounties", "propose_bounty").get("12935940-3")
+    extrinsics = db.extrinsics_query("bounties", "propose_bounty")
+    extrinsics = [e for e in extrinsics if e.id == "12935940-3"]
+    assert len(extrinsics) == 1, "Expected 1 extrinsic"
+    extrinsic = extrinsics[0]
     assert extrinsic is not None
     assert extrinsic.extrinsic_hash == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
     assert extrinsic.params is not None
 
-    extrinsic = db.extrinsics_query("bounties", "extend_bounty_expiry").get("14534356-3")
+    extrinsics = db.extrinsics_query("bounties", "extend_bounty_expiry")
+    extrinsics = [e for e in extrinsics if e.id == "14534356-3"]
+    assert len(extrinsics) == 1, "Expected 1 extrinsic"
+    extrinsic = extrinsics[0]
     assert extrinsic is not None
     assert extrinsic.extrinsic_hash == '0xf02b930789a35b4b942006c60ae6c83daee4d87237e213bab4ce0e7d93cfb0f4'
     assert extrinsic.params is not None
@@ -86,7 +92,7 @@ async def test_fetch_all_extrinsics_from_address():
     logging.info("transforming")
 
     db = SubscrapeDB()
-    extrinsic = db.extrinsics_query.get("14815834-2")
+    extrinsic = db.read_extrinsic("14815834-2")
     assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
 
     db.close()

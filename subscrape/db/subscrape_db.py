@@ -29,7 +29,7 @@ class Extrinsic(Base):
     # event_count
     fee = Column(Integer)
     fee_used = Column(Integer)
-    error = Column(String(100))
+    error = Column(JSON)
     finalized = Column(Boolean)
     tip = Column(Integer)
 
@@ -95,7 +95,7 @@ class SubscrapeDB:
 
     """ # Extrinsics """
 
-    def extrinsics_query(self, module=None, call=None) -> Query:
+    def extrinsics_query(self, module: str = None, call: str = None, extrinsic_ids: list = None) -> Query:
         """
         Returns a query object for extrinsics.
 
@@ -111,15 +111,10 @@ class SubscrapeDB:
             query = query.filter(Extrinsic.module == module)
         if call is not None:
             query = query.filter(Extrinsic.call == call)
-        return query
+        if extrinsic_ids is not None:
+            query = query.filter(Extrinsic.id.in_(extrinsic_ids))
 
-    def missing_extrinsics_from_index_list(self, index_list):
-        """
-        Returns a list of all extrinsics that are not in the database.
-        """
-        matches = self._session.query(Extrinsic).filter(Extrinsic.id.in_(index_list)).all()
-        # find all indices that are not in the matches
-        return [index for index in index_list if index not in [match.id for match in matches]]
+        return query
 
     def read_extrinsic(self, extrinsic_id) -> Extrinsic:
         """

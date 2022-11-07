@@ -10,6 +10,7 @@ class ScrapeConfig:
         self.skip = False
         self.params = None
         self.db_connection_string = None
+        self.auto_hydrate = True
         self._set_config(config)
 
     def _set_config(self, config):
@@ -46,6 +47,10 @@ class ScrapeConfig:
         db_connection_string = config.get("_db_connection_string", None)
         if db_connection_string is not None:
             self.db_connection_string = db_connection_string
+
+        auto_hydrate = config.get("_auto_hydrate", None)
+        if auto_hydrate is not None:
+            self.auto_hydrate = auto_hydrate
 
     def create_inner_config(self, config):
         """

@@ -8,6 +8,7 @@ from ratelimit import limits, sleep_and_retry
 from subscrape.db.subscrape_db import SubscrapeDB, Extrinsic, Event
 from substrateinterface.utils import ss58
 import asyncio
+from subscrape.scrapers.scrape_config import ScrapeConfig
 
 #import http.client
 #http.client.HTTPConnection.debuglevel = 1
@@ -20,23 +21,21 @@ SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
 MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 
-def extrinsic_from_raw_dict(raw_extrinsic):
-    return Extrinsic(
-        id = raw_extrinsic["extrinsic_index"],
-        block_number = raw_extrinsic["block_num"],
-        module = raw_extrinsic["call_module"],
-        call = raw_extrinsic["call_module_function"],
-        address = raw_extrinsic["account_display"]["address"],
-        nonce = raw_extrinsic["nonce"],
-        extrinsic_hash = raw_extrinsic["extrinsic_hash"],
-        success = raw_extrinsic["success"],
-        params = raw_extrinsic["params"],
-        fee = raw_extrinsic["fee"],
-        fee_used = raw_extrinsic["fee_used"],
-        error = raw_extrinsic["error"],
-        finalized = raw_extrinsic["finalized"],
-        tip = raw_extrinsic["tip"],
-    )
+def update_extrinsic_from_raw_extrinsic(extrinsic: Extrinsic, raw_extrinsic):
+    extrinsic.id = raw_extrinsic["extrinsic_index"]
+    extrinsic.block_number = raw_extrinsic["block_num"]
+    extrinsic.module = raw_extrinsic["call_module"]
+    extrinsic.call = raw_extrinsic["call_module_function"]
+    extrinsic.address = raw_extrinsic["account_display"]["address"]
+    extrinsic.nonce = raw_extrinsic["nonce"]
+    extrinsic.extrinsic_hash = raw_extrinsic["extrinsic_hash"]
+    extrinsic.success = raw_extrinsic["success"]
+    extrinsic.params = raw_extrinsic["params"]
+    extrinsic.fee = raw_extrinsic["fee"]
+    extrinsic.fee_used = raw_extrinsic["fee_used"]
+    extrinsic.error = raw_extrinsic["error"]
+    extrinsic.finalized = raw_extrinsic["finalized"]
+    extrinsic.tip = raw_extrinsic["tip"]
 
 def event_metadata_from_raw_dict(raw_event_metadata):
     # block_number is the the string until the hyphen
@@ -89,7 +88,7 @@ class SubscanWrapper:
         self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
         self.lock = asyncio.Lock()
 
-        #self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
+        self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
         #self._events_index_deducer = lambda e: f"{e['event_index']}"
         #self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
         #self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
@@ -281,7 +280,7 @@ class SubscanWrapper:
         return process_element
 
 
-    async def fetch_extrinsic_metadata(self, module, call, config) -> list:
+    async def fetch_extrinsic_metadata(self, module, call, config: ScrapeConfig) -> list:
         """
         Scrapes all extrinsics matching the specified module and call (like `utility.batchAll` or `system.remark`)
 
@@ -311,16 +310,21 @@ class SubscanWrapper:
 
         self.db.flush()
 
+        if config.auto_hydrate == True:
+            extrinsic_indexes = [e.id for e in items]
+            items = await self.fetch_extrinsics(extrinsic_indexes)
+
         return items
 
 
-    async def fetch_extrinsics(self, extrinsic_indexes: list) -> list:
+    async def fetch_extrinsics(self, extrinsic_indexes: list, update_existing: bool = True) -> list:
         """
         Fetches the extrinsic with the specified index and writes it to the db.
+
         :param extrinsic_index: The extrinsix index to fetch
         :type extrinsic_index: str
-        :param element_processor: The function to process the extrinsic
-        :type element_processor: function
+        :param update_existing: Whether to update the extrinsic if it already exists in the db. Defaults to True.
+        :type update_existing: bool
         :return: The extrinsics
         :rtype: list
         """
@@ -328,16 +332,22 @@ class SubscanWrapper:
         items = []
         
         self.logger.info("Building list of extrinsics to fetch...")
-        # build list of extrinsics we need to fetch
-        extrinsics_to_fetch = self.db.missing_extrinsics_from_index_list(extrinsic_indexes)
-        self.logger.info(f"Fetching {len(extrinsics_to_fetch)} extrinsics from {self.endpoint}")
+
+        already_fetched_extrinsics = self.db.extrinsics_query(extrinsic_ids=extrinsic_indexes).all()
+        already_fetched_extrinsic_ids = [e.id for e in already_fetched_extrinsics]
+
+        # if we do not update existing items, we only need to fetch the ones that are not in the db
+        if update_existing == False:
+            extrinsic_indexes = already_fetched_extrinsic_ids
+
+        self.logger.info(f"Fetching {len(extrinsic_indexes)} extrinsics from {self.endpoint}")
 
         method = self._api_method_extrinsic
 
         async with httpx.AsyncClient() as client:
-            while len(extrinsics_to_fetch) > 0:
+            while len(extrinsic_indexes) > 0:
                 # take up to 1000 extrinsics at a time
-                batch = extrinsics_to_fetch[:1000]
+                batch = extrinsic_indexes[:1000]
                 if len(batch) == 0:
                     break
                 
@@ -354,14 +364,22 @@ class SubscanWrapper:
                 raw_extrinsics = await asyncio.gather(*futures)
                 
                 for raw_extrinsic in raw_extrinsics:
-                    extrinsic = extrinsic_from_raw_dict(raw_extrinsic)
+                    extrinsic_id = self._extrinsic_index_deducer(raw_extrinsic)
+                    
+                    if extrinsic_id in already_fetched_extrinsic_ids:
+                        extrinsic = self.db.read_extrinsic(extrinsic_id)
+                    else:
+                        extrinsic = Extrinsic()
+                    update_extrinsic_from_raw_extrinsic(extrinsic, raw_extrinsic)
+
                     self.db.write_item(extrinsic)
                     items.append(extrinsic)
-
+                    #self.db.flush() # enable this line for debugging single writes
+                    
                 self.db.flush()
 
                 for index in batch:
-                    extrinsics_to_fetch.remove(index)
+                    extrinsic_indexes.remove(index)
 
         return items
 
@@ -396,15 +414,21 @@ class SubscanWrapper:
         )
 
         self.db.flush()
+
+        if config.auto_hydrate == True:
+            event_indexes = [e.id for e in items]
+            items = await self.fetch_events(event_indexes)
+
         return items
 
-    async def fetch_events(self, event_indexes: list) -> list:
+    async def fetch_events(self, event_indexes: list, update_existing: bool = True) -> list:
         """
         Fetches the event with the specified index and writes it to the db.
+
         :param event_index: The event index to fetch
         :type event_index: str
-        :param element_processor: The function to process the event
-        :type element_processor: function
+        :param update_existing: Whether to update the event if it already exists in the db. Defaults to True.
+        :type update_existing: bool
         :return: The events
         :rtype: list
         """
@@ -412,16 +436,16 @@ class SubscanWrapper:
         items = []
         
         self.logger.info("Building list of events to fetch...")
-        # build list of events to fetch
-        events_to_fetch = self.db.missing_events_from_index_list(event_indexes)
-        self.logger.info(f"Fetching {len(events_to_fetch)} events from {self.endpoint}")
+        if update_existing == False:
+            event_indexes = self.db.missing_events_from_index_list(event_indexes)
+        self.logger.info(f"Fetching {len(event_indexes)} events from {self.endpoint}")
 
         method = self._api_method_event
 
         async with httpx.AsyncClient() as client:
-            while len(events_to_fetch) > 0:
+            while len(event_indexes) > 0:
                 # take up to 1000 extrinsics at a time
-                batch = events_to_fetch[:1000]
+                batch = event_indexes[:1000]
                 if len(batch) == 0:
                     break
                 
@@ -445,7 +469,7 @@ class SubscanWrapper:
                 self.db.flush()
 
                 for id in batch:
-                    events_to_fetch.remove(id)
+                    event_indexes.remove(id)
 
         return items
 

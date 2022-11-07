@@ -1,5 +1,5 @@
 import subscrape
-from subscrape.db.subscrape_db import SubscrapeDB, ExtrinsicMetadata, Extrinsic, EventMetadata, Event
+from subscrape.db.subscrape_db import SubscrapeDB, Extrinsic, Event
 import pytest
 
 @pytest.mark.asyncio
