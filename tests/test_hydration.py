@@ -4,7 +4,7 @@ import subscrape
 import pytest
 
 @pytest.mark.asyncio
-async def test_hydration(api):
+async def test_hydration():
         
     chain = "mangatax"
     module = "bootstrap"
@@ -40,4 +40,5 @@ async def test_hydration(api):
     data = db.read_extrinsic(index)
     assert type(data["params"]) is list
 
+    db.close()
 

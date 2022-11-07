@@ -6,8 +6,8 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 {
     "_version": 1,
     "kusama": {
-        "_api": "SubscanV2",
-        "_db_path": "data/example.sqlite",
+        "_db_connection_string": "sqlite:///data/cache/default.db",
+        "_auto_hydrate": false,
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
@@ -51,12 +51,13 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 
 ## Config for scraping Substrate chains:
 
-### Param: _api
-Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
-In the future, we will change this to `SubscanV2`.
-
 ### Param: _db_connection_string
 The SQLAlchemy connection string to the database. The default is `sqlite:///data/cache/default.db`.
+
+### Param: _auto_hydrate
+The Subscan API has two different calls per entity type from which it delivers extrinsics and events data. e.g. the `events` call is more flexible,
+but the `event` call gives more data. Thus, when calling `events`, it makes
+sense to automatically hydrate the events with the missing info from the `event` call. The default is `true`. Set to `false` to disable.
 
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.

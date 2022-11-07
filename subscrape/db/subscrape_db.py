@@ -14,22 +14,6 @@ class Block(Base):
     __tablename__ = "blocks"
     block_number = Column(Integer, unique=True, primary_key=True)
 
-class ExtrinsicMetadata(Base):
-    __tablename__ = 'extrinsics_metadata'
-    id = Column(String(20), primary_key=True)
-    block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    module = Column(String(100))
-    call = Column(String(100))
-    address = Column(String(100))
-    nonce = Column(Integer)
-    extrinsic_hash = Column(String(100))
-    success = Column(Boolean)
-    # event
-    # event_count
-    fee = Column(Integer)
-    fee_used = Column(Integer)
-    finalized = Column(Boolean)
-
 class Extrinsic(Base):
     __tablename__ = 'extrinsics'
     id = Column(String(20), primary_key=True)
@@ -49,15 +33,6 @@ class Extrinsic(Base):
     finalized = Column(Boolean)
     tip = Column(Integer)
 
-class EventMetadata(Base):
-    __tablename__ = 'events_metadata'
-    id = Column(String(20), primary_key=True)
-    block_number = Column(Integer, ForeignKey('blocks.block_number'))
-    extrinsic_id = Column(String(20), ForeignKey('extrinsics.id'))
-    module = Column(String(100))
-    event = Column(String(100))
-    finalized = Column(Boolean)
-
 class Event(Base):
     __tablename__ = 'events'
     id = Column(String(20), primary_key=True)
@@ -65,9 +40,6 @@ class Event(Base):
     extrinsic_id = Column(Integer)
     module = Column(String(100))
     event = Column(String(100))
-    # In the Subscan API, `params` is only delivered in the `events call of
-    # API v1 and in the `event` call. When using the `events` call of API v2,
-    # we need to make sure we hydrate them by calling `event` for each event.
     params = Column(JSON)
     finalized = Column(Boolean)
 
@@ -123,7 +95,7 @@ class SubscrapeDB:
 
     """ # Extrinsics """
 
-    def extrinsics_query(self, module=None, call=None):
+    def extrinsics_query(self, module=None, call=None) -> Query:
         """
         Returns a query object for extrinsics.
 
@@ -131,6 +103,8 @@ class SubscrapeDB:
         :type module: str
         :param call: The call to filter for
         :type call: str
+        :return: The query object
+        :rtype: Query
         """
         query = self._session.query(Extrinsic)
         if module is not None:
@@ -143,7 +117,7 @@ class SubscrapeDB:
         """
         Returns a list of all extrinsics that are not in the database.
         """
-        matches = self._session.query(ExtrinsicMetadata).filter(ExtrinsicMetadata.id.in_(index_list)).all()
+        matches = self._session.query(Extrinsic).filter(Extrinsic.id.in_(index_list)).all()
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
 
@@ -158,17 +132,6 @@ class SubscrapeDB:
         """
         return self._session.query(Extrinsic).get(extrinsic_id)
 
-    def read_extrinsic_metadata(self, extrinsic_id) -> ExtrinsicMetadata:
-        """
-        Returns the extrinsic metadata with the given id.
-
-        :param extrinsic_id: The id of the extrinsic
-        :type extrinsic_id: str
-        :return: The extrinsic metadata
-        :rtype: ExtrinsicMetadata
-        """
-        return self._session.query(ExtrinsicMetadata).get(extrinsic_id)
-
     """ # Events """
 
     def events_query(self, module=None, event=None) -> Query:       
@@ -182,11 +145,11 @@ class SubscrapeDB:
         :return: The query object
         :rtype: Query
         """
-        query = self._session.query(EventMetadata)
+        query = self._session.query(Event)
         if module is not None:
-            query = query.filter(EventMetadata.module == module)
+            query = query.filter(Event.module == module)
         if event is not None:
-            query = query.filter(EventMetadata.event == event)
+            query = query.filter(Event.event == event)
         return query
 
     def missing_events_from_index_list(self, index_list) -> list:
@@ -198,11 +161,11 @@ class SubscrapeDB:
         :return: The list of missing event indices
         :rtype: list
         """
-        matches = self._session.query(EventMetadata).filter(EventMetadata.id.in_(index_list)).all()
+        matches = self._session.query(Event).filter(Event.id.in_(index_list)).all()
         # find all indices that are not in the matches
         return [index for index in index_list if index not in [match.id for match in matches]]
 
-    def read_event_metadata(self, event_id) -> EventMetadata:
+    def read_event_metadata(self, event_id) -> Event:
         """
         Reads an event with a given id from the database.
 
@@ -211,7 +174,7 @@ class SubscrapeDB:
         :return: The event
         :rtype: EventMetadata
         """
-        result = self._session.query(EventMetadata).get(event_id)
+        result = self._session.query(Event).get(event_id)
         return result
 
     def read_event(self, event_id) -> Event:

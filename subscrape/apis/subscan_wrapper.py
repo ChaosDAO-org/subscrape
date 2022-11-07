@@ -5,7 +5,7 @@ import httpx
 import json
 import logging
 from ratelimit import limits, sleep_and_retry
-from subscrape.db.subscrape_db import SubscrapeDB, ExtrinsicMetadata, Extrinsic, EventMetadata, Event
+from subscrape.db.subscrape_db import SubscrapeDB, Extrinsic, Event
 from substrateinterface.utils import ss58
 import asyncio
 
@@ -19,20 +19,6 @@ SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
 SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
 MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
-def extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata):
-    return ExtrinsicMetadata(
-        id = raw_extrinsic_metadata["extrinsic_index"],
-        block_number = raw_extrinsic_metadata["block_num"],
-        module = raw_extrinsic_metadata["call_module"],
-        call = raw_extrinsic_metadata["call_module_function"],
-        address = raw_extrinsic_metadata["account_display"]["address"],
-        nonce = raw_extrinsic_metadata["nonce"],
-        extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
-        success = raw_extrinsic_metadata["success"],
-        fee = raw_extrinsic_metadata["fee"],
-        fee_used = raw_extrinsic_metadata["fee_used"],
-        finalized = raw_extrinsic_metadata["finalized"],
-    )
 
 def extrinsic_from_raw_dict(raw_extrinsic):
     return Extrinsic(
@@ -40,7 +26,7 @@ def extrinsic_from_raw_dict(raw_extrinsic):
         block_number = raw_extrinsic["block_num"],
         module = raw_extrinsic["call_module"],
         call = raw_extrinsic["call_module_function"],
-        address = raw_extrinsic["account_id"],
+        address = raw_extrinsic["account_display"]["address"],
         nonce = raw_extrinsic["nonce"],
         extrinsic_hash = raw_extrinsic["extrinsic_hash"],
         success = raw_extrinsic["success"],
@@ -55,7 +41,7 @@ def extrinsic_from_raw_dict(raw_extrinsic):
 def event_metadata_from_raw_dict(raw_event_metadata):
     # block_number is the the string until the hyphen
     block_number = int(raw_event_metadata["event_index"].split("-")[0])
-    return EventMetadata(
+    return Event(
         id=raw_event_metadata["event_index"],
         block_number=block_number,
         extrinsic_id=raw_event_metadata["extrinsic_index"],
@@ -250,7 +236,20 @@ class SubscanWrapper:
         :type raw_extrinsic_metadata: dict
         :return: The function that can be used to process an element in the list
         """
-        extrinsic = extrinsic_metadata_from_raw_dict(raw_extrinsic_metadata)
+        extrinsic = Extrinsic(
+            id = raw_extrinsic_metadata["extrinsic_index"],
+            block_number = raw_extrinsic_metadata["block_num"],
+            module = raw_extrinsic_metadata["call_module"],
+            call = raw_extrinsic_metadata["call_module_function"],
+            address = raw_extrinsic_metadata["account_display"]["address"],
+            nonce = raw_extrinsic_metadata["nonce"],
+            extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
+            success = raw_extrinsic_metadata["success"],
+            fee = raw_extrinsic_metadata["fee"],
+            fee_used = raw_extrinsic_metadata["fee_used"],
+            finalized = raw_extrinsic_metadata["finalized"],
+        )
+
         self.db.write_item(extrinsic)
         return extrinsic
 
