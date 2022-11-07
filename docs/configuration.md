@@ -30,9 +30,6 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
         "events-list":[
             "14238250-39"
         ],
-        "transfers": {
-            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
-        },
     },
     "moonriver": {
         "transactions": {
@@ -70,9 +67,6 @@ Scrapes events by using their `module` and `name`. `module` can be `None` to scr
 
 ### Operation: events-list
 Scrapes events by using a list of event indexes.
-
-### Operation: transfers
-Scrapes transfers by using their `address` and a `label`.
 
 ### Config for scraping Moonriver or Moonbeam:
 

@@ -22,11 +22,13 @@ MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 
 def update_extrinsic_from_raw_extrinsic(extrinsic: Extrinsic, raw_extrinsic):
+
     extrinsic.id = raw_extrinsic["extrinsic_index"]
     extrinsic.block_number = raw_extrinsic["block_num"]
-    extrinsic.module = raw_extrinsic["call_module"]
-    extrinsic.call = raw_extrinsic["call_module_function"]
-    extrinsic.address = raw_extrinsic["account_display"]["address"]
+    extrinsic.module = raw_extrinsic["call_module"].lower()
+    extrinsic.call = raw_extrinsic["call_module_function"].lower()
+    if raw_extrinsic["account_display"] is not None:
+        extrinsic.address = raw_extrinsic["account_display"]["address"]
     extrinsic.nonce = raw_extrinsic["nonce"]
     extrinsic.extrinsic_hash = raw_extrinsic["extrinsic_hash"]
     extrinsic.success = raw_extrinsic["success"]
@@ -37,30 +39,17 @@ def update_extrinsic_from_raw_extrinsic(extrinsic: Extrinsic, raw_extrinsic):
     extrinsic.finalized = raw_extrinsic["finalized"]
     extrinsic.tip = raw_extrinsic["tip"]
 
-def event_metadata_from_raw_dict(raw_event_metadata):
-    # block_number is the the string until the hyphen
-    block_number = int(raw_event_metadata["event_index"].split("-")[0])
-    return Event(
-        id=raw_event_metadata["event_index"],
-        block_number=block_number,
-        extrinsic_id=raw_event_metadata["extrinsic_index"],
-        module=raw_event_metadata["module_id"],
-        event=raw_event_metadata["event_id"],
-        finalized=raw_event_metadata["finalized"],
-    )
 
-def event_from_raw_dict(raw_event):
-    return Event(
-        # Subscan API is delivering the extrinsic id instead of the event id 
-        # in the event_index field. So let's work around that.
-        id=f'{raw_event["block_num"]}-{raw_event["event_idx"]}',
-        block_number=raw_event["block_num"],
-        extrinsic_id=f'{raw_event["block_num"]}-{raw_event["extrinsic_idx"]}',
-        module=raw_event["module_id"],
-        event=raw_event["event_id"],
-        params=raw_event["params"],
-        finalized=raw_event["finalized"],
-    )
+def update_event_from_raw_event(event: Event, raw_event):
+    # Subscan API is delivering the extrinsic id instead of the event id 
+    # in the event_index field. So let's work around that.
+    event.id = f'{raw_event["block_num"]}-{raw_event["event_idx"]}'
+    event.block_number = raw_event["block_num"]
+    event.extrinsic_id = f'{raw_event["block_num"]}-{raw_event["extrinsic_idx"]}'
+    event.module = raw_event["module_id"].lower()
+    event.event = raw_event["event_id"].lower()
+    event.params = raw_event["params"]
+    event.finalized = raw_event["finalized"]
 
 class SubscanWrapper:
     """
@@ -90,15 +79,13 @@ class SubscanWrapper:
 
         self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
         #self._events_index_deducer = lambda e: f"{e['event_index']}"
-        #self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
         #self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
         self._last_id_deducer = lambda e: e["id"]
-        self._last_transfer_id_deducer = lambda e: [e["block_num"], e["event_idx"]]
         self._api_method_extrinsics = "/api/v2/scan/extrinsics"
         self._api_method_extrinsic = "/api/scan/extrinsic"
         self._api_method_events = "/api/v2/scan/events"
         self._api_method_event = "/api/scan/event"
-        self._api_method_transfers = "/api/v2/scan/transfers"
         self._api_method_events_call = "event_id"
 
 
@@ -222,9 +209,9 @@ class SubscanWrapper:
             if num_items >= limit:
                 done = True
 
+            last_id = last_id_deducer(elements[-1])
             self.logger.debug(f"Last ID: {last_id}")
 
-            last_id = last_id_deducer(elements[-1])
 
         return items
 
@@ -235,12 +222,17 @@ class SubscanWrapper:
         :type raw_extrinsic_metadata: dict
         :return: The function that can be used to process an element in the list
         """
+        if raw_extrinsic_metadata["account_display"] is not None:
+            address = raw_extrinsic_metadata["account_display"]["address"]
+        else:
+            address = None
+
         extrinsic = Extrinsic(
             id = raw_extrinsic_metadata["extrinsic_index"],
             block_number = raw_extrinsic_metadata["block_num"],
-            module = raw_extrinsic_metadata["call_module"],
-            call = raw_extrinsic_metadata["call_module_function"],
-            address = raw_extrinsic_metadata["account_display"]["address"],
+            module = raw_extrinsic_metadata["call_module"].lower(),
+            call = raw_extrinsic_metadata["call_module_function"].lower(),
+            address = address,
             nonce = raw_extrinsic_metadata["nonce"],
             extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
             success = raw_extrinsic_metadata["success"],
@@ -259,26 +251,19 @@ class SubscanWrapper:
         :type raw_event_metadata: dict
         :return: The function that can be used to process an element in the list
         """
-        event = event_metadata_from_raw_dict(raw_event_metadata)
+            # block_number is the the string until the hyphen
+        block_number = int(raw_event_metadata["event_index"].split("-")[0])
+        event = Event(
+            id=raw_event_metadata["event_index"],
+            block_number=block_number,
+            extrinsic_id=raw_event_metadata["extrinsic_index"],
+            module=raw_event_metadata["module_id"].lower(),
+            event=raw_event_metadata["event_id"].lower(),
+            finalized=raw_event_metadata["finalized"],
+        )
+
         self.db.write_item(event)
         return event
-
-    def _transfer_processor(self, address, index_decucer):
-        """
-        Factory method for creating a function that can be used to process an element in the list.
-        :param element_processor: The element processor function
-        :type element_processor: function
-        :param index_decucer: The index decucer function
-        :type index_decucer: function
-        :return: The function that can be used to process an element in the list
-        """
-        def process_element(element):
-            sm = self.db.storage_manager_for_transfers(address)
-            self.storage_managers_to_flush.add(sm)
-            index = index_decucer(element)
-            return sm.write_item(index, element)
-        return process_element
-
 
     async def fetch_extrinsic_metadata(self, module, call, config: ScrapeConfig) -> list:
         """
@@ -374,8 +359,7 @@ class SubscanWrapper:
 
                     self.db.write_item(extrinsic)
                     items.append(extrinsic)
-                    #self.db.flush() # enable this line for debugging single writes
-                    
+
                 self.db.flush()
 
                 for index in batch:
@@ -435,9 +419,13 @@ class SubscanWrapper:
 
         items = []
         
-        self.logger.info("Building list of events to fetch...")
+        already_fetched_events = self.db.events_query(event_ids=event_indexes).all()
+        already_fetched_event_ids = [e.id for e in already_fetched_events]
+
+        # if we do not update existing items, we only need to fetch the ones that are not in the db
         if update_existing == False:
-            event_indexes = self.db.missing_events_from_index_list(event_indexes)
+            event_indexes = already_fetched_event_ids
+
         self.logger.info(f"Fetching {len(event_indexes)} events from {self.endpoint}")
 
         method = self._api_method_event
@@ -462,7 +450,14 @@ class SubscanWrapper:
                 raw_events = await asyncio.gather(*futures)
 
                 for raw_event in raw_events:
-                    event = event_from_raw_dict(raw_event)
+                    event_id = self._event_index_deducer(raw_event)
+                    
+                    if event_id in already_fetched_event_ids:
+                        event = self.db.read_event(event_id)
+                    else:
+                        event = Event()
+                    update_event_from_raw_event(event, raw_event)
+
                     self.db.write_item(event)
                     items.append(event)
 
@@ -472,38 +467,3 @@ class SubscanWrapper:
                     event_indexes.remove(id)
 
         return items
-
-    async def fetch_transfers(self, address, config) -> int:
-        """
-        Fetches the transfers for a single address and writes them to the db.
-
-        :param address: The address to scrape
-        :type address: str
-        :param config: the `ScrapeConfig`
-        :type config: ScrapeConfig
-        :return: the number of items scraped
-        """
-        items_scraped = 0
-        sm = self.db.storage_manager_for_transfers(address)
-
-        self.logger.info(f"Fetching transfers for {address} from {self.endpoint}")
-
-        body = {"address": address}
-        if config.params is not None:
-            body.update(config.params)
-
-        items_scraped += await self._iterate_pages(
-            self._api_method_transfers,
-            self._transfer_processor(address, self._transfers_index_deducer),
-            last_id_deducer=self._last_transfer_id_deducer,
-            list_key="transfers",
-            body=body,
-            filter=config.filter
-        )
-
-        for sm in self.storage_managers_to_flush:
-            sm.flush()
-        self.storage_managers_to_flush.clear()
-
-        return items_scraped
-

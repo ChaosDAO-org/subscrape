@@ -2,12 +2,78 @@ from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 import pytest
+from subscrape.db.subscrape_db import Event
 
 @pytest.mark.asyncio
-async def test_events():
+async def test_fetch_events_list():
+    
+    event_index = "14238250-39"
     
     config = {
         "kusama":{
+            "events-list":[
+                event_index
+            ]
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping")
+    await subscrape.scrape(config)
+    logging.info("testing")
+
+    db = SubscrapeDB()
+    event = db.read_event(event_index)
+
+    assert event is not None
+    assert event.extrinsic_id == '14238250-2'
+    assert type(event.params) is list
+
+    db.close()
+    
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("auto_hydrate", [True, False])
+async def test_fetch_and_hydrate_event(auto_hydrate):
+    
+    config = {
+        "kusama":{
+            "_auto_hydrate": auto_hydrate,
+            "events": None,
+            "_params": {
+                "block_num": 700000
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping")
+    await subscrape.scrape(config)
+    logging.info("testing")
+
+    db = SubscrapeDB()
+    event = db.read_event("700000-0")
+    assert event is not None, "The event should exist in the database"
+    assert event.extrinsic_id == "700000-0"
+    if auto_hydrate:
+        assert type(event.params) is list, "Hydrated events should have a list of params"
+    else:
+        assert event.params is None, "Non-hydrated events should have no params"
+
+    db.close()
+
+@pytest.mark.asyncio
+async def test_fetch_events_by_module_event():
+    
+    config = {
+        "kusama":{
+            "_auto_hydrate": False,
             "events":{
                 "council": ["proposed"]
             }
@@ -19,22 +85,25 @@ async def test_events():
     logging.info("wiping storage")
     subscrape.wipe_cache()
     logging.info("scraping")
-    await subscrape.scrape(config)
-    logging.info("transforming")
+    scrape_result = await subscrape.scrape(config)
+    logging.info("testing")
 
     db = SubscrapeDB()
-    events_query = db.events_query()
-    proposal_event = events_query.get("7608975-2")
-    assert proposal_event is not None, "The event should exist in the database"
-    assert proposal_event.id == "7608975-2"
+    events = db.events_query("council", "proposed").all()
+
+    events = [e for e in events if e.id == "52631-4"]
+    assert len(events) == 1, "Expected 1 event"
+    event:Event = events[0]
+    assert event.extrinsic_id == '52631-3'
 
     db.close()
 
 @pytest.mark.asyncio
-async def test_fetch_all_events_from_module():
+async def test_fetch_events_by_module():
     
     config = {
         "kusama":{
+            "_auto_hydrate": False,
             "events":{
                 "council": None,
             }
@@ -51,23 +120,26 @@ async def test_fetch_all_events_from_module():
 
     db = SubscrapeDB()
 
-    events_storage = db.storage_manager_for_events_call("council", "proposed")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["7608975-2"]
-    assert proposal_event["extrinsic_hash"] == '0x2e8d37a0ec4613b445dfd08d927710c6ad4938bc17b7c9ced8467652ed9835ab'
+    events = db.events_query("council", "proposed")
+    events = [e for e in events if e.id == "14966317-39"]
+    assert len(events) == 1, "Expected 1 event"
+    event:Event = events[0]
+    assert event.extrinsic_id == '14966317-2'
 
-    events_storage = db.storage_manager_for_events_call("council", "voted")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["14938460-47"]
-    assert proposal_event["extrinsic_hash"] == '0x339d3522cc716887e83accbc2f7a17173be0871023a2dbe9e4daf25fc1f37852'
+    events = db.events_query("council", "voted")
+    events = [e for e in events if e.id == "14938460-47"]
+    assert len(events) == 1, "Expected 1 event"
+    event = events[0]
+    assert event.extrinsic_id == '14938460-4'
 
     db.close()
 
 @pytest.mark.asyncio
-async def test_fetch_all_events_from_module():
+async def test_fetch_events_by_address():
     
     config = {
         "kusama":{
+            "_auto_hydrate": False,
             "events": None,
             "_params": {
                 "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
@@ -87,6 +159,6 @@ async def test_fetch_all_events_from_module():
     events_query = db.events_query()
     event = events_query.get("14804812-56")
     assert event is not None, "The event should exist in the database"
-    assert event.id == "14804812-56"
+    assert event.extrinsic_id == "14804812-11"
 
     db.close()

@@ -129,7 +129,7 @@ class SubscrapeDB:
 
     """ # Events """
 
-    def events_query(self, module=None, event=None) -> Query:       
+    def events_query(self, module=None, event=None, event_ids: list = None) -> Query:       
         """
         Returns a query object for events.
 
@@ -137,6 +137,8 @@ class SubscrapeDB:
         :type module: str
         :param event: The event to filter for
         :type event: str
+        :param event_ids: The ids of the events to filter for
+        :type event_ids: list
         :return: The query object
         :rtype: Query
         """
@@ -145,32 +147,9 @@ class SubscrapeDB:
             query = query.filter(Event.module == module)
         if event is not None:
             query = query.filter(Event.event == event)
+        if event_ids is not None:
+            query = query.filter(Event.id.in_(event_ids))
         return query
-
-    def missing_events_from_index_list(self, index_list) -> list:
-        """
-        Returns a list of all events that are not in the database.
-
-        :param index_list: The list of event indices
-        :type index_list: list
-        :return: The list of missing event indices
-        :rtype: list
-        """
-        matches = self._session.query(Event).filter(Event.id.in_(index_list)).all()
-        # find all indices that are not in the matches
-        return [index for index in index_list if index not in [match.id for match in matches]]
-
-    def read_event_metadata(self, event_id) -> Event:
-        """
-        Reads an event with a given id from the database.
-
-        :param event_id: The id of the event to read, e.g. "123456-12"
-        :type event_id: str
-        :return: The event
-        :rtype: EventMetadata
-        """
-        result = self._session.query(Event).get(event_id)
-        return result
 
     def read_event(self, event_id) -> Event:
         """
@@ -183,50 +162,4 @@ class SubscrapeDB:
         """
         result = self._session.query(Event).get(event_id)
         return result
-
-
-    """ # Transfers """
-
-    def write_transfer(self, index, transfer) -> bool:
-        """
-        Write transfer to the database.
-
-        :param index: The index of the transfer
-        :type index: str
-        :param transfer: The transfer to write
-        :type transfer: dict
-        """
-
-        raise NotImplementedError()
-
-        sm = self.storage_manager_for_transfers(transfer["address"])
-        was_new_element = sm.write_item(index, transfer)
-
-        if not was_new_element:
-            self.logger.warning(f"Transfer {index} already exists in the database.")
-
-        return was_new_element
-
-    def read_transfers(self):
-        """
-        Reads all transfers from the database.
-
-        :return: The transfers
-        """
-        raise NotImplementedError()
-
-    def has_transfer(self, transfer_index):
-        """
-        Returns true if the transfer with the given index is in the database.
-        """
-        raise NotImplementedError()
-
-    def read_transfer(self, transfer_index):
-        """
-        Reads an transfer with a given index from the database.
-
-        :param transfer_index: The index of the transfer to read, e.g. "123456-12"
-        :return: The transfer
-        """
-        raise NotImplementedError()
 
