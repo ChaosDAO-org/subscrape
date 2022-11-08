@@ -166,3 +166,37 @@ async def test_fetch_extrinsics_by_address():
     assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
 
     db.close()
+
+
+
+@pytest.mark.asyncio
+async def test_fetch_extrinsics_repeatedly():
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "extrinsics": None,
+            "_params": {
+                "address": "EGP7XztdTosm1EmaATZVMjSWujGEj9nNidhjqA2zZtttkFg"
+            }
+        }
+    }
+    
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping the first time")
+    await subscrape.scrape(config)
+    logging.info("scraping the second time")
+    await subscrape.scrape(config)
+    logging.info("testing")
+
+    db = SubscrapeDB()
+    extrinsic = db.query_extrinsic(chain, "14815834-2")
+    assert extrinsic is not None, "This extrinsic should exist in the database"
+    assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
+
+    db.close()

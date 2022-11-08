@@ -169,10 +169,11 @@ class SubscanWrapper:
                 if item:
                     items.append(item)
                 else:
-                    raise Exception("we recently refactored the code and this case needs to be reavaluated")
-                    # it is likely going to happen because we did not properly check if
-                    # the item exists in the db already. Maybe we also made the assumption
-                    # that it is okay to just throw new items here. Let's revisit our life decisions.
+                    self.logger.warning("element_processor didn't return a new item. Stopping.")
+                    # TE: I recently refactored the code to return None when the item already 
+                    # exists in the database. I am leaving this. I am leaving this comment here
+                    # until we have a proper decision on how to parameterize the config to
+                    # make sure there are no unintended edge cases.
 
             num_items = len(items)
             self.logger.debug(num_items)
@@ -186,57 +187,98 @@ class SubscanWrapper:
 
         return items
 
-    def _extrinsic_metadata_processor(self, raw_extrinsic_metadata):
+    def _create_extrinsic_metadata_processor(self, already_existing_extrinsic_pks: list):
         """
-        Processes extrinsic metadata and stores it in the database.
-        :param raw_extrinsic_metadata: raw extrinsic metadata
-        :type raw_extrinsic_metadata: dict
+        Creates a method to process extrinsic metadata and stores it in the database.
+
+        :param already_existing_extrinsic_pks: list of primary keys of extrinsics that already exist in the database
+        :type already_existing_extrinsic_pks: list
+        :return: method to process extrinsic metadata and store it in the database
+        :rtype: function
+        """
+
+        def _extrinsic_metadata_processor(raw_extrinsic_metadata: dict) -> Extrinsic:
+            """
+            Processes extrinsic metadata and stores it in the database.
+
+            :param raw_extrinsic_metadata: raw extrinsic metadata
+            :type raw_extrinsic_metadata: dict
+            :return: The extrinsic
+            :rtype: Extrinsic
+            """
+            # not every extrinsic has a sender
+            if raw_extrinsic_metadata["account_display"] is not None:
+                address = raw_extrinsic_metadata["account_display"]["address"]
+            else:
+                address = None
+
+            extrinsic_id = raw_extrinsic_metadata["extrinsic_index"]
+
+            if (self.chain, extrinsic_id) in already_existing_extrinsic_pks:
+                return None
+
+            extrinsic = Extrinsic(
+                chain = self.chain,
+                id = extrinsic_id,
+                block_number = raw_extrinsic_metadata["block_num"],
+                module = raw_extrinsic_metadata["call_module"].lower(),
+                call = raw_extrinsic_metadata["call_module_function"].lower(),
+                address = address,
+                nonce = raw_extrinsic_metadata["nonce"],
+                extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
+                success = raw_extrinsic_metadata["success"],
+                fee = raw_extrinsic_metadata["fee"],
+                fee_used = raw_extrinsic_metadata["fee_used"],
+                finalized = raw_extrinsic_metadata["finalized"],
+            )
+
+            self.db.write_item(extrinsic)
+            return extrinsic
+        
+        return _extrinsic_metadata_processor
+
+    def _create_event_metadata_processor(self, already_existing_event_pks: list):
+        """
+        Creates a function that processes event metadata and stores it in the database.
+        `already_existing_event_pks` is used to prevent duplicate events from being written to the database.
+        
+        :param already_existing_event_pks: a list of event primary keys that already exist in the database
+        :type already_existing_event_pks: list
         :return: The function that can be used to process an element in the list
+        :rtype: function
         """
-        if raw_extrinsic_metadata["account_display"] is not None:
-            address = raw_extrinsic_metadata["account_display"]["address"]
-        else:
-            address = None
 
-        extrinsic = Extrinsic(
-            chain = self.chain,
-            id = raw_extrinsic_metadata["extrinsic_index"],
-            block_number = raw_extrinsic_metadata["block_num"],
-            module = raw_extrinsic_metadata["call_module"].lower(),
-            call = raw_extrinsic_metadata["call_module_function"].lower(),
-            address = address,
-            nonce = raw_extrinsic_metadata["nonce"],
-            extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
-            success = raw_extrinsic_metadata["success"],
-            fee = raw_extrinsic_metadata["fee"],
-            fee_used = raw_extrinsic_metadata["fee_used"],
-            finalized = raw_extrinsic_metadata["finalized"],
-        )
+        def _event_metadata_processor(raw_event_metadata: dict) -> Event:
+            """
+            Processes event metadata and stores it in the database.
 
-        self.db.write_item(extrinsic)
-        return extrinsic
+            :param raw_event_metadata: raw event metadata
+            :type raw_event_metadata: dict
+            :return: The event
+            :rtype: Event
+            """
+            event_id = raw_event_metadata["event_index"]
 
-    def _event_metadata_processor(self, raw_event_metadata):
-        """
-        Processes event metadata and stores it in the database.
-        :param raw_event_metadata: raw event metadata
-        :type raw_event_metadata: dict
-        :return: The function that can be used to process an element in the list
-        """
+            if (self.chain, event_id) in already_existing_event_pks:
+                return None
+
             # block_number is the the string until the hyphen
-        block_number = int(raw_event_metadata["event_index"].split("-")[0])
-        event = Event(
-            chain = self.chain,
-            id=raw_event_metadata["event_index"],
-            block_number=block_number,
-            extrinsic_id=raw_event_metadata["extrinsic_index"],
-            module=raw_event_metadata["module_id"].lower(),
-            event=raw_event_metadata["event_id"].lower(),
-            finalized=raw_event_metadata["finalized"],
-        )
+            block_number = int(raw_event_metadata["event_index"].split("-")[0])
 
-        self.db.write_item(event)
-        return event
+            event = Event(
+                chain = self.chain,
+                id = event_id,
+                block_number=block_number,
+                extrinsic_id=raw_event_metadata["extrinsic_index"],
+                module=raw_event_metadata["module_id"].lower(),
+                event=raw_event_metadata["event_id"].lower(),
+                finalized=raw_event_metadata["finalized"],
+            )
+
+            self.db.write_item(event)
+            return event
+        
+        return _event_metadata_processor
 
     def update_extrinsic_from_raw_extrinsic(self, extrinsic: Extrinsic, raw_extrinsic: dict):
         """
@@ -302,13 +344,17 @@ class SubscanWrapper:
         """
         self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
 
+        # create a list of already fetched extrinsics
+        already_fetched_extrinsics = self.db.query_extrinsics(chain = self.chain, module = module, call = call).all()
+        already_fetched_extrinsic_pks = [(e.chain, e.id) for e in already_fetched_extrinsics]
+
         body = {"module": module, "call": call}
         if config.params is not None:
             body.update(config.params)
 
         items = await self._iterate_pages(
             self._api_method_extrinsics,
-            self._extrinsic_metadata_processor,
+            self._create_extrinsic_metadata_processor(already_fetched_extrinsic_pks),
             last_id_deducer=self._last_id_deducer,
             list_key="extrinsics",
             body=body,
@@ -406,13 +452,17 @@ class SubscanWrapper:
 
         self.logger.info(f"Fetching events {module}.{call} from {self.endpoint}")
 
+        # create a list of already fetched event ids
+        already_fetched_events = self.db.query_events(chain = self.chain, module = module, event = call).all()
+        already_fetched_event_pks = [(e.chain, e.id) for e in already_fetched_events]
+
         body = {"module": module, self._api_method_events_call: call}
         if config.params is not None:
             body.update(config.params)
 
         items = await self._iterate_pages(
             self._api_method_events,
-            self._event_metadata_processor,
+            self._create_event_metadata_processor(already_fetched_event_pks),
             last_id_deducer=self._last_id_deducer,
             list_key="events",
             body=body,

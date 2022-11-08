@@ -175,3 +175,38 @@ async def test_fetch_events_by_address():
     assert event.extrinsic_id == "14804812-11"
 
     db.close()
+
+
+@pytest.mark.asyncio
+async def test_fetch_events_repeatedly():
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "events": None,
+            "_params": {
+                "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping the first time")
+    await subscrape.scrape(config)
+    logging.info("scraping the second time")
+    await subscrape.scrape(config)
+
+
+    logging.info("testing")
+    db = SubscrapeDB()
+    events_query = db.query_events()
+    event = db.query_event(chain, "14804812-56")
+    assert event is not None, "The event should exist in the database"
+    assert event.extrinsic_id == "14804812-11"
+
+    db.close()
