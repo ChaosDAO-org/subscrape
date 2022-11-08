@@ -16,6 +16,7 @@ async def main():
     config = {
         chain: {
             "_db_connection_string": db_connection_string,
+            "_auto_hydrate": False,
             "events": {
                 module_name: [event_name]
             }
@@ -34,9 +35,8 @@ async def main():
     for event in events:
         print(event.id)
 
-    pass
-    
+    db.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
