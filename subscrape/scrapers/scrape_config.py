@@ -11,6 +11,7 @@ class ScrapeConfig:
         self.params = None
         self.db_connection_string = None
         self.auto_hydrate = True
+        self.stop_on_known_data = True
         self._set_config(config)
 
     def _set_config(self, config):
@@ -51,6 +52,10 @@ class ScrapeConfig:
         auto_hydrate = config.get("_auto_hydrate", None)
         if auto_hydrate is not None:
             self.auto_hydrate = auto_hydrate
+
+        stop_on_known_data = config.get("_stop_on_known_data", None)
+        if stop_on_known_data is not None:
+            self.stop_on_known_data = stop_on_known_data
 
     def create_inner_config(self, config):
         """

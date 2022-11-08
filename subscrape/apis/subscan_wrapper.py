@@ -119,7 +119,9 @@ class SubscanWrapper:
         list_key,
         last_id_deducer,
         body={}, 
-        filter=None) -> list:
+        filter=None,
+        stop_on_known_data=True,
+        ) -> list:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -134,6 +136,8 @@ class SubscanWrapper:
         :type body: list
         :param filter: method to determine whether certain extrinsics/events should be filtered out of the results
         :type filter: function
+        :param stop_on_known_data: whether to stop iterating when we encounter a known element
+        :type stop_on_known_data: bool
         :return: the items processed
         """
 
@@ -168,12 +172,9 @@ class SubscanWrapper:
                 item = element_processor(element)
                 if item:
                     items.append(item)
-                else:
-                    self.logger.warning("element_processor didn't return a new item. Stopping.")
-                    # TE: I recently refactored the code to return None when the item already 
-                    # exists in the database. I am leaving this. I am leaving this comment here
-                    # until we have a proper decision on how to parameterize the config to
-                    # make sure there are no unintended edge cases.
+                elif stop_on_known_data:
+                    done = True
+                    break
 
             num_items = len(items)
             self.logger.debug(num_items)
@@ -358,7 +359,8 @@ class SubscanWrapper:
             last_id_deducer=self._last_id_deducer,
             list_key="extrinsics",
             body=body,
-            filter=config.filter
+            filter=config.filter,
+            stop_on_known_data=config.stop_on_known_data,
             )
 
         self.db.flush()
@@ -466,7 +468,8 @@ class SubscanWrapper:
             last_id_deducer=self._last_id_deducer,
             list_key="events",
             body=body,
-            filter=config.filter
+            filter=config.filter,
+            stop_on_known_data=config.stop_on_known_data,
         )
 
         self.db.flush()

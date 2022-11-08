@@ -210,3 +210,51 @@ async def test_fetch_events_repeatedly():
     assert event.extrinsic_id == "14804812-11"
 
     db.close()
+
+@pytest.mark.asyncio
+async def test_fetch_events_stop_on_known_data():
+    '''
+    This unit test tests the proper behavior of the scraper when it encounters a block that it has already scraped.
+    In the default case, `stop_on_known_data` is set to True, so the scraper should stop scraping when it encounters
+    a block that it has already scraped.
+
+    This test will first scrape in the middle of the event history of Gav, then scrape again from the beginning.
+    Lastly, we set `stop_on_known_data` to False and scrape again. This time, the scraper should scrape all the way
+    to the end of the event history of Gav.
+
+    We counted the number of events in the database before and after the second scrape, and know exactly how many
+    events there should be.
+    '''
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "events": None,
+            "_params": {
+                "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL",
+                "block_range": "10000000-12000000"
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping the first time")
+
+    first_result = await subscrape.scrape(config)
+    logging.info("scraping the second time")
+    config[chain]["_params"].pop("block_range")
+    second_result = await subscrape.scrape(config)
+    config[chain]["_stop_on_known_data"] = False
+    third_result = await subscrape.scrape(config)
+
+    assert len(first_result) == 3, "Expected 3 events"
+    assert len(second_result) >= 14, "Expected at least 14 events"
+    assert len(third_result) == 322, "Expected 322 events"
+     
+
+    

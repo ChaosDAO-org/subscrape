@@ -53,11 +53,16 @@ The SQLAlchemy connection string to the database. The default is `sqlite:///data
 
 ### Param: _auto_hydrate
 The Subscan API has two different calls per entity type from which it delivers 
-extrinsics and events data. e.g. the `events` call is more flexible, but the 
+extrinsics and events data. e.g. the `events` call has more parameters, but the 
 `event` call gives more data. Thus, when calling `events`, it makes sense to 
 automatically hydrate the events with the missing info from the `event` call.
 
-Hydration takes considerable more time. 
+Hydration takes considerably more time (up to 100x).
+
+The default is `true`. Set to `false` to disable.
+
+### Param: _stop_on_known_data
+If set to `true`, the scraper will stop scraping when it encounters an extrinsic or event that it has already scraped. This is useful for incremental scraping.
 
 The default is `true`. Set to `false` to disable.
 
@@ -93,7 +98,10 @@ Will skip the current scope of the config.
 `"_filter": [{"block_timestamp": [{"<":1644796800}]}],`
 
 ### Params: _params
-This allows you to set params which are sent to the API. For example, you can set the `address` param to a specific address to start scraping all extrinsics or events for that address.
+This allows you to set params which are sent to the API. For example, you can set
+the `address` param to a specific address to start scraping all extrinsics or 
+events for that address. This is a very powerful feature that allows you to tap
+into the full power of the Subscan API.
 
 #### `_version` identifier
 This will be useful in the future if breaking changes are needed. But for now, just leave it as `1`.
