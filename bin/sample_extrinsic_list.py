@@ -5,12 +5,12 @@ import asyncio
 
 async def main():
     
+    chain = "kusama"
     db_connection_string = "sqlite:///data/cache/sample_extrinsic_list.db"
     extrinsic_idx = "14238250-2"
 
     config = {
-        "kusama":{
-            "_api": "SubscanV2",
+        chain:{
             "_db_connection_string": db_connection_string,
             "extrinsics-list":[
                 extrinsic_idx
@@ -27,7 +27,7 @@ async def main():
     logging.info("transforming")
 
     db = SubscrapeDB(db_connection_string)
-    data = db.read_extrinsic(extrinsic_idx)
+    data = db.query_extrinsic(chain, extrinsic_idx)
 
     assert data["extrinsic_hash"] == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
     assert type(data["params"]) is list

@@ -7,10 +7,11 @@ from subscrape.db.subscrape_db import Event
 @pytest.mark.asyncio
 async def test_fetch_events_list():
     
+    chain = "kusama"
     event_index = "14238250-39"
     
     config = {
-        "kusama":{
+        chain:{
             "events-list":[
                 event_index
             ]
@@ -26,7 +27,7 @@ async def test_fetch_events_list():
     logging.info("testing")
 
     db = SubscrapeDB()
-    event = db.read_event(event_index)
+    event = db.query_event(chain, event_index)
 
     assert event is not None
     assert event.extrinsic_id == '14238250-2'
@@ -39,8 +40,10 @@ async def test_fetch_events_list():
 @pytest.mark.parametrize("auto_hydrate", [True, False])
 async def test_fetch_and_hydrate_event(auto_hydrate):
     
+    chain = "kusama"
+
     config = {
-        "kusama":{
+        chain:{
             "_auto_hydrate": auto_hydrate,
             "events": None,
             "_params": {
@@ -58,7 +61,7 @@ async def test_fetch_and_hydrate_event(auto_hydrate):
     logging.info("testing")
 
     db = SubscrapeDB()
-    event = db.read_event("700000-0")
+    event = db.query_event(chain, "700000-0")
     assert event is not None, "The event should exist in the database"
     assert event.extrinsic_id == "700000-0"
     if auto_hydrate:
@@ -71,11 +74,15 @@ async def test_fetch_and_hydrate_event(auto_hydrate):
 @pytest.mark.asyncio
 async def test_fetch_events_by_module_event():
     
+    chain = "kusama"
+    module_name = "council"
+    event_name = "proposed"
+
     config = {
-        "kusama":{
+        chain:{
             "_auto_hydrate": False,
             "events":{
-                "council": ["proposed"]
+                module_name: [event_name]
             }
         }
     }
@@ -89,18 +96,22 @@ async def test_fetch_events_by_module_event():
     logging.info("testing")
 
     db = SubscrapeDB()
-    events = db.events_query("council", "proposed").all()
+    events = db.query_events(chain = chain, module = module_name, event = event_name).all()
 
     events = [e for e in events if e.id == "52631-4"]
     assert len(events) == 1, "Expected 1 event"
-    event:Event = events[0]
-    assert event.extrinsic_id == '52631-3'
+    event_name:Event = events[0]
+    assert event_name.extrinsic_id == '52631-3'
 
     db.close()
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_module():
     
+    chain = "kusama"
+    module_name = "council"
+    event_names = ["proposed", "voted"]
+
     config = {
         "kusama":{
             "_auto_hydrate": False,
@@ -120,13 +131,13 @@ async def test_fetch_events_by_module():
 
     db = SubscrapeDB()
 
-    events = db.events_query("council", "proposed")
+    events = db.query_events(chain = chain, module = module_name, event = event_names[0]).all()
     events = [e for e in events if e.id == "14966317-39"]
     assert len(events) == 1, "Expected 1 event"
     event:Event = events[0]
     assert event.extrinsic_id == '14966317-2'
 
-    events = db.events_query("council", "voted")
+    events = db.query_events(chain = chain, module = module_name, event = event_names[1]).all()
     events = [e for e in events if e.id == "14938460-47"]
     assert len(events) == 1, "Expected 1 event"
     event = events[0]
@@ -137,8 +148,10 @@ async def test_fetch_events_by_module():
 @pytest.mark.asyncio
 async def test_fetch_events_by_address():
     
+    chain = "kusama"
+
     config = {
-        "kusama":{
+        chain:{
             "_auto_hydrate": False,
             "events": None,
             "_params": {
@@ -153,11 +166,11 @@ async def test_fetch_events_by_address():
     subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
-    logging.info("transforming")
 
+    logging.info("testing")
     db = SubscrapeDB()
-    events_query = db.events_query()
-    event = events_query.get("14804812-56")
+    events_query = db.query_events()
+    event = db.query_event(chain, "14804812-56")
     assert event is not None, "The event should exist in the database"
     assert event.extrinsic_id == "14804812-11"
 

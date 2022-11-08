@@ -21,42 +21,12 @@ SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
 MAX_CALLS_PER_SEC = SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 
-def update_extrinsic_from_raw_extrinsic(extrinsic: Extrinsic, raw_extrinsic):
-
-    extrinsic.id = raw_extrinsic["extrinsic_index"]
-    extrinsic.block_number = raw_extrinsic["block_num"]
-    extrinsic.module = raw_extrinsic["call_module"].lower()
-    extrinsic.call = raw_extrinsic["call_module_function"].lower()
-    if raw_extrinsic["account_display"] is not None:
-        extrinsic.address = raw_extrinsic["account_display"]["address"]
-    extrinsic.nonce = raw_extrinsic["nonce"]
-    extrinsic.extrinsic_hash = raw_extrinsic["extrinsic_hash"]
-    extrinsic.success = raw_extrinsic["success"]
-    extrinsic.params = raw_extrinsic["params"]
-    extrinsic.fee = raw_extrinsic["fee"]
-    extrinsic.fee_used = raw_extrinsic["fee_used"]
-    extrinsic.error = raw_extrinsic["error"]
-    extrinsic.finalized = raw_extrinsic["finalized"]
-    extrinsic.tip = raw_extrinsic["tip"]
-
-
-def update_event_from_raw_event(event: Event, raw_event):
-    # Subscan API is delivering the extrinsic id instead of the event id 
-    # in the event_index field. So let's work around that.
-    event.id = f'{raw_event["block_num"]}-{raw_event["event_idx"]}'
-    event.block_number = raw_event["block_num"]
-    event.extrinsic_id = f'{raw_event["block_num"]}-{raw_event["extrinsic_idx"]}'
-    event.module = raw_event["module_id"].lower()
-    event.event = raw_event["event_id"].lower()
-    event.params = raw_event["params"]
-    event.finalized = raw_event["finalized"]
-
 class SubscanWrapper:
     """
     Interface for interacting with the API of explorer Subscan.io for the Moonriver and Moonbeam chains.
     """
 
-    def __init__(self, chain, db: SubscrapeDB, api_key):
+    def __init__(self, chain: str, db: SubscrapeDB, api_key: str = None):
         """
         Initializes the SubscanBase.
         :param chain: The chain to scrape.
@@ -67,7 +37,8 @@ class SubscanWrapper:
         :type api_key: str or None
         """
         self.logger = logging.getLogger("SubscanWrapper")
-        self.endpoint = f"https://{chain}.api.subscan.io"
+        self.chain = chain.lower()
+        self.endpoint = f"https://{self.chain}.api.subscan.io"
         self.db: SubscrapeDB = db
         self.api_key = api_key
         global MAX_CALLS_PER_SEC
@@ -228,6 +199,7 @@ class SubscanWrapper:
             address = None
 
         extrinsic = Extrinsic(
+            chain = self.chain,
             id = raw_extrinsic_metadata["extrinsic_index"],
             block_number = raw_extrinsic_metadata["block_num"],
             module = raw_extrinsic_metadata["call_module"].lower(),
@@ -254,6 +226,7 @@ class SubscanWrapper:
             # block_number is the the string until the hyphen
         block_number = int(raw_event_metadata["event_index"].split("-")[0])
         event = Event(
+            chain = self.chain,
             id=raw_event_metadata["event_index"],
             block_number=block_number,
             extrinsic_id=raw_event_metadata["extrinsic_index"],
@@ -264,6 +237,55 @@ class SubscanWrapper:
 
         self.db.write_item(event)
         return event
+
+    def update_extrinsic_from_raw_extrinsic(self, extrinsic: Extrinsic, raw_extrinsic: dict):
+        """
+        Updates an extrinsic with the data from the raw extrinsic.
+        
+        :param extrinsic: The extrinsic to update
+        :type extrinsic: Extrinsic
+        :param raw_extrinsic: The raw extrinsic
+        :type raw_extrinsic: dict
+        """
+
+        extrinsic.id = raw_extrinsic["extrinsic_index"]
+        extrinsic.chain = self.chain
+        extrinsic.block_number = raw_extrinsic["block_num"]
+        extrinsic.module = raw_extrinsic["call_module"].lower()
+        extrinsic.call = raw_extrinsic["call_module_function"].lower()
+        if raw_extrinsic["account_display"] is not None:
+            extrinsic.address = raw_extrinsic["account_display"]["address"]
+        extrinsic.nonce = raw_extrinsic["nonce"]
+        extrinsic.extrinsic_hash = raw_extrinsic["extrinsic_hash"]
+        extrinsic.success = raw_extrinsic["success"]
+        extrinsic.params = raw_extrinsic["params"]
+        extrinsic.fee = raw_extrinsic["fee"]
+        extrinsic.fee_used = raw_extrinsic["fee_used"]
+        extrinsic.error = raw_extrinsic["error"]
+        extrinsic.finalized = raw_extrinsic["finalized"]
+        extrinsic.tip = raw_extrinsic["tip"]
+
+
+    def update_event_from_raw_event(self, event: Event, raw_event: dict):
+        """
+        Updates an event with the data from the raw event.
+
+        :param event: The event to update
+        :type event: Event
+        :param raw_event: The raw event
+        :type raw_event: dict
+        """
+
+        # Subscan API is delivering the extrinsic id instead of the event id 
+        # in the event_index field. So let's work around that.
+        event.id = f'{raw_event["block_num"]}-{raw_event["event_idx"]}'
+        event.chain = self.chain
+        event.block_number = raw_event["block_num"]
+        event.extrinsic_id = f'{raw_event["block_num"]}-{raw_event["extrinsic_idx"]}'
+        event.module = raw_event["module_id"].lower()
+        event.event = raw_event["event_id"].lower()
+        event.params = raw_event["params"]
+        event.finalized = raw_event["finalized"]
 
     async def fetch_extrinsic_metadata(self, module, call, config: ScrapeConfig) -> list:
         """
@@ -318,7 +340,7 @@ class SubscanWrapper:
         
         self.logger.info("Building list of extrinsics to fetch...")
 
-        already_fetched_extrinsics = self.db.extrinsics_query(extrinsic_ids=extrinsic_indexes).all()
+        already_fetched_extrinsics = self.db.query_extrinsics(chain = self.chain, extrinsic_ids = extrinsic_indexes).all()
         already_fetched_extrinsic_ids = [e.id for e in already_fetched_extrinsics]
 
         # if we do not update existing items, we only need to fetch the ones that are not in the db
@@ -352,10 +374,10 @@ class SubscanWrapper:
                     extrinsic_id = self._extrinsic_index_deducer(raw_extrinsic)
                     
                     if extrinsic_id in already_fetched_extrinsic_ids:
-                        extrinsic = self.db.read_extrinsic(extrinsic_id)
+                        extrinsic = self.db.query_extrinsic(self.chain, extrinsic_id)
                     else:
                         extrinsic = Extrinsic()
-                    update_extrinsic_from_raw_extrinsic(extrinsic, raw_extrinsic)
+                    self.update_extrinsic_from_raw_extrinsic(extrinsic, raw_extrinsic)
 
                     self.db.write_item(extrinsic)
                     items.append(extrinsic)
@@ -419,7 +441,7 @@ class SubscanWrapper:
 
         items = []
         
-        already_fetched_events = self.db.events_query(event_ids=event_indexes).all()
+        already_fetched_events = self.db.query_events(chain = self.chain, event_ids = event_indexes).all()
         already_fetched_event_ids = [e.id for e in already_fetched_events]
 
         # if we do not update existing items, we only need to fetch the ones that are not in the db
@@ -453,10 +475,10 @@ class SubscanWrapper:
                     event_id = self._event_index_deducer(raw_event)
                     
                     if event_id in already_fetched_event_ids:
-                        event = self.db.read_event(event_id)
+                        event = self.db.query_event(self.chain, event_id)
                     else:
                         event = Event()
-                    update_event_from_raw_event(event, raw_event)
+                    self.update_event_from_raw_event(event, raw_event)
 
                     self.db.write_item(event)
                     items.append(event)

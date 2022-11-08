@@ -41,9 +41,6 @@ class ParachainScraper:
             elif operation == "events-list":
                 events_list = operations[operation]
                 new_items = await self.api.fetch_events(events_list)
-            elif operation == "transfers":
-                accounts = operations[operation]
-                new_items = await self.scrape_transfers(accounts, chain_config)
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")            
                 exit

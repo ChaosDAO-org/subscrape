@@ -16,6 +16,7 @@ class Block(Base):
 
 class Extrinsic(Base):
     __tablename__ = 'extrinsics'
+    chain = Column(String(50), primary_key=True)
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
     module = Column(String(100))
@@ -35,6 +36,7 @@ class Extrinsic(Base):
 
 class Event(Base):
     __tablename__ = 'events'
+    chain = Column(String(50), primary_key=True)
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
     extrinsic_id = Column(Integer)
@@ -95,10 +97,12 @@ class SubscrapeDB:
 
     """ # Extrinsics """
 
-    def extrinsics_query(self, module: str = None, call: str = None, extrinsic_ids: list = None) -> Query:
+    def query_extrinsics(self, chain: str = None, module: str = None, call: str = None, extrinsic_ids: list = None) -> Query:
         """
         Returns a query object for extrinsics.
 
+        :param chain: The chain to filter for
+        :type chain: str
         :param module: The module to filter for
         :type module: str
         :param call: The call to filter for
@@ -107,6 +111,8 @@ class SubscrapeDB:
         :rtype: Query
         """
         query = self._session.query(Extrinsic)
+        if chain is not None:
+            query = query.filter(Extrinsic.chain == chain)
         if module is not None:
             query = query.filter(Extrinsic.module == module)
         if call is not None:
@@ -116,20 +122,22 @@ class SubscrapeDB:
 
         return query
 
-    def read_extrinsic(self, extrinsic_id) -> Extrinsic:
+    def query_extrinsic(self, chain: str, extrinsic_id: str) -> Extrinsic:
         """
         Returns the extrinsic with the given id.
 
+        :param chain: The chain to filter for
+        :type chain: str
         :param extrinsic_id: The id of the extrinsic
         :type extrinsic_id: str
         :return: The extrinsic
         :rtype: Extrinsic
         """
-        return self._session.query(Extrinsic).get(extrinsic_id)
+        return self._session.query(Extrinsic).get((chain, extrinsic_id))
 
     """ # Events """
 
-    def events_query(self, module=None, event=None, event_ids: list = None) -> Query:       
+    def query_events(self, chain: str = None, module: str = None, event: str = None, event_ids: list = None) -> Query:       
         """
         Returns a query object for events.
 
@@ -143,6 +151,8 @@ class SubscrapeDB:
         :rtype: Query
         """
         query = self._session.query(Event)
+        if chain is not None:
+            query = query.filter(Event.chain == chain)
         if module is not None:
             query = query.filter(Event.module == module)
         if event is not None:
@@ -151,15 +161,17 @@ class SubscrapeDB:
             query = query.filter(Event.id.in_(event_ids))
         return query
 
-    def read_event(self, event_id) -> Event:
+    def query_event(self, chain: str, event_id: str) -> Event:
         """
         Reads an event with a given id from the database.
 
+        :param chain: The chain to filter for
+        :type chain: str
         :param event_id: The id of the event to read, e.g. "123456-12"
         :type event_id: str
         :return: The event
         :rtype: Event
         """
-        result = self._session.query(Event).get(event_id)
+        result = self._session.query(Event).get((chain, event_id))
         return result
 

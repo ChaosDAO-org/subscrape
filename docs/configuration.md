@@ -52,9 +52,14 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 The SQLAlchemy connection string to the database. The default is `sqlite:///data/cache/default.db`.
 
 ### Param: _auto_hydrate
-The Subscan API has two different calls per entity type from which it delivers extrinsics and events data. e.g. the `events` call is more flexible,
-but the `event` call gives more data. Thus, when calling `events`, it makes
-sense to automatically hydrate the events with the missing info from the `event` call. The default is `true`. Set to `false` to disable.
+The Subscan API has two different calls per entity type from which it delivers 
+extrinsics and events data. e.g. the `events` call is more flexible, but the 
+`event` call gives more data. Thus, when calling `events`, it makes sense to 
+automatically hydrate the events with the missing info from the `event` call.
+
+Hydration takes considerable more time. 
+
+The default is `true`. Set to `false` to disable.
 
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.

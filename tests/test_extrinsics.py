@@ -6,10 +6,11 @@ import pytest
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_list():
     
+    chain = "kusama"
     extrinsic_idx = "14238250-2"
     
     config = {
-        "kusama":{
+        chain:{
             "extrinsics-list":[
                 extrinsic_idx
             ],
@@ -25,7 +26,7 @@ async def test_fetch_extrinsics_list():
     logging.info("testing")
 
     db = SubscrapeDB()
-    extrinsic = db.read_extrinsic(extrinsic_idx)
+    extrinsic = db.query_extrinsic(chain, extrinsic_idx)
 
     assert extrinsic is not None
     assert extrinsic.extrinsic_hash == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
@@ -39,8 +40,10 @@ async def test_fetch_extrinsics_list():
 @pytest.mark.parametrize("auto_hydrate", [True, False])
 async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
 
+    chain = "kusama"
+
     config = {
-        "kusama":{
+        chain:{
             "_auto_hydrate": auto_hydrate,
             "extrinsics": None,
             "_params": {
@@ -58,7 +61,7 @@ async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
     logging.info("testing")
 
     db = SubscrapeDB()
-    extrinsic = db.read_extrinsic("15228214-2")
+    extrinsic = db.query_extrinsic(chain, "15228214-2")
     assert extrinsic is not None, "This extrinsic should exist in the database"
     assert extrinsic.extrinsic_hash == '0x8863fb33e2bac6f48b8a0c6a08a27871631046a2654fcd4574f4e8faaaa7cba1'
     if auto_hydrate:
@@ -89,7 +92,7 @@ async def test_fetch_extrinsics_by_module_call():
     logging.info("testing")
 
     db = SubscrapeDB()
-    extrinsics = db.extrinsics_query("bounties", "propose_bounty").all()
+    extrinsics = db.query_extrinsics(module = "bounties", call = "propose_bounty").all()
 
     extrinsics = [e for e in extrinsics if e.id == "14061443-2"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
@@ -120,13 +123,13 @@ async def test_fetch_extrinsics_by_module():
 
     db = SubscrapeDB()
 
-    extrinsics = db.extrinsics_query("bounties", "propose_bounty")
+    extrinsics = db.query_extrinsics(module = "bounties", call = "propose_bounty")
     extrinsics = [e for e in extrinsics if e.id == "12935940-3"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
     extrinsic = extrinsics[0]
     assert extrinsic.extrinsic_hash == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
 
-    extrinsics = db.extrinsics_query("bounties", "extend_bounty_expiry")
+    extrinsics = db.query_extrinsics(module = "bounties", call = "extend_bounty_expiry")
     extrinsics = [e for e in extrinsics if e.id == "14534356-3"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
     extrinsic = extrinsics[0]
@@ -137,8 +140,10 @@ async def test_fetch_extrinsics_by_module():
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_address():
     
+    chain = "kusama"
+
     config = {
-        "kusama":{
+        chain:{
             "_auto_hydrate": False,
             "extrinsics": None,
             "_params": {
@@ -156,7 +161,7 @@ async def test_fetch_extrinsics_by_address():
     logging.info("testing")
 
     db = SubscrapeDB()
-    extrinsic = db.read_extrinsic("14815834-2")
+    extrinsic = db.query_extrinsic(chain, "14815834-2")
     assert extrinsic is not None, "This extrinsic should exist in the database"
     assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
 
