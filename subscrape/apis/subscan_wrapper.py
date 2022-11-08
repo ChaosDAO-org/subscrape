@@ -222,6 +222,7 @@ class SubscanWrapper:
                 chain = self.chain,
                 id = extrinsic_id,
                 block_number = raw_extrinsic_metadata["block_num"],
+                block_timestamp = datetime.fromtimestamp(raw_extrinsic_metadata["block_timestamp"]),
                 module = raw_extrinsic_metadata["call_module"].lower(),
                 call = raw_extrinsic_metadata["call_module_function"].lower(),
                 address = address,
@@ -270,6 +271,7 @@ class SubscanWrapper:
                 chain = self.chain,
                 id = event_id,
                 block_number=block_number,
+                block_timestamp = datetime.fromtimestamp(raw_event_metadata["block_timestamp"]),
                 extrinsic_id=raw_event_metadata["extrinsic_index"],
                 module=raw_event_metadata["module_id"].lower(),
                 event=raw_event_metadata["event_id"].lower(),
@@ -294,6 +296,7 @@ class SubscanWrapper:
         extrinsic.id = raw_extrinsic["extrinsic_index"]
         extrinsic.chain = self.chain
         extrinsic.block_number = raw_extrinsic["block_num"]
+        extrinsic.block_timestamp = datetime.fromtimestamp(raw_extrinsic["block_timestamp"])
         extrinsic.module = raw_extrinsic["call_module"].lower()
         extrinsic.call = raw_extrinsic["call_module_function"].lower()
         if raw_extrinsic["account_display"] is not None:
@@ -366,6 +369,7 @@ class SubscanWrapper:
         self.db.flush()
 
         if config.auto_hydrate == True:
+            self.logger.info(f"Hydrating extrinsics {module}.{call} from {self.endpoint}")
             extrinsic_indexes = [e.id for e in items]
             items = await self.fetch_extrinsics(extrinsic_indexes)
 
@@ -435,6 +439,8 @@ class SubscanWrapper:
                 for index in batch:
                     extrinsic_indexes.remove(index)
 
+                self.logger.info(f"Done fetching {len(items)} extrinsics. {len(extrinsic_indexes)} remaining.")
+
         return items
 
     async def fetch_event_metadata(self, module, call, config) -> list:
@@ -475,6 +481,7 @@ class SubscanWrapper:
         self.db.flush()
 
         if config.auto_hydrate == True:
+            self.logger.info("Hydrating events from {module}.{call} from {self.endpoint}")
             event_indexes = [e.id for e in items]
             items = await self.fetch_events(event_indexes)
 

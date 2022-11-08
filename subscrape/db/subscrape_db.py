@@ -19,6 +19,7 @@ class Extrinsic(Base):
     chain = Column(String(50), primary_key=True)
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime)
     module = Column(String(100))
     call = Column(String(100))
     address = Column(String(100))
@@ -39,6 +40,7 @@ class Event(Base):
     chain = Column(String(50), primary_key=True)
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime) # only present in the Subscan metadata
     extrinsic_id = Column(Integer)
     module = Column(String(100))
     event = Column(String(100))
