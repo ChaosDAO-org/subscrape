@@ -2,8 +2,7 @@ __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import os
 import logging
-from substrateinterface.utils import ss58
-from sqlalchemy import create_engine, Table, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import Session, Query
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy_utils import database_exists, create_database
