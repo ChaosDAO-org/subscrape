@@ -2,16 +2,52 @@ from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 import pytest
+from subscrape.db.subscrape_db import Event
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [(None), ("SubscanV2")])
-async def test_events(api):
+async def test_fetch_events_list():
+    
+    chain = "kusama"
+    event_index = "14238250-39"
     
     config = {
-        "kusama":{
-            "_api": api,
-            "events":{
-                "council": ["proposed"]
+        chain:{
+            "events-list":[
+                event_index
+            ]
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping")
+    await subscrape.scrape(config)
+    logging.info("testing")
+
+    db = SubscrapeDB()
+    event = db.query_event(chain, event_index)
+
+    assert event is not None
+    assert event.extrinsic_id == '14238250-2'
+    assert type(event.params) is list
+
+    db.close()
+    
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("auto_hydrate", [True, False])
+async def test_fetch_and_hydrate_event(auto_hydrate):
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": auto_hydrate,
+            "events": None,
+            "_params": {
+                "block_num": 700000
             }
         }
     }
@@ -19,24 +55,66 @@ async def test_events(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
-    logging.info("transforming")
+    logging.info("testing")
 
-    db = SubscrapeDB("kusama")
-    events_storage = db.storage_manager_for_events_call("council", "proposed")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["7608975-2"]
-    assert proposal_event["extrinsic_hash"] == '0x2e8d37a0ec4613b445dfd08d927710c6ad4938bc17b7c9ced8467652ed9835ab'
+    db = SubscrapeDB()
+    event = db.query_event(chain, "700000-0")
+    assert event is not None, "The event should exist in the database"
+    assert event.extrinsic_id == "700000-0"
+    if auto_hydrate:
+        assert type(event.params) is list, "Hydrated events should have a list of params"
+    else:
+        assert event.params is None, "Non-hydrated events should have no params"
+
+    db.close()
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [(None), ("SubscanV2")])
-async def test_fetch_all_events_from_module(api):
+async def test_fetch_events_by_module_event():
     
+    chain = "kusama"
+    module_name = "council"
+    event_name = "proposed"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "events":{
+                module_name: [event_name]
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping")
+    scrape_result = await subscrape.scrape(config)
+    logging.info("testing")
+
+    db = SubscrapeDB()
+    events = db.query_events(chain = chain, module = module_name, event = event_name).all()
+
+    events = [e for e in events if e.id == "52631-4"]
+    assert len(events) == 1, "Expected 1 event"
+    event_name:Event = events[0]
+    assert event_name.extrinsic_id == '52631-3'
+
+    db.close()
+
+@pytest.mark.asyncio
+async def test_fetch_events_by_module():
+    
+    chain = "kusama"
+    module_name = "council"
+    event_names = ["proposed", "voted"]
+
     config = {
         "kusama":{
-            "_api": api,
+            "_auto_hydrate": False,
             "events":{
                 "council": None,
             }
@@ -46,30 +124,35 @@ async def test_fetch_all_events_from_module(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
     logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    db = SubscrapeDB()
 
-    events_storage = db.storage_manager_for_events_call("council", "proposed")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["7608975-2"]
-    assert proposal_event["extrinsic_hash"] == '0x2e8d37a0ec4613b445dfd08d927710c6ad4938bc17b7c9ced8467652ed9835ab'
+    events = db.query_events(chain = chain, module = module_name, event = event_names[0]).all()
+    events = [e for e in events if e.id == "14966317-39"]
+    assert len(events) == 1, "Expected 1 event"
+    event:Event = events[0]
+    assert event.extrinsic_id == '14966317-2'
 
-    events_storage = db.storage_manager_for_events_call("council", "voted")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["14938460-47"]
-    assert proposal_event["extrinsic_hash"] == '0x339d3522cc716887e83accbc2f7a17173be0871023a2dbe9e4daf25fc1f37852'
+    events = db.query_events(chain = chain, module = module_name, event = event_names[1]).all()
+    events = [e for e in events if e.id == "14938460-47"]
+    assert len(events) == 1, "Expected 1 event"
+    event = events[0]
+    assert event.extrinsic_id == '14938460-4'
+
+    db.close()
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("api", [(None), ("SubscanV2")])
-async def test_fetch_all_events_from_module(api):
+async def test_fetch_events_by_address():
     
+    chain = "kusama"
+
     config = {
-        "kusama":{
-            "_api": api,
+        chain:{
+            "_auto_hydrate": False,
             "events": None,
             "_params": {
                 "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
@@ -80,14 +163,98 @@ async def test_fetch_all_events_from_module(api):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
-    subscrape.wipe_storage()
+    subscrape.wipe_cache()
     logging.info("scraping")
     await subscrape.scrape(config)
-    logging.info("transforming")
 
-    db = SubscrapeDB("kusama")
+    logging.info("testing")
+    db = SubscrapeDB()
+    events_query = db.query_events()
+    event = db.query_event(chain, "14804812-56")
+    assert event is not None, "The event should exist in the database"
+    assert event.extrinsic_id == "14804812-11"
 
-    events_storage = db.storage_manager_for_events_call("society", "defendervote")
-    events = dict(events_storage.get_iter())
-    proposal_event = events["14804812-56"]
-    assert proposal_event["extrinsic_hash"] == '0x6f8f1cb925d533d7754ec81bf744d7b0ed98230bc1c116b1dd9a29035aa41c75'
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_fetch_events_repeatedly():
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "events": None,
+            "_params": {
+                "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL"
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping the first time")
+    await subscrape.scrape(config)
+    logging.info("scraping the second time")
+    await subscrape.scrape(config)
+
+
+    logging.info("testing")
+    db = SubscrapeDB()
+    events_query = db.query_events()
+    event = db.query_event(chain, "14804812-56")
+    assert event is not None, "The event should exist in the database"
+    assert event.extrinsic_id == "14804812-11"
+
+    db.close()
+
+@pytest.mark.asyncio
+async def test_fetch_events_stop_on_known_data():
+    '''
+    This unit test tests the proper behavior of the scraper when it encounters a block that it has already scraped.
+    In the default case, `stop_on_known_data` is set to True, so the scraper should stop scraping when it encounters
+    a block that it has already scraped.
+
+    This test will first scrape in the middle of the event history of Gav, then scrape again from the beginning.
+    Lastly, we set `stop_on_known_data` to False and scrape again. This time, the scraper should scrape all the way
+    to the end of the event history of Gav.
+
+    We counted the number of events in the database before and after the second scrape, and know exactly how many
+    events there should be.
+    '''
+    
+    chain = "kusama"
+
+    config = {
+        chain:{
+            "_auto_hydrate": False,
+            "events": None,
+            "_params": {
+                "address": "FcxNWVy5RESDsErjwyZmPCW6Z8Y3fbfLzmou34YZTrbcraL",
+                "block_range": "10000000-12000000"
+            }
+        }
+    }
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+
+    logging.info("wiping storage")
+    subscrape.wipe_cache()
+    logging.info("scraping the first time")
+
+    first_result = await subscrape.scrape(config)
+    logging.info("scraping the second time")
+    config[chain]["_params"].pop("block_range")
+    second_result = await subscrape.scrape(config)
+    config[chain]["_stop_on_known_data"] = False
+    third_result = await subscrape.scrape(config)
+
+    assert len(first_result) == 3, "Expected 3 events"
+    assert len(second_result) >= 14, "Expected at least 14 events"
+    assert len(third_result) == 322, "Expected 322 events"
+     
+
+    

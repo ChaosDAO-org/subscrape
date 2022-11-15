@@ -9,7 +9,9 @@ class ScrapeConfig:
         self.processor_name = None
         self.skip = False
         self.params = None
-        self.api = None
+        self.db_connection_string = None
+        self.auto_hydrate = True
+        self.stop_on_known_data = True
         self._set_config(config)
 
     def _set_config(self, config):
@@ -42,9 +44,18 @@ class ScrapeConfig:
         if params is not None:
             self.params = params
 
-        api = config.get("_api", None)
-        if api is not None:
-            self.api = api
+        # _db_path is only relevant on the chain level
+        db_connection_string = config.get("_db_connection_string", None)
+        if db_connection_string is not None:
+            self.db_connection_string = db_connection_string
+
+        auto_hydrate = config.get("_auto_hydrate", None)
+        if auto_hydrate is not None:
+            self.auto_hydrate = auto_hydrate
+
+        stop_on_known_data = config.get("_stop_on_known_data", None)
+        if stop_on_known_data is not None:
+            self.stop_on_known_data = stop_on_known_data
 
     def create_inner_config(self, config):
         """

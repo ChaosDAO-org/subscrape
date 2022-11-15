@@ -6,6 +6,7 @@ pandas
 pytest-asyncio
 ratelimit
 simplejson
+sqlalchemy
+sqlalchemy-utils
 substrate-interface
-sqlitedict
 web3>5.0 

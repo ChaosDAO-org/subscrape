@@ -1,14 +1,52 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import os
-import io
-import json
 import logging
 from substrateinterface.utils import ss58
-from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
-import sqlite3
+from sqlalchemy import create_engine, Table, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy.orm import Session, Query
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy_utils import database_exists, create_database
 
-# one DB per Parachain
+Base = declarative_base()
+
+class Block(Base):
+    __tablename__ = "blocks"
+    block_number = Column(Integer, unique=True, primary_key=True)
+
+class Extrinsic(Base):
+    __tablename__ = 'extrinsics'
+    chain = Column(String(50), primary_key=True)
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime)
+    module = Column(String(100))
+    call = Column(String(100))
+    address = Column(String(100))
+    nonce = Column(Integer)
+    extrinsic_hash = Column(String(100))
+    success = Column(Boolean)
+    params = Column(JSON)
+    # event
+    # event_count
+    fee = Column(Integer)
+    fee_used = Column(Integer)
+    error = Column(JSON)
+    finalized = Column(Boolean)
+    tip = Column(Integer)
+
+class Event(Base):
+    __tablename__ = 'events'
+    chain = Column(String(50), primary_key=True)
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime) # only present in the Subscan metadata
+    extrinsic_id = Column(Integer)
+    module = Column(String(100))
+    event = Column(String(100))
+    params = Column(JSON)
+    finalized = Column(Boolean)
+
 class SubscrapeDB:
     """
     This class is used to support online scraping of various types of data.
@@ -18,196 +56,124 @@ class SubscrapeDB:
     At the end of the process, flush_<type>() is called to make sure the state is properly saved.
     """
 
-    def __init__(self, parachain):
+    def __init__(self, connection_string="sqlite:///data/cache/default.db"):
         self.logger = logging.getLogger("SubscrapeDB")
+        self._engine = create_engine(connection_string)
 
-        # make sure casing is correct
-        parachain = parachain.lower()
+        if not database_exists(self._engine.url):
+            # ensure that the folder exists
+            os.makedirs(os.path.dirname(connection_string.replace("sqlite:///", "")), exist_ok=True)
+            create_database(self._engine.url)
+            self._setup_db()
 
-        # make sure the parachains folder exists
-        folder_path = f"{os.getcwd()}/data/parachains/"
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        self._session = Session(bind=self._engine)
 
-        #: str: the root path to this db
-        self._path = f"data/parachains/{parachain}_"
-        #: str: the name of the chain this db represents
-        self._parachain = parachain
-        #: SqliteDict: the index of all extrinsics
-        self._extrinsics_storage = SqliteDictWrapper(self._path + "extrinsics.sqlite", f"{parachain}.extrinsics")
-        #: SqliteDict: the index of all events
-        self._events_storage = SqliteDictWrapper(self._path + "events.sqlite", f"{parachain}.events")
+    def _setup_db(self):
+        """
+        Creates the database tables if they do not exist.
+        """
+        Base.metadata.create_all(self._engine)
+        
 
-        self._extrinsics_index_managers = {}
-        self._events_index_managers = {}
-        self._transfers_index_managers = {}
+    def flush(self):
+        """
+        Flush the extrinsics to the database.
+        """
+        self._session.commit()
+
+    def close(self):
+        """
+        Close the database connection.
+        """
+        self._session.close()
+
+    def write_item(self, item: Base):
+        """
+        Write this item to the database.
+
+        :param item: The item to write
+        :type item: Base
+        """
+        self._session.add(item)
 
 
     """ # Extrinsics """
 
-    def storage_manager_for_extrinsics_call(self, module, call):
+    def query_extrinsics(self, chain: str = None, module: str = None, call: str = None, extrinsic_ids: list = None) -> Query:
         """
-        returns a SqliteDictWrapper to store and retrieve extrinsics
+        Returns a query object for extrinsics.
+
+        :param chain: The chain to filter for
+        :type chain: str
+        :param module: The module to filter for
+        :type module: str
+        :param call: The call to filter for
+        :type call: str
+        :return: The query object
+        :rtype: Query
         """
-        module = module.lower()
-        call = call.lower()
-        name = f"{self._parachain}.{module}.{call}"
-        if name in self._extrinsics_index_managers:
-            return self._extrinsics_index_managers[name]
+        query = self._session.query(Extrinsic)
+        if chain is not None:
+            query = query.filter(Extrinsic.chain == chain)
+        if module is not None:
+            query = query.filter(Extrinsic.module == module)
+        if call is not None:
+            query = query.filter(Extrinsic.call == call)
+        if extrinsic_ids is not None:
+            query = query.filter(Extrinsic.id.in_(extrinsic_ids))
 
-        path = f"{self._path}extrinsics_index_{module}_{call}.sqlite"
-        sm = SqliteDictWrapper(path, name)
-        self._extrinsics_index_managers[name] = sm
-        return sm
+        return query
 
-    def storage_manager_for_extrinsics(self):
-        return self._extrinsics_storage
-
-    def write_extrinsic(self, index, extrinsic) -> bool:
+    def query_extrinsic(self, chain: str, extrinsic_id: str) -> Extrinsic:
         """
-        Write extrinsic to the database.
+        Returns the extrinsic with the given id.
 
-        :param index: The index of the extrinsic
-        :type index: str
-        :param extrinsic: The extrinsic to write
-        :type extrinsic: dict
-        """
-                
-        was_new_element = self._extrinsics_storage.write_item(index, extrinsic)
-        
-        if not was_new_element:
-            self.logger.warning(f"Extrinsic {index} already exists in the database. This should be prevented by the scraper by checking `has_extrinsic`.")
-
-        return was_new_element
-
-    def flush_extrinsics(self):
-        """
-        Flush the extrinsics to the database.
-        """
-        self._extrinsics_storage.flush()
-
-    def has_extrinsic(self, extrinsic_index):
-        """
-        Returns true if the extrinsic with the given index is in the database.
-        """
-        return extrinsic_index in self._extrinsics_storage
-
-    def read_extrinsic(self, extrinsic_index):
-        """
-        Reads an extrinsic with a given index from the database.
-
-        :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
+        :param chain: The chain to filter for
+        :type chain: str
+        :param extrinsic_id: The id of the extrinsic
+        :type extrinsic_id: str
         :return: The extrinsic
+        :rtype: Extrinsic
         """
-        return self._extrinsics_storage.read_item(extrinsic_index)
+        return self._session.query(Extrinsic).get((chain, extrinsic_id))
 
     """ # Events """
 
-    def storage_manager_for_events_call(self, module, event):
+    def query_events(self, chain: str = None, module: str = None, event: str = None, event_ids: list = None) -> Query:       
         """
-        returns a SqliteDictWrapper to store and retrieve events
+        Returns a query object for events.
+
+        :param module: The module to filter for
+        :type module: str
+        :param event: The event to filter for
+        :type event: str
+        :param event_ids: The ids of the events to filter for
+        :type event_ids: list
+        :return: The query object
+        :rtype: Query
         """
-        module = module.lower()
-        event = event.lower()
-        name = f"{self._parachain}.{module}.{event}"
-        if name in self._events_index_managers:
-            return self._events_index_managers[name]
+        query = self._session.query(Event)
+        if chain is not None:
+            query = query.filter(Event.chain == chain)
+        if module is not None:
+            query = query.filter(Event.module == module)
+        if event is not None:
+            query = query.filter(Event.event == event)
+        if event_ids is not None:
+            query = query.filter(Event.id.in_(event_ids))
+        return query
 
-        path = f"{self._path}events_index_{module}_{event}.sqlite"
-        sm = SqliteDictWrapper(path, name)
-        self._events_index_managers[name] = sm
-        return sm
-
-    def write_event(self, index, event) -> bool:
+    def query_event(self, chain: str, event_id: str) -> Event:
         """
-        Write event to the database.
+        Reads an event with a given id from the database.
 
-        :param index: The index of the event
-        :type index: str
-        :param event: The event to write
-        :type event: dict
-        """
-        was_new_element = self._events_storage.write_item(index, event)
-
-        if not was_new_element:
-            self.logger.warning(f"Event {index} already exists in the database. This should be prevented by the scraper by checking `has_event`.")
-
-        return was_new_element
-
-    def flush_events(self):
-        """
-        Flush the events to the database.
-        """
-        self._events_storage.flush()
-
-    def has_event(self, event_index):
-        """
-        Returns true if the event with the given index is in the database.
-        """
-        return event_index in self._events_storage
-
-    def read_event(self, event_index):
-        """
-        Reads an event with a given index from the database.
-
-        :param event_index: The index of the event to read, e.g. "123456-12"
+        :param chain: The chain to filter for
+        :type chain: str
+        :param event_id: The id of the event to read, e.g. "123456-12"
+        :type event_id: str
         :return: The event
+        :rtype: Event
         """
-        return self._events_storage.read_item(event_index)
-    
-    """ # Transfers """
-
-    def storage_manager_for_transfers(self, address):
-        """
-        returns a SqliteDictWrapper to store and retrieve transfers
-        """
-        address = ss58.ss58_decode(address)
-        address = ss58.ss58_encode(address, 42)
-        name = f"{self._parachain}.transfers.{address}"
-        if name in self._transfers_index_managers:
-            return self._transfers_index_managers[name]
-
-        path = f"{self._path}transfers_index_{address}.sqlite"
-        sm = SqliteDictWrapper(path, name)
-        self._transfers_index_managers[name] = sm
-        return sm
-
-    def write_transfer(self, index, transfer) -> bool:
-        """
-        Write transfer to the database.
-
-        :param index: The index of the transfer
-        :type index: str
-        :param transfer: The transfer to write
-        :type transfer: dict
-        """
-        sm = self.storage_manager_for_transfers(transfer["address"])
-        was_new_element = sm.write_item(index, transfer)
-
-        if not was_new_element:
-            self.logger.warning(f"Transfer {index} already exists in the database.")
-
-        return was_new_element
-
-    def flush_transfers(self):
-        """
-        Flush the transfers to the database.
-        """
-        for sm in self._transfers_index_managers.values():
-            sm.flush()
-
-    def has_transfer(self, transfer_index):
-        """
-        Returns true if the transfer with the given index is in the database.
-        """
-        return transfer_index in self._transfers_storage
-
-    def read_transfer(self, transfer_index):
-        """
-        Reads an transfer with a given index from the database.
-
-        :param transfer_index: The index of the transfer to read, e.g. "123456-12"
-        :return: The transfer
-        """
-        return self._transfers_storage.read_item(transfer_index)
+        result = self._session.query(Event).get((chain, event_id))
+        return result
 

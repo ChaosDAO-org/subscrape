@@ -6,7 +6,8 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 {
     "_version": 1,
     "kusama": {
-        "_api": "SubscanV2",
+        "_db_connection_string": "sqlite:///data/cache/default.db",
+        "_auto_hydrate": false,
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
@@ -29,9 +30,6 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
         "events-list":[
             "14238250-39"
         ],
-        "transfers": {
-            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
-        },
     },
     "moonriver": {
         "transactions": {
@@ -50,9 +48,23 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
 
 ## Config for scraping Substrate chains:
 
-### Param: _api
-Defines the API to use. It is either `SubscanV1` or `SubscanV2`. At the moment, it defaults to `SubscanV1`.
-In the future, we will change this to `SubscanV2`.
+### Param: _db_connection_string
+The SQLAlchemy connection string to the database. The default is `sqlite:///data/cache/default.db`.
+
+### Param: _auto_hydrate
+The Subscan API has two different calls per entity type from which it delivers 
+extrinsics and events data. e.g. the `events` call has more parameters, but the 
+`event` call gives more data. Thus, when calling `events`, it makes sense to 
+automatically hydrate the events with the missing info from the `event` call.
+
+Hydration takes considerably more time (up to 100x).
+
+The default is `true`. Set to `false` to disable.
+
+### Param: _stop_on_known_data
+If set to `true`, the scraper will stop scraping when it encounters an extrinsic or event that it has already scraped. This is useful for incremental scraping.
+
+The default is `true`. Set to `false` to disable.
 
 ### Operation: extrinsics
 Scrapes extrinsics by using their `module` and `name`. `module` can be `None` to scrape all extrinsics. `name` can also be `None` to scrape all extrinsics of a module.
@@ -65,9 +77,6 @@ Scrapes events by using their `module` and `name`. `module` can be `None` to scr
 
 ### Operation: events-list
 Scrapes events by using a list of event indexes.
-
-### Operation: transfers
-Scrapes transfers by using their `address` and a `label`.
 
 ### Config for scraping Moonriver or Moonbeam:
 
@@ -89,7 +98,10 @@ Will skip the current scope of the config.
 `"_filter": [{"block_timestamp": [{"<":1644796800}]}],`
 
 ### Params: _params
-This allows you to set params which are sent to the API. For example, you can set the `address` param to a specific address to start scraping all extrinsics or events for that address.
+This allows you to set params which are sent to the API. For example, you can set
+the `address` param to a specific address to start scraping all extrinsics or 
+events for that address. This is a very powerful feature that allows you to tap
+into the full power of the Subscan API.
 
 #### `_version` identifier
 This will be useful in the future if breaking changes are needed. But for now, just leave it as `1`.

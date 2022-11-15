@@ -1,10 +1,8 @@
 {
     "_version": 1,
     "kusama": {
-        "_api": "SubscanV2",
-        "transfers": {
-            "F3opxRbN5ZbjJNU511Kj2TLuzFcDq9BGduA9TgiECafpg29": "Treasury"
-        },
+        "_db_connection_string": "sqlite:///data/cache/default.db",
+        "_auto_hydrate": false,
         "extrinsics": {
             "_filter": [{"block_timestamp": [{"<":1644796800}]}],
             "system": [
