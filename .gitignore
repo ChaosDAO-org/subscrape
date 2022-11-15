@@ -2,6 +2,8 @@
 
 subscan-key
 moonscan-key
+moonscan-moonriver-key
+moonscan-moonbeam-key
 .vscode/
 data/
 config/scrape_config.json

@@ -52,7 +52,7 @@ class MoonscanWrapper:
             # unpackage the payload
             obj = json.loads(response)
             if obj["status"] == "0":
-                self.logger.info("received empty result")
+                self.logger.info(f"received empty result. message='{obj['message']}' and result='{obj['result']}'")
                 return
         
             elements = obj["result"]

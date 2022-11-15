@@ -20,7 +20,7 @@ def moonscan_factory(chain):
     :type chain: str
     """
     moonscan_key = None
-    moonscan_key_path = repo_root / 'config' / 'moonscan-key'
+    moonscan_key_path = repo_root / 'config' / f'moonscan-{chain}-key'
     if moonscan_key_path.exists():
         with moonscan_key_path.open(encoding="UTF-8", mode='r') as source:
             moonscan_key = source.read()
@@ -89,7 +89,6 @@ def scrape(chains) -> int:
     items_scraped = 0
 
     try:
-
         scrape_config = ScrapeConfig(chains)
 
         for chain in chains:

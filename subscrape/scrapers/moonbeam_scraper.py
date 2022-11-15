@@ -291,7 +291,7 @@ class MoonbeamScraper:
         tx_hash = transaction['hash']
         contract_address = transaction['to']
         receipt = self.moonscan_api.get_transaction_receipt(tx_hash)
-        # receipt = self.blockscout_api.get_transaction_receipt(tx_hash)
+        # receipt = self.blockscout_api.get_transaction_receipt(tx_hash)    # todo: test blockscout receipts
         if type(receipt) is not dict or 'logs' not in receipt or len(receipt['logs']) == 0:
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no"
                                 f" logs/traces present for transaction receipt: {receipt}")
