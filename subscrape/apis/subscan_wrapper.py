@@ -481,7 +481,7 @@ class SubscanWrapper:
         self.db.flush()
 
         if config.auto_hydrate == True:
-            self.logger.info("Hydrating events from {module}.{call} from {self.endpoint}")
+            self.logger.info(f"Hydrating events from {module}.{call} from {self.endpoint}")
             event_indexes = [e.id for e in items]
             items = await self.fetch_events(event_indexes)
 
