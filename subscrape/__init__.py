@@ -54,62 +54,75 @@ def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
     return scraper
 
 
-def scraper_factory(name, chain_config: ScrapeConfig):
+def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable = None):
     """
     Configure and return a configured object ready to scrape one or more Dotsama EVM or substrate-based chains
 
-    :param name: name of the specific chain
-    :type name: str
+    :param chain_name: name of the specific chain
+    :type chain_name: str
+    :param chain_config: configuration for the specific chain
+    :type chain_config: ScrapeConfig
+    :param db_factory: optional function to use to create a database connection. takes the chain config as parameter
+    :type db_factory: callable
     """
-    if name == "moonriver" or name == "moonbeam":
+    if chain_name == "moonriver" or chain_name == "moonbeam":
         db_connection_string = f"data/parachains"
         if not os.path.exists(db_connection_string):
             os.makedirs(db_connection_string)
-        db_connection_string += f'/{name}_'
-        moonscan_api = moonscan_factory(name)
-        blockscout_api = blockscout_factory(name)
+        db_connection_string += f'/{chain_name}_'
+        moonscan_api = moonscan_factory(chain_name)
+        blockscout_api = blockscout_factory(chain_name)
         scraper = MoonbeamScraper(db_connection_string, moonscan_api, blockscout_api)
         return scraper
     else:
+        # determine the database connection string
         if chain_config.db_connection_string is None:
             db_connection_string = "sqlite:///data/cache/default.db"
+        else:
+            db_connection_string = chain_config.db_connection_string
+        
+        # create the database object
+        if db_factory is None:
             db = SubscrapeDB(db_connection_string)
         else:
-            db = SubscrapeDB(chain_config.db_connection_string)
-        subscan_api = subscan_factory(name, db, chain_config)
+            db = db_factory(chain_config)
+
+        subscan_api = subscan_factory(chain_name, db, chain_config)
         scraper = ParachainScraper(subscan_api)
         return scraper
 
 
-async def scrape(chains) -> list:
+async def scrape(chains_config, db_factory = None) -> list:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
 
     :param chains: list of chains to scrape
     :type chains: list
+    :param db_factory: optional function to use to create a database connection. takes the chain config as parameter
+    :type db_factory: function
     :return: the list of scraped items
     """
     items = []
 
     try:
 
-        scrape_config = ScrapeConfig(chains)
+        scrape_config = ScrapeConfig(chains_config)
 
-        for chain in chains:
-            if chain.startswith("_"):
-                if chain == "_version" and chains[chain] != 1:
+        for chain_name in chains_config:
+            if chain_name.startswith("_"):
+                if chain_name == "_version" and chains_config[chain_name] != 1:
                     logging.warning("config version != 1. It could contain runtime breaking contents")
                 continue
-            operations = chains[chain]
+            operations = chains_config[chain_name]
             chain_config = scrape_config.create_inner_config(operations)
 
             # check if we should skip this chain
             if chain_config.skip:
-                logging.info(f"Config asks to skip chain {chain}")
+                logging.info(f"Config asks to skip chain {chain_name}")
                 continue
 
-            scraper = scraper_factory(chain, chain_config)
+            scraper = scraper_factory(chain_name, chain_config, db_factory)
             new_items = await scraper.scrape(operations, chain_config)
             items.extend(new_items)
     except Exception as e:
