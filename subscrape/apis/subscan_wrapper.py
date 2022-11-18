@@ -225,7 +225,8 @@ class SubscanWrapper:
                 block_timestamp = datetime.fromtimestamp(raw_extrinsic_metadata["block_timestamp"]),
                 module = raw_extrinsic_metadata["call_module"].lower(),
                 call = raw_extrinsic_metadata["call_module_function"].lower(),
-                address = address,
+                origin_address = address,
+                origin_public_key = ss58.ss58_decode(address),
                 nonce = raw_extrinsic_metadata["nonce"],
                 extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
                 success = raw_extrinsic_metadata["success"],
@@ -300,7 +301,9 @@ class SubscanWrapper:
         extrinsic.module = raw_extrinsic["call_module"].lower()
         extrinsic.call = raw_extrinsic["call_module_function"].lower()
         if raw_extrinsic["account_display"] is not None:
-            extrinsic.address = raw_extrinsic["account_display"]["address"]
+            address = raw_extrinsic["account_display"]["address"]
+            extrinsic.origin_address = address
+            extrinsic.origin_public_key = ss58.ss58_decode(address)
         extrinsic.nonce = raw_extrinsic["nonce"]
         extrinsic.extrinsic_hash = raw_extrinsic["extrinsic_hash"]
         extrinsic.success = raw_extrinsic["success"]
