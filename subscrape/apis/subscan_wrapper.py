@@ -226,7 +226,7 @@ class SubscanWrapper:
                 module = raw_extrinsic_metadata["call_module"].lower(),
                 call = raw_extrinsic_metadata["call_module_function"].lower(),
                 origin_address = address,
-                origin_public_key = ss58.ss58_decode(address),
+                origin_public_key = ss58.ss58_decode(address) if address is not None else None,
                 nonce = raw_extrinsic_metadata["nonce"],
                 extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
                 success = raw_extrinsic_metadata["success"],
