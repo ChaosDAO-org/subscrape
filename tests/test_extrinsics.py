@@ -30,6 +30,7 @@ async def test_fetch_extrinsics_list():
 
     assert extrinsic is not None
     assert extrinsic.extrinsic_hash == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
+    assert extrinsic.origin_public_key == "1eb38b0d5178bc680c10a204f81164946a25078c6d3b5f6813cef61c3aef4843"
     assert type(extrinsic.params) is list
     
     db.close()
@@ -200,3 +201,7 @@ async def test_fetch_extrinsics_repeatedly():
     assert extrinsic.extrinsic_hash == '0xc015e661ce5a763d2377d5216037677f5e16fe1a5ec4471de3acbd6be683461b'
 
     db.close()
+
+# injection tests
+# https://kusama.subscan.io/extrinsic/15356089-2
+# https://kusama.subscan.io/extrinsic/15356091-4
