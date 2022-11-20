@@ -159,6 +159,9 @@ class MoonbeamScraper:
             xlsx_file_path.unlink()
         pandas.read_json(json_file_path).transpose().to_excel(xlsx_file_path)
 
+        self.logger.info(f'All transactions exported in JSON to {json_file_path}.'
+                         f'    and in XLSX format to {xlsx_file_path}')
+
     def _process_methods_in_transaction_factory(self, contract_method, method):
         def _process_method_in_transaction(transaction):
             """Process each transaction from a specific method of a contract, counting the number of transactions for
@@ -425,6 +428,18 @@ class MoonbeamScraper:
 
             continue
 
+        # If there wasn't an explicit event for how much was transferred, use the original requested amount.
+        if exact_input_quantity_int == 0:
+            self.logger.warning(f"For transaction {tx_hash}, contract_method {contract_method_name}, there was no"
+                                f" explicit input quantity transfer event. Therefore defaulting to requested tx amount"
+                                f" from original function params.")
+            exact_input_quantity_int = amount_in
+        if exact_output_quantity_int == 0:
+            self.logger.warning(f"For transaction {tx_hash}, contract_method {contract_method_name}, there was no"
+                                f" explicit output quantity transfer event. Therefore defaulting to requested tx amount"
+                                f" from original function params.")
+            exact_output_quantity_int = amount_out
+
         exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
         self.transactions[account][timestamp]['input_quantity'] = exact_amount_in_float
@@ -512,16 +527,18 @@ class MoonbeamScraper:
                 # output quantity is unknown in the original request. Therefore, nothing to store.
             return
 
-        exact_input_a_quantity_int = 0
-        exact_input_b_quantity_int = 0
+        exact_mint_input_a_quantity_int = 0
+        exact_mint_input_b_quantity_int = 0
+        exact_transfer_input_a_quantity_int = 0
+        exact_transfer_input_b_quantity_int = 0
         exact_output_quantity_int = 0
         output_token = None
         for (evt_name, decoded_event_data, schema, token_address) in decoded_logs:
             decoded_event_params = json.loads(decoded_event_data)
 
             if evt_name == 'Mint':
-                exact_input_a_quantity_int = decoded_event_params['amount0']
-                exact_input_b_quantity_int = decoded_event_params['amount1']
+                exact_mint_input_a_quantity_int = decoded_event_params['amount0']
+                exact_mint_input_b_quantity_int = decoded_event_params['amount1']
                 output_token = token_address  # LP token transferred as a result of minting it
                 output_token_info = self._retrieve_and_cache_token_info_from_contract_address(output_token)
             elif evt_name == 'Transfer':
@@ -532,12 +549,17 @@ class MoonbeamScraper:
                 decoded_event_destination_address = self._extract_destination_address_from_params(transaction, evt_name,
                                                                                                   decoded_event_params)
                 if decoded_event_source_address == account:
-                    # Depositing token A into the LP token contract
-                    if lower(token_address) != lower(input_token_a):
+                    # Depositing token A or B into the LP token contract
+                    if lower(token_address) == lower(input_token_a):
+                        exact_transfer_input_a_quantity_int = decoded_event_quantity_int
+                    elif lower(token_address) == lower(input_token_b):
+                        exact_transfer_input_b_quantity_int = decoded_event_quantity_int
+                    else:
                         self.logger.warning(f"For transaction {tx_hash}, contract_method {contract_method_name}"
                                             f" transfer from decoded_event_source_address"
                                             f" {decoded_event_source_address}, token_address {token_address}"
-                                            f" doesn't match original input_token_a {input_token_a} from token path.")
+                                            f" doesn't match original input_token_a {input_token_a} or input_token_b"
+                                            f" {input_token_b} from token path.")
                 elif decoded_event_destination_address == account:
                     exact_output_quantity_int = decoded_event_quantity_int
                 else:
@@ -545,8 +567,26 @@ class MoonbeamScraper:
             else:
                 continue
 
-        exact_amount_in_a_float = exact_input_a_quantity_int / (10 ** int(input_token_a_info['decimals']))
-        exact_amount_in_b_float = exact_input_b_quantity_int / (10 ** int(input_token_b_info['decimals']))
+        # There's at least one contract that reverses the order of the tokens when it uses them to mint the LP token.
+        # Therefore compare the Transfer log event quantity to the Mint event quantity to see if they're reversed.
+        # If A & B transferred are >1% different, but Mint B is within 1% of Transfer A AND Mint A is within 1% of
+        # Transfer B then they must be swapped.
+        # DEX fee usually 0.3%, so comparison tolerance of 1% is sufficiently wide for that.
+        input_tolerance_a_int = int(exact_transfer_input_a_quantity_int * 0.01)
+        input_tolerance_b_int = int(exact_transfer_input_b_quantity_int * 0.01)
+        if ((exact_transfer_input_a_quantity_int > exact_transfer_input_b_quantity_int + input_tolerance_b_int)
+            or (exact_transfer_input_a_quantity_int < exact_transfer_input_b_quantity_int - input_tolerance_b_int)) \
+                and (exact_mint_input_b_quantity_int > exact_transfer_input_a_quantity_int - input_tolerance_a_int) \
+                and (exact_mint_input_b_quantity_int < exact_transfer_input_a_quantity_int + input_tolerance_a_int) \
+                and (exact_mint_input_a_quantity_int > exact_transfer_input_b_quantity_int - input_tolerance_b_int) \
+                and (exact_mint_input_a_quantity_int < exact_transfer_input_b_quantity_int + input_tolerance_b_int):
+            # tokens A & B were flipped during the Mint event.
+            temp = exact_mint_input_a_quantity_int
+            exact_mint_input_a_quantity_int = exact_mint_input_b_quantity_int
+            exact_mint_input_b_quantity_int = temp
+
+        exact_amount_in_a_float = exact_mint_input_a_quantity_int / (10 ** int(input_token_a_info['decimals']))
+        exact_amount_in_b_float = exact_mint_input_b_quantity_int / (10 ** int(input_token_b_info['decimals']))
         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
         self.transactions[account][timestamp]['input_a_quantity'] = exact_amount_in_a_float
         self.transactions[account][timestamp]['input_b_quantity'] = exact_amount_in_b_float
@@ -695,6 +735,10 @@ class MoonbeamScraper:
 
     def _decode_deposit_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a deposit contract interaction
+        Possible contracts using a 'deposit' method:
+        * Deposit MOVR into WMOVR token contract to receive WMOVR
+        * Deposit LP tokens into LP farm (solarbeam)
+        * Deposit LP tokens into auto-compounder services (Moon Kafe, Beefy, Kogefarm, etc)
 
         :param account: the 'owner' account that we're analyzing transactions for
         :type account: str
@@ -710,23 +754,49 @@ class MoonbeamScraper:
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'deposit'
 
-        possible_token = transaction['to']
-        token_info = self._retrieve_and_cache_token_info_from_contract_address(possible_token)
-        if token_info is None:
-            # Assume native currency must be used since no other info is available
-            token_info = self._get_custom_token_info(self.chain_name)
-        self.transactions[account][timestamp]['output_token_name'] = token_info['name']
-        self.transactions[account][timestamp]['output_token_symbol'] = token_info['symbol']
-        if len(decoded_func_params) == 0:
-            quantity_float = int(transaction['value']) / (10 ** int(token_info['decimals']))
-        else:
-            decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
-                                                                           decoded_func_params)
-            quantity_float = decoded_func_quantity_int / (10 ** int(token_info['decimals']))
-        self.transactions[account][timestamp]['output_quantity'] = quantity_float
+        decoded_logs = self.decode_logs(transaction)
+        if not decoded_logs or len(decoded_logs) == 0:
+            self.logger.warning(f"No logs/traces present for transaction {tx_hash}.")
+            return
 
-        # no additional new info available in log events, so don't bother decoding them (they do exist)
-        # todo maybe decode the log to get the exact token address.
+        token_info = None
+        for (evt_name, decoded_event_data, schema, token_address) in decoded_logs:
+            decoded_event_params = json.loads(decoded_event_data)
+
+            if evt_name not in {'Deposit', 'deposit', 'Transfer'}:
+                # todo reduce to not emit a log message
+                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'ReservesUpdated', 'UpdatePool'} and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
+                    self.logger.info(f"Transaction {tx_hash} uses contract_method_name {contract_method_name} but has"
+                                     f" '{evt_name}' event in addition to a Deposit")
+                continue
+
+            decoded_event_quantity_int = self._extract_quantity_from_params(transaction, evt_name, decoded_event_params)
+            decoded_event_source_address = self._extract_source_address_from_params(transaction, evt_name,
+                                                                                    decoded_event_params)
+            decoded_event_destination_address = self._extract_destination_address_from_params(transaction, evt_name,
+                                                                                              decoded_event_params)
+            if decoded_event_source_address == account:
+                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                if token_info is not None:
+                    quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
+                    if 'input_quantity' in self.transactions[account][timestamp]:
+                        timestamp_key = self._add_another_entry_for_transaction(account, transaction)
+                    else:
+                        timestamp_key = timestamp
+                    self.transactions[account][timestamp_key]['input_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['input_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['input_token_symbol'] = token_info['symbol']
+            elif decoded_event_destination_address == account:
+                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                if token_info is not None:
+                    quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
+                    if 'output_quantity' in self.transactions[account][timestamp]:
+                        timestamp_key = self._add_another_entry_for_transaction(account, transaction)
+                    else:
+                        timestamp_key = timestamp
+                    self.transactions[account][timestamp_key]['output_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['output_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['output_token_symbol'] = token_info['symbol']
 
     def _decode_withdraw_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a withdraw contract interaction
@@ -745,38 +815,38 @@ class MoonbeamScraper:
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'withdraw'
 
-        possible_token = transaction['to']
-        possible_token_info = self._retrieve_and_cache_token_info_from_contract_address(possible_token)
-        if possible_token_info is None:
-            # Assume native currency must be used since no other info is available
-            possible_token_info = self._get_custom_token_info(self.chain_name)
-
-        if contract_address == '0xf50225a84382c74cbdea10b0c176f71fc3de0c4d':
-            # this WMOVR contract burns WMOVR to get MOVR back, but in ways completely different from others, so go
-            # ahead and process it and exit instead of trying to conform to the behavior of other withdraw transactions.
-            self.transactions[account][timestamp]['action'] = 'token swap'
-            self.transactions[account][timestamp]['input_token_name'] = possible_token_info['name']
-            self.transactions[account][timestamp]['input_token_symbol'] = possible_token_info['symbol']
-            decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
-                                                                           decoded_func_params)
-            quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
-            self.transactions[account][timestamp]['input_quantity'] = quantity_float
-
-            output_token_info = self._get_custom_token_info('MOVR')
-            self.transactions[account][timestamp]['output_token_name'] = output_token_info['name']
-            self.transactions[account][timestamp]['output_token_symbol'] = output_token_info['symbol']
-            self.transactions[account][timestamp]['output_quantity'] = quantity_float   # same output as input
-            return
-        else:
-            self.transactions[account][timestamp]['output_token_name'] = possible_token_info['name']
-            self.transactions[account][timestamp]['output_token_symbol'] = possible_token_info['symbol']
-            if len(decoded_func_params) == 0:
-                quantity_float = int(transaction['value']) / (10 ** int(possible_token_info['decimals']))
-            else:
-                decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
-                                                                               decoded_func_params)
-                quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
-            self.transactions[account][timestamp]['output_quantity'] = quantity_float
+        # possible_token = transaction['to']
+        # possible_token_info = self._retrieve_and_cache_token_info_from_contract_address(possible_token)
+        # if possible_token_info is None:
+        #     # Assume native currency must be used since no other info is available
+        #     possible_token_info = self._get_custom_token_info(self.chain_name)
+        #
+        # if contract_address == '0xf50225a84382c74cbdea10b0c176f71fc3de0c4d':
+        #     # this WMOVR contract burns WMOVR to get MOVR back, but in ways completely different from others, so go
+        #     # ahead and process it and exit instead of trying to conform to the behavior of other withdraw transactions.
+        #     self.transactions[account][timestamp]['action'] = 'token swap'
+        #     self.transactions[account][timestamp]['input_token_name'] = possible_token_info['name']
+        #     self.transactions[account][timestamp]['input_token_symbol'] = possible_token_info['symbol']
+        #     decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
+        #                                                                    decoded_func_params)
+        #     quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
+        #     self.transactions[account][timestamp]['input_quantity'] = quantity_float
+        #
+        #     output_token_info = self._get_custom_token_info('MOVR')
+        #     self.transactions[account][timestamp]['output_token_name'] = output_token_info['name']
+        #     self.transactions[account][timestamp]['output_token_symbol'] = output_token_info['symbol']
+        #     self.transactions[account][timestamp]['output_quantity'] = quantity_float   # same output as input
+        #     return
+        # else:
+        #     self.transactions[account][timestamp]['output_token_name'] = possible_token_info['name']
+        #     self.transactions[account][timestamp]['output_token_symbol'] = possible_token_info['symbol']
+        #     if len(decoded_func_params) == 0:
+        #         quantity_float = int(transaction['value']) / (10 ** int(possible_token_info['decimals']))
+        #     else:
+        #         decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
+        #                                                                        decoded_func_params)
+        #         quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
+        #     self.transactions[account][timestamp]['output_quantity'] = quantity_float
 
         decoded_logs = self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
@@ -792,7 +862,11 @@ class MoonbeamScraper:
         for (evt_name, decoded_event_data, schema, token_address) in decoded_logs:
             decoded_event_params = json.loads(decoded_event_data)
 
-            if evt_name not in {'Transfer', 'Withdraw', 'Withdrawal'}:
+            if evt_name not in {'Transfer', 'Withdraw', 'Withdrawal', 'Deposit'}:
+                # todo reduce to not emit a log message
+                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'CapitalZeroed', 'DelegateVotesChanged'} and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
+                    self.logger.info(f"Transaction {tx_hash} uses contract_method_name {contract_method_name} but has"
+                                     f" '{evt_name}' event in addition to a Withdraw")
                 continue
 
             decoded_event_quantity_int = self._extract_quantity_from_params(transaction, evt_name, decoded_event_params)
@@ -800,86 +874,108 @@ class MoonbeamScraper:
                                                                                     decoded_event_params)
             decoded_event_destination_address = self._extract_destination_address_from_params(transaction, evt_name,
                                                                                               decoded_event_params)
-
-            if evt_name == 'Transfer':
-                if lower(decoded_event_destination_address) == lower(transaction['from']):
-                    # when a contract interaction triggers tokens to be sent back from multiple addresses (like DEX LP
-                    # pair contracts) that's easy enough to track. But sometimes multiple tx events come back from a
-                    # single contract address (like withdrawing LP triggering token reward payout). Therefore we track
-                    # them separately, assuming we'll know what kind of tokens from each specific contract.
-
-                    if decoded_event_source_address not in quantities_from_contract_addr:
-                        quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
+            if decoded_event_source_address == account:
+                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                if token_info is not None:
+                    quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
+                    if 'input_quantity' in self.transactions[account][timestamp]:
+                        timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
-                        quantities_from_contract_addr[decoded_event_source_address].append(decoded_event_quantity_int)
-            elif evt_name == 'Withdrawal' or evt_name == 'Withdraw':
-                if decoded_event_source_address is None:
-                    continue
-                lower_decoded_event_source_address = lower(decoded_event_source_address)
-                if lower_decoded_event_source_address == lower(transaction['to']):
-                    # Final withdrawal tx back to source addr. Not used on all DEXs.
-                    quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
-                elif lower_decoded_event_source_address == lower(transaction['from']):
-                    quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
-                else:
-                    self.logger.info(f"For transaction {tx_hash}, event `{evt_name}` addr"
-                                     f" {lower_decoded_event_source_address} didn't match to or from addr.")
-
-            continue
-
-        # We've gathered the withdraw transaction events just in case there are multiple tokens received.
-        # Now process them.
-        for contract_source_addr in quantities_from_contract_addr:
-            event_list_length = len(quantities_from_contract_addr[contract_source_addr])
-            for idx, quantity in enumerate(quantities_from_contract_addr[contract_source_addr]):
-                if idx > 0:
-                    timestamp_key = self._add_another_entry_for_transaction(account, transaction)
-                else:
-                    timestamp_key = timestamp
-
-                if contract_source_addr == '0xf03b75831397D4695a6b9dDdEEA0E578faa30907':  # SolarbeamDistributor
-                    exact_output_quantity_int = quantity
-                    if event_list_length == 1:
-                        output_token_info = self._get_custom_token_info('SLP')
+                        timestamp_key = timestamp
+                    self.transactions[account][timestamp_key]['input_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['input_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['input_token_symbol'] = token_info['symbol']
+            elif decoded_event_destination_address == account:
+                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                if token_info is not None:
+                    quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
+                    if 'output_quantity' in self.transactions[account][timestamp]:
+                        timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
-                        # in addition to the withdrawn LP, a DEX SOLAR token claim transaction must have been
-                        # triggered also.
-                        if idx == 0:
-                            # assume SOLAR is always the first claim token type if there are multiple# reward tokens
-                            # for an LP.
-                            output_token_info = self._get_custom_token_info('SOLAR')
-                            self.transactions[account][timestamp_key]['action'] = 'claim'
-                        elif idx == event_list_length - 1:
-                            # assume the Solarbeam LP token will be the last thing returned, after claims
-                            self.transactions[account][timestamp_key]['action'] = 'withdraw'
-                            output_token_info = self._get_custom_token_info('SLP')
-                        else:
-                            # other reward tokens can be issued (MOVR, CHAOS, etc) and user needs to check which.
-                            output_token_info = None
-                            self.transactions[account][timestamp_key]['action'] = 'claim'
-                            self.transactions[account][timestamp_key]['notes'] = \
-                                'Check block explorer for reward token type'
-                else:
-                    # Transfers of the withdrawn token back into the original address
-                    exact_output_quantity_int = quantity
-                    output_token_info = self._retrieve_and_cache_token_info_from_contract_address(contract_source_addr)
+                        timestamp_key = timestamp
+                    self.transactions[account][timestamp_key]['output_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['output_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['output_token_symbol'] = token_info['symbol']
 
-                if output_token_info is None:
-                    if exact_output_quantity_int == 0:
-                        return  # don't care
-                    # we know a quantity, but don't know what type of token was sent.
-                    lower_contract_address = lower(contract_address)
-                    output_token_info = self._get_custom_token_info('??')
-
-                if input_token_info is not None:
-                    exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
-                    self.transactions[account][timestamp_key]['input_quantity'] = exact_amount_in_float
-                    self.transactions[account][timestamp_key]['input_token_name'] = input_token_info['name']
-                    self.transactions[account][timestamp_key]['input_token_symbol'] = input_token_info['symbol']
-                exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
-                self.transactions[account][timestamp_key]['output_quantity'] = exact_amount_out_float
-                self.transactions[account][timestamp_key]['output_token_name'] = output_token_info['name']
-                self.transactions[account][timestamp_key]['output_token_symbol'] = output_token_info['symbol']
+        #     if evt_name == 'Transfer':
+        #         if lower(decoded_event_destination_address) == lower(transaction['from']):
+        #             # when a contract interaction triggers tokens to be sent back from multiple addresses (like DEX LP
+        #             # pair contracts) that's easy enough to track. But sometimes multiple tx events come back from a
+        #             # single contract address (like withdrawing LP triggering token reward payout). Therefore we track
+        #             # them separately, assuming we'll know what kind of tokens from each specific contract.
+        #
+        #             if decoded_event_source_address not in quantities_from_contract_addr:
+        #                 quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
+        #             else:
+        #                 quantities_from_contract_addr[decoded_event_source_address].append(decoded_event_quantity_int)
+        #     elif evt_name == 'Withdrawal' or evt_name == 'Withdraw':
+        #         if decoded_event_source_address is None:
+        #             continue
+        #         lower_decoded_event_source_address = lower(decoded_event_source_address)
+        #         if lower_decoded_event_source_address == lower(transaction['to']):
+        #             # Final withdrawal tx back to source addr. Not used on all DEXs.
+        #             quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
+        #         elif lower_decoded_event_source_address == lower(transaction['from']):
+        #             quantities_from_contract_addr[decoded_event_source_address] = [decoded_event_quantity_int]
+        #         else:
+        #             self.logger.info(f"For transaction {tx_hash}, event `{evt_name}` addr"
+        #                              f" {lower_decoded_event_source_address} didn't match to or from addr.")
+        #
+        #     continue
+        #
+        # # We've gathered the withdraw transaction events just in case there are multiple tokens received.
+        # # Now process them.
+        # for contract_source_addr in quantities_from_contract_addr:
+        #     event_list_length = len(quantities_from_contract_addr[contract_source_addr])
+        #     for idx, quantity in enumerate(quantities_from_contract_addr[contract_source_addr]):
+        #         if idx > 0:
+        #             timestamp_key = self._add_another_entry_for_transaction(account, transaction)
+        #         else:
+        #             timestamp_key = timestamp
+        #
+        #         if contract_source_addr == '0xf03b75831397D4695a6b9dDdEEA0E578faa30907':  # SolarbeamDistributor
+        #             exact_output_quantity_int = quantity
+        #             if event_list_length == 1:
+        #                 output_token_info = self._get_custom_token_info('SLP')
+        #             else:
+        #                 # in addition to the withdrawn LP, a DEX SOLAR token claim transaction must have been
+        #                 # triggered also.
+        #                 if idx == 0:
+        #                     # assume SOLAR is always the first claim token type if there are multiple# reward tokens
+        #                     # for an LP.
+        #                     output_token_info = self._get_custom_token_info('SOLAR')
+        #                     self.transactions[account][timestamp_key]['action'] = 'claim'
+        #                 elif idx == event_list_length - 1:
+        #                     # assume the Solarbeam LP token will be the last thing returned, after claims
+        #                     self.transactions[account][timestamp_key]['action'] = 'withdraw'
+        #                     output_token_info = self._get_custom_token_info('SLP')
+        #                 else:
+        #                     # other reward tokens can be issued (MOVR, CHAOS, etc) and user needs to check which.
+        #                     output_token_info = None
+        #                     self.transactions[account][timestamp_key]['action'] = 'claim'
+        #                     self.transactions[account][timestamp_key]['notes'] = \
+        #                         'Check block explorer for reward token type'
+        #         else:
+        #             # Transfers of the withdrawn token back into the original address
+        #             exact_output_quantity_int = quantity
+        #             output_token_info = self._retrieve_and_cache_token_info_from_contract_address(contract_source_addr)
+        #
+        #         if output_token_info is None:
+        #             if exact_output_quantity_int == 0:
+        #                 return  # don't care
+        #             # we know a quantity, but don't know what type of token was sent.
+        #             lower_contract_address = lower(contract_address)
+        #             output_token_info = self._get_custom_token_info('??')
+        #
+        #         if input_token_info is not None:
+        #             exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
+        #             self.transactions[account][timestamp_key]['input_quantity'] = exact_amount_in_float
+        #             self.transactions[account][timestamp_key]['input_token_name'] = input_token_info['name']
+        #             self.transactions[account][timestamp_key]['input_token_symbol'] = input_token_info['symbol']
+        #         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
+        #         self.transactions[account][timestamp_key]['output_quantity'] = exact_amount_out_float
+        #         self.transactions[account][timestamp_key]['output_token_name'] = output_token_info['name']
+        #         self.transactions[account][timestamp_key]['output_token_symbol'] = output_token_info['symbol']
 
     def _decode_redeem_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a redeem contract interaction
@@ -952,7 +1048,7 @@ class MoonbeamScraper:
         self.transactions[account][timestamp]['output_token_name'] = token_info['name']
         self.transactions[account][timestamp]['output_token_symbol'] = token_info['symbol']
 
-    def _extract_quantity_from_params(self, transaction, method_name, decoded_event_params) -> int:
+    def _extract_quantity_from_params(self, transaction, method_name, decoded_event_params, verbose=True) -> int:
         """Different DEXs might name their event parameters differently, so we have to be flexible in what dictionary
         keywords we use.
 
@@ -964,9 +1060,13 @@ class MoonbeamScraper:
         :param decoded_event_params: dict containing decoded parameter details of the contract trace event or contract
         method interaction
         :type decoded_event_params: dict
+        :param verbose: should a warning be logged if no quantity keyword is found?
+        :type verbose: bool
         :returns: quantity extracted from this specific event
+        :rtype: str
         """
-        event_quantity_keywords = {'value', 'input', 'amount', '_amount', 'wad', '_share', '_shares'}
+        event_quantity_keywords = {'value', 'input', 'amount', '_amount', 'wad', '_share', '_shares', 'amtSharesMinted',
+                                   'amtTokRedemmed'}
         tx_hash = transaction['hash']
         contract_address = transaction['to']
 
@@ -978,14 +1078,14 @@ class MoonbeamScraper:
                 keyword_found = True
                 continue
         if not keyword_found:
-            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no param keyword found"
-                                f" for quantity. This indicates subscrape doesn't handle this particular contract"
-                                f" implementation yet."
-                                f" method_name={method_name} and decoded_event_params={decoded_event_params}")
+            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
+                                f" '{method_name}', no param keyword found for quantity. This indicates subscrape"
+                                f" doesn't handle this particular contract implementation yet."
+                                f" decoded_event_params={decoded_event_params}")
 
         return decoded_event_quantity_int
 
-    def _extract_source_address_from_params(self, transaction, method_name, decoded_event_params):
+    def _extract_source_address_from_params(self, transaction, method_name, decoded_event_params, verbose=True):
         """Different DEXs might name their event parameters differently, so we have to be flexible in what dictionary
         keywords we use.
 
@@ -997,9 +1097,11 @@ class MoonbeamScraper:
         :param decoded_event_params: dict containing decoded parameter details of the contract trace event or contract
         method interaction
         :type decoded_event_params: dict
+        :param verbose: should a warning be logged if no source address keyword is found?
+        :type verbose: bool
         :returns: source_addr extracted from this specific event
         """
-        event_source_address_keywords = {'from', 'src'}
+        event_source_address_keywords = {'from', 'src', 'user'}
         tx_hash = transaction['hash']
         contract_address = transaction['to']
 
@@ -1015,14 +1117,14 @@ class MoonbeamScraper:
             decoded_event_source_address = transaction['from']
             keyword_found = True
         if not keyword_found:
-            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no param keyword found"
-                                f" for source address. This indicates subscrape doesn't handle this particular contract"
-                                f" implementation yet."
-                                f" method_name={method_name} and decoded_event_params={decoded_event_params}")
+            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
+                                f" '{method_name}', no param keyword found for source address. This indicates"
+                                f" subscrape doesn't handle this particular contract implementation yet."
+                                f" decoded_event_params={decoded_event_params}")
 
         return decoded_event_source_address
 
-    def _extract_destination_address_from_params(self, transaction, method_name, decoded_event_params):
+    def _extract_destination_address_from_params(self, transaction, method_name, decoded_event_params, verbose=True):
         """Different DEXs might name their event parameters differently, so we have to be flexible in what dictionary
         keywords we use.
 
@@ -1034,6 +1136,8 @@ class MoonbeamScraper:
         :param decoded_event_params: dict containing decoded parameter details of the contract trace event or contract
         method interaction
         :type decoded_event_params: dict
+        :param verbose: should a warning be logged if no destination address keyword is found?
+        :type verbose: bool
         :returns: destination_addr extracted from this specific event
         """
         event_destination_address_keywords = {'to', 'dst'}
@@ -1049,10 +1153,10 @@ class MoonbeamScraper:
                     keyword_found = True
                     continue
             if not keyword_found:
-                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no Transfer param"
-                                    f" keyword found for destination address. This indicates subscrape doesn't"
-                                    f" handle this particular contract implementation yet."
-                                    f" method_name={method_name} and decoded_event_params={decoded_event_params}")
+                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
+                                    f" '{method_name}', no param keyword found for destination address. This indicates"
+                                    f" subscrape doesn't handle this particular contract implementation yet."
+                                    f" decoded_event_params={decoded_event_params}")
 
         return decoded_event_destination_address
 
