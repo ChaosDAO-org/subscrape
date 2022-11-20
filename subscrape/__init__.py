@@ -8,6 +8,7 @@ from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
 from subscrape.apis.subscan_wrapper import SubscanWrapper
 
+logger = logging.getLogger(__name__)
 
 def moonscan_factory(chain):
     """
@@ -112,27 +113,27 @@ async def scrape(chains_config, db_factory = None) -> list:
         for chain_name in chains_config:
             if chain_name.startswith("_"):
                 if chain_name == "_version" and chains_config[chain_name] != 1:
-                    logging.warning("config version != 1. It could contain runtime breaking contents")
+                    logger.warning("config version != 1. It could contain runtime breaking contents")
                 continue
             operations = chains_config[chain_name]
             chain_config = scrape_config.create_inner_config(operations)
 
             # check if we should skip this chain
             if chain_config.skip:
-                logging.info(f"Config asks to skip chain {chain_name}")
+                logger.info(f"Config asks to skip chain {chain_name}")
                 continue
 
             scraper = scraper_factory(chain_name, chain_config, db_factory)
             new_items = await scraper.scrape(operations, chain_config)
             items.extend(new_items)
     except Exception as e:
-        logging.error(f"Uncaught error during scraping: {e}")
+        logger.error(f"Uncaught error during scraping: {e}")
         import traceback
         # log traceback
-        logging.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise e
 
-    logging.info(f"Scraped {len(items)} items")
+    logger.info(f"Scraped {len(items)} items")
     return items
 
 def wipe_cache():
@@ -141,7 +142,7 @@ def wipe_cache():
     """
     if os.path.exists("data/cache"):
         import shutil
-        logging.info("wiping cache folder")
+        logger.info("wiping cache folder")
         shutil.rmtree("data/cache/")
     else:
-        logging.info("cache folder does not exist")
+        logger.info("cache folder does not exist")

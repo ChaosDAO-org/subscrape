@@ -10,7 +10,7 @@ from ratelimit import limits, sleep_and_retry
 class BlockscoutWrapper:
     """Interface for interacting with the API of the Blockscout explorer for the Moonriver and Moonbeam chains."""
     def __init__(self, chain):
-        self.logger = logging.getLogger("BlockscoutWrapper")
+        self.logger = logging.getLogger(__name__)
         self.endpoint = f"https://blockscout.{chain}.moonbeam.network/api"
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit

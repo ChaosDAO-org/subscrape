@@ -16,7 +16,7 @@ from subscrape.decode.decode_evm_log import decode_log
 class MoonbeamScraper:
     """Scrape the Moonbeam or Moonriver chains for transactions/accounts of interest."""
     def __init__(self, db_path, moonscan_api, blockscout_api):
-        self.logger = logging.getLogger("MoonbeamScraper")
+        self.logger = logging.getLogger(__name__)
         self.db_path = db_path
         self.moonscan_api = moonscan_api
         self.blockscout_api = blockscout_api

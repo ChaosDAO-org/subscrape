@@ -57,7 +57,7 @@ class SubscrapeDB:
     """
 
     def __init__(self, connection_string="sqlite:///data/cache/default.db"):
-        self.logger = logging.getLogger("SubscrapeDB")
+        self.logger = logging.getLogger(__name__)
         self._engine = create_engine(connection_string)
 
         if not database_exists(self._engine.url):

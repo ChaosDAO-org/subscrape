@@ -36,7 +36,7 @@ class SubscanWrapper:
         :param api_key: The api key to use. Use None, if no api key is to be used.
         :type api_key: str or None
         """
-        self.logger = logging.getLogger("SubscanWrapper")
+        self.logger = logging.getLogger(__name__)
         self.chain = chain.lower()
         self.endpoint = f"https://{self.chain}.api.subscan.io"
         self.db: SubscrapeDB = db

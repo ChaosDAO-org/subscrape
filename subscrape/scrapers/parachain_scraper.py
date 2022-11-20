@@ -10,7 +10,7 @@ class ParachainScraper:
     """Scrape a substrate-based (non-EVM) chain for transactions/accounts of interest."""
 
     def __init__(self, api):
-        self.logger = logging.getLogger("ParachainScraper")
+        self.logger = logging.getLogger(__name__)
         self.api: SubscanWrapper = api
 
     async def scrape(self, operations, chain_config) -> list:
