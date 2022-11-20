@@ -13,7 +13,7 @@ from ratelimit import limits, sleep_and_retry
 class MoonscanWrapper:
     """Interface for interacting with the API of explorer Moonscan.io for the Moonriver and Moonbeam chains."""
     def __init__(self, chain, api_key=None):
-        self.logger = logging.getLogger("MoonscanWrapper")
+        self.logger = logging.getLogger(__name__)
         self.endpoint = f"https://api-{chain}.moonscan.io/api"
         self.api_key = api_key
 
