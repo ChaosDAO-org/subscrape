@@ -157,9 +157,30 @@ class MoonbeamScraper:
         xlsx_file_path = Path(f"{self.db_path.parent}\\{self.db_path.stem}{reference}.xlsx")
         if xlsx_file_path.exists():     # delete and recreate the file
             xlsx_file_path.unlink()
-        pandas.read_json(json_file_path).transpose().to_excel(xlsx_file_path)
+        data_frame = pandas.read_json(json_file_path).transpose()
+        (num_rows, num_columns) = data_frame.shape
+        writer = pandas.ExcelWriter(xlsx_file_path, engine='xlsxwriter')
+        tx_sheet_name = 'Transactions'
+        data_frame.to_excel(writer, sheet_name=tx_sheet_name, index=False, freeze_panes=(1, 1))
+        worksheet = writer.sheets[tx_sheet_name]
+        worksheet.autofilter(0, 0, num_rows, num_columns - 1)
 
-        self.logger.info(f'All transactions exported in JSON to {json_file_path}.'
+        # Auto-adjust columns' width
+        for column in data_frame:
+            column_width = max(data_frame[column].astype(str).map(len).max(), len(column))
+            col_idx = data_frame.columns.get_loc(column)
+            worksheet.set_column(col_idx, col_idx, column_width)
+
+        # hide column 'valueInWei' because we prefer the 'value' float value.
+        worksheet.set_column('E:E', None, None, {'hidden': True})
+        # hide columns for gas, since tx gas isn't a concern on Moonbeam/Moonriver
+        worksheet.set_column('G:I', None, None, {'hidden': True})
+        # Shorten the 'hash', 'from', and 'to' address columns
+        worksheet.set_column('B:D', width=20)
+
+        writer.close()
+
+        self.logger.info(f'All transactions exported in JSON to {json_file_path}.\n\r'
                          f'    and in XLSX format to {xlsx_file_path}')
 
     def _process_methods_in_transaction_factory(self, contract_method, method):
@@ -192,6 +213,24 @@ class MoonbeamScraper:
                        'value': eth_utils.from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
             self.transactions[account][timestamp] = acct_tx
+
+            if len(self.transactions[account]) == 1:
+                # This is the first entry/row. Initialize the rest of the custom/optional fields in the order that they
+                # should be visualized when exported to a spreadsheet. (Don't init every entry to keep JSON cleaner.)
+                self.transactions[account][timestamp]['contract_method_name'] = ''
+                self.transactions[account][timestamp]['action'] = ''
+                self.transactions[account][timestamp]['input_a_token_name'] = ''
+                self.transactions[account][timestamp]['input_a_token_symbol'] = ''
+                self.transactions[account][timestamp]['input_a_quantity'] = ''
+                self.transactions[account][timestamp]['input_b_token_name'] = ''
+                self.transactions[account][timestamp]['input_b_token_symbol'] = ''
+                self.transactions[account][timestamp]['input_b_quantity'] = ''
+                self.transactions[account][timestamp]['output_a_token_name'] = ''
+                self.transactions[account][timestamp]['output_a_token_symbol'] = ''
+                self.transactions[account][timestamp]['output_a_quantity'] = ''
+                self.transactions[account][timestamp]['output_b_token_name'] = ''
+                self.transactions[account][timestamp]['output_b_token_symbol'] = ''
+                self.transactions[account][timestamp]['output_b_quantity'] = ''
 
             if 'input' in transaction and len(transaction['input']) >= 8:
                 # assume this was a call to a contract since input data was provided
@@ -345,12 +384,12 @@ class MoonbeamScraper:
 
         input_token = token_path[0]
         input_token_info = self.tokens[input_token]
-        self.transactions[account][timestamp]['input_token_name'] = input_token_info['name']
-        self.transactions[account][timestamp]['input_token_symbol'] = input_token_info['symbol']
+        self.transactions[account][timestamp]['input_a_token_name'] = input_token_info['name']
+        self.transactions[account][timestamp]['input_a_token_symbol'] = input_token_info['symbol']
         output_token = token_path[len(token_path) - 1]
         output_token_info = self.tokens[output_token]
-        self.transactions[account][timestamp]['output_token_name'] = output_token_info['name']
-        self.transactions[account][timestamp]['output_token_symbol'] = output_token_info['symbol']
+        self.transactions[account][timestamp]['output_a_token_name'] = output_token_info['name']
+        self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_info['symbol']
         if contract_method_name in {'swapExactTokensForTokens', 'swapExactTokensForETH',
                                     'swapExactTokensForTokensSupportingFeeOnTransferTokens',
                                     'swapExactTokensForETHSupportingFeeOnTransferTokens'}:
@@ -380,8 +419,8 @@ class MoonbeamScraper:
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}. Therefore defaulting to"
                                 f" transaction input/output values.")
-            self.transactions[account][timestamp]['input_quantity'] = float(amount_in)
-            self.transactions[account][timestamp]['output_quantity'] = float(amount_out)
+            self.transactions[account][timestamp]['input_a_quantity'] = float(amount_in)
+            self.transactions[account][timestamp]['output_a_quantity'] = float(amount_out)
             return
 
         exact_input_quantity_int = 0
@@ -442,8 +481,8 @@ class MoonbeamScraper:
 
         exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
-        self.transactions[account][timestamp]['input_quantity'] = exact_amount_in_float
-        self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
+        self.transactions[account][timestamp]['input_a_quantity'] = exact_amount_in_float
+        self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_float
 
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
@@ -507,10 +546,10 @@ class MoonbeamScraper:
         if input_token_a is not None:
             input_token_a_info = self._retrieve_and_cache_token_info_from_contract_address(input_token_a)
             input_token_b_info = self._retrieve_and_cache_token_info_from_contract_address(input_token_b)
-            self.transactions[account][timestamp]['input_tokenA_name'] = input_token_a_info['name']
-            self.transactions[account][timestamp]['input_tokenA_symbol'] = input_token_a_info['symbol']
-            self.transactions[account][timestamp]['input_tokenB_name'] = input_token_b_info['name']
-            self.transactions[account][timestamp]['input_tokenB_symbol'] = input_token_b_info['symbol']
+            self.transactions[account][timestamp]['input_a_token_name'] = input_token_a_info['name']
+            self.transactions[account][timestamp]['input_a_token_symbol'] = input_token_a_info['symbol']
+            self.transactions[account][timestamp]['input_b_token_name'] = input_token_b_info['name']
+            self.transactions[account][timestamp]['input_b_token_symbol'] = input_token_b_info['symbol']
 
             requested_input_a_quantity_float = amount_in_a / (10 ** int(input_token_a_info['decimals']))
             requested_input_b_quantity_float = amount_in_b / (10 ** int(input_token_b_info['decimals']))
@@ -590,7 +629,12 @@ class MoonbeamScraper:
         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
         self.transactions[account][timestamp]['input_a_quantity'] = exact_amount_in_a_float
         self.transactions[account][timestamp]['input_b_quantity'] = exact_amount_in_b_float
-        self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
+        self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_float
+
+        if input_token_a == '0xf37626e2284742305858052615e94b380b23b3b7' \
+                or input_token_a_info['name'] == 'TreasureMaps':
+            # ignore tolerances for transactions of TMAPS
+            return
 
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
@@ -649,10 +693,10 @@ class MoonbeamScraper:
 
         output_token_a_info = self._retrieve_and_cache_token_info_from_contract_address(output_token_a)
         output_token_b_info = self._retrieve_and_cache_token_info_from_contract_address(output_token_b)
-        self.transactions[account][timestamp]['output_tokenA_name'] = output_token_a_info['name']
-        self.transactions[account][timestamp]['output_tokenA_symbol'] = output_token_a_info['symbol']
-        self.transactions[account][timestamp]['output_tokenB_name'] = output_token_b_info['name']
-        self.transactions[account][timestamp]['output_tokenB_symbol'] = output_token_b_info['symbol']
+        self.transactions[account][timestamp]['output_a_token_name'] = output_token_a_info['name']
+        self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_a_info['symbol']
+        self.transactions[account][timestamp]['output_b_token_name'] = output_token_b_info['name']
+        self.transactions[account][timestamp]['output_b_token_symbol'] = output_token_b_info['symbol']
 
         requested_output_a_quantity_float = amount_out_a / (10 ** int(output_token_a_info['decimals']))
         requested_output_b_quantity_float = amount_out_b / (10 ** int(output_token_b_info['decimals']))
@@ -705,7 +749,7 @@ class MoonbeamScraper:
         exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
         exact_amount_out_a_float = exact_output_a_quantity_int / (10 ** int(output_token_a_info['decimals']))
         exact_amount_out_b_float = exact_output_b_quantity_int / (10 ** int(output_token_b_info['decimals']))
-        self.transactions[account][timestamp]['input_quantity'] = exact_amount_in_float
+        self.transactions[account][timestamp]['input_a_quantity'] = exact_amount_in_float
         self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_a_float
         self.transactions[account][timestamp]['output_b_quantity'] = exact_amount_out_b_float
 
@@ -765,7 +809,8 @@ class MoonbeamScraper:
 
             if evt_name not in {'Deposit', 'deposit', 'Transfer'}:
                 # todo reduce to not emit a log message
-                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'ReservesUpdated', 'UpdatePool'} and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
+                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'ReservesUpdated',
+                                    'UpdatePool'} and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
                     self.logger.info(f"Transaction {tx_hash} uses contract_method_name {contract_method_name} but has"
                                      f" '{evt_name}' event in addition to a Deposit")
                 continue
@@ -779,24 +824,24 @@ class MoonbeamScraper:
                 token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
-                    if 'input_quantity' in self.transactions[account][timestamp]:
+                    if 'input_a_quantity' in self.transactions[account][timestamp]:
                         timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
                         timestamp_key = timestamp
-                    self.transactions[account][timestamp_key]['input_quantity'] = quantity_float
-                    self.transactions[account][timestamp_key]['input_token_name'] = token_info['name']
-                    self.transactions[account][timestamp_key]['input_token_symbol'] = token_info['symbol']
+                    self.transactions[account][timestamp_key]['input_a_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['input_a_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['input_a_token_symbol'] = token_info['symbol']
             elif decoded_event_destination_address == account:
                 token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
-                    if 'output_quantity' in self.transactions[account][timestamp]:
+                    if 'output_a_quantity' in self.transactions[account][timestamp]:
                         timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
                         timestamp_key = timestamp
-                    self.transactions[account][timestamp_key]['output_quantity'] = quantity_float
-                    self.transactions[account][timestamp_key]['output_token_name'] = token_info['name']
-                    self.transactions[account][timestamp_key]['output_token_symbol'] = token_info['symbol']
+                    self.transactions[account][timestamp_key]['output_a_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['output_a_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['output_a_token_symbol'] = token_info['symbol']
 
     def _decode_withdraw_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a withdraw contract interaction
@@ -825,28 +870,28 @@ class MoonbeamScraper:
         #     # this WMOVR contract burns WMOVR to get MOVR back, but in ways completely different from others, so go
         #     # ahead and process it and exit instead of trying to conform to the behavior of other withdraw transactions.
         #     self.transactions[account][timestamp]['action'] = 'token swap'
-        #     self.transactions[account][timestamp]['input_token_name'] = possible_token_info['name']
-        #     self.transactions[account][timestamp]['input_token_symbol'] = possible_token_info['symbol']
+        #     self.transactions[account][timestamp]['input_a_token_name'] = possible_token_info['name']
+        #     self.transactions[account][timestamp]['input_a_token_symbol'] = possible_token_info['symbol']
         #     decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
         #                                                                    decoded_func_params)
         #     quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
-        #     self.transactions[account][timestamp]['input_quantity'] = quantity_float
+        #     self.transactions[account][timestamp]['input_a_quantity'] = quantity_float
         #
         #     output_token_info = self._get_custom_token_info('MOVR')
-        #     self.transactions[account][timestamp]['output_token_name'] = output_token_info['name']
-        #     self.transactions[account][timestamp]['output_token_symbol'] = output_token_info['symbol']
-        #     self.transactions[account][timestamp]['output_quantity'] = quantity_float   # same output as input
+        #     self.transactions[account][timestamp]['output_a_token_name'] = output_token_info['name']
+        #     self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_info['symbol']
+        #     self.transactions[account][timestamp]['output_a_quantity'] = quantity_float   # same output as input
         #     return
         # else:
-        #     self.transactions[account][timestamp]['output_token_name'] = possible_token_info['name']
-        #     self.transactions[account][timestamp]['output_token_symbol'] = possible_token_info['symbol']
+        #     self.transactions[account][timestamp]['output_a_token_name'] = possible_token_info['name']
+        #     self.transactions[account][timestamp]['output_a_token_symbol'] = possible_token_info['symbol']
         #     if len(decoded_func_params) == 0:
         #         quantity_float = int(transaction['value']) / (10 ** int(possible_token_info['decimals']))
         #     else:
         #         decoded_func_quantity_int = self._extract_quantity_from_params(transaction, contract_method_name,
         #                                                                        decoded_func_params)
         #         quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
-        #     self.transactions[account][timestamp]['output_quantity'] = quantity_float
+        #     self.transactions[account][timestamp]['output_a_quantity'] = quantity_float
 
         decoded_logs = self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
@@ -864,7 +909,9 @@ class MoonbeamScraper:
 
             if evt_name not in {'Transfer', 'Withdraw', 'Withdrawal', 'Deposit'}:
                 # todo reduce to not emit a log message
-                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'CapitalZeroed', 'DelegateVotesChanged'} and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
+                if evt_name not in {'Approval', 'Sync', 'Mint', 'Swap', 'PricePerShareUpdated', 'CapitalZeroed',
+                                    'DelegateVotesChanged'} \
+                        and contract_address != '0xf5791d77c5975610af1be35b423189a8f5eb6923':
                     self.logger.info(f"Transaction {tx_hash} uses contract_method_name {contract_method_name} but has"
                                      f" '{evt_name}' event in addition to a Withdraw")
                 continue
@@ -878,24 +925,24 @@ class MoonbeamScraper:
                 token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
-                    if 'input_quantity' in self.transactions[account][timestamp]:
+                    if 'input_a_quantity' in self.transactions[account][timestamp]:
                         timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
                         timestamp_key = timestamp
-                    self.transactions[account][timestamp_key]['input_quantity'] = quantity_float
-                    self.transactions[account][timestamp_key]['input_token_name'] = token_info['name']
-                    self.transactions[account][timestamp_key]['input_token_symbol'] = token_info['symbol']
+                    self.transactions[account][timestamp_key]['input_a_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['input_a_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['input_a_token_symbol'] = token_info['symbol']
             elif decoded_event_destination_address == account:
                 token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
-                    if 'output_quantity' in self.transactions[account][timestamp]:
+                    if 'output_a_quantity' in self.transactions[account][timestamp]:
                         timestamp_key = self._add_another_entry_for_transaction(account, transaction)
                     else:
                         timestamp_key = timestamp
-                    self.transactions[account][timestamp_key]['output_quantity'] = quantity_float
-                    self.transactions[account][timestamp_key]['output_token_name'] = token_info['name']
-                    self.transactions[account][timestamp_key]['output_token_symbol'] = token_info['symbol']
+                    self.transactions[account][timestamp_key]['output_a_quantity'] = quantity_float
+                    self.transactions[account][timestamp_key]['output_a_token_name'] = token_info['name']
+                    self.transactions[account][timestamp_key]['output_a_token_symbol'] = token_info['symbol']
 
         #     if evt_name == 'Transfer':
         #         if lower(decoded_event_destination_address) == lower(transaction['from']):
@@ -969,13 +1016,13 @@ class MoonbeamScraper:
         #
         #         if input_token_info is not None:
         #             exact_amount_in_float = exact_input_quantity_int / (10 ** int(input_token_info['decimals']))
-        #             self.transactions[account][timestamp_key]['input_quantity'] = exact_amount_in_float
-        #             self.transactions[account][timestamp_key]['input_token_name'] = input_token_info['name']
-        #             self.transactions[account][timestamp_key]['input_token_symbol'] = input_token_info['symbol']
+        #             self.transactions[account][timestamp_key]['input_a_quantity'] = exact_amount_in_float
+        #             self.transactions[account][timestamp_key]['input_a_token_name'] = input_token_info['name']
+        #             self.transactions[account][timestamp_key]['input_a_token_symbol'] = input_token_info['symbol']
         #         exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
-        #         self.transactions[account][timestamp_key]['output_quantity'] = exact_amount_out_float
-        #         self.transactions[account][timestamp_key]['output_token_name'] = output_token_info['name']
-        #         self.transactions[account][timestamp_key]['output_token_symbol'] = output_token_info['symbol']
+        #         self.transactions[account][timestamp_key]['output_a_quantity'] = exact_amount_out_float
+        #         self.transactions[account][timestamp_key]['output_a_token_name'] = output_token_info['name']
+        #         self.transactions[account][timestamp_key]['output_a_token_symbol'] = output_token_info['symbol']
 
     def _decode_redeem_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a redeem contract interaction
@@ -1044,9 +1091,9 @@ class MoonbeamScraper:
                 token_info = self._get_custom_token_info('??')
 
         exact_amount_out_float = exact_quantity_int / (10 ** int(token_info['decimals']))
-        self.transactions[account][timestamp]['output_quantity'] = exact_amount_out_float
-        self.transactions[account][timestamp]['output_token_name'] = token_info['name']
-        self.transactions[account][timestamp]['output_token_symbol'] = token_info['symbol']
+        self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_float
+        self.transactions[account][timestamp]['output_a_token_name'] = token_info['name']
+        self.transactions[account][timestamp]['output_a_token_symbol'] = token_info['symbol']
 
     def _extract_quantity_from_params(self, transaction, method_name, decoded_event_params, verbose=True) -> int:
         """Different DEXs might name their event parameters differently, so we have to be flexible in what dictionary

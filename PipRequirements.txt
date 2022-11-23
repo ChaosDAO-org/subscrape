@@ -7,4 +7,6 @@ ratelimit
 simplejson
 sqlitedict
 substrate-interface
-web3>5.0 
+web3>5.0
+xlsxwriter
+
