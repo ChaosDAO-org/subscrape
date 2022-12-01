@@ -2,14 +2,15 @@ from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 
+
 def test():
-        
+
     config = {
-        "kusama":{
-            "extrinsics":{
+        "kusama": {
+            "extrinsics": {
                 "crowdloan": ["create"]
             },
-            "events":{
+            "events": {
                 "crowdloan": ["created"]
             }
         },
@@ -23,6 +24,7 @@ def test():
     items_scraped1 = subscrape.scrape(config)
     items_scraped2 = subscrape.scrape(config)
     
-    assert items_scraped1 != items_scraped2
+    assert items_scraped1 == items_scraped2
+
 
 test()

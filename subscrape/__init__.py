@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.subscan_wrapper import SubscanWrapper
@@ -128,4 +127,3 @@ def wipe_storage():
         shutil.rmtree(data_path)
     else:
         logging.info("data folder does not exist")
-

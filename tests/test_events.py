@@ -2,11 +2,12 @@ from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 
+
 def test():
-        
+
     config = {
-        "kusama":{
-            "events":{
+        "kusama": {
+            "events": {
                 "crowdloan": ["created"]
             }
         }
@@ -26,5 +27,6 @@ def test():
 
     first_crowdloan = events["14215808-27"]
     assert first_crowdloan["extrinsic_hash"] == '0x9d3430cd00bff235d4cdd595513375e6ceacb5228590a8629a865922d67f056f'
+
 
 test()

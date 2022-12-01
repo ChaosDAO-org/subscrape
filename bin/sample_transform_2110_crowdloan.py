@@ -75,8 +75,8 @@ def fetch_batch_contributions():
                         else:
                             referral = json.dumps(memo_call)
                         value = contribute_call["params"][1]["value"]
-                        #public_key = ss58.ss58_decode(address)
-                        #ksm_address = ss58.ss58_encode(public_key, ss58_format=2)
+                        # public_key = ss58.ss58_decode(address)
+                        # ksm_address = ss58.ss58_encode(public_key, ss58_format=2)
                         row = ["batch", value, referral]
                         row.extend(extract_interesting_extrinsic_properties(extrinsic))
                         rows.append(row)

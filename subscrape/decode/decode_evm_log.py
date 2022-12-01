@@ -6,7 +6,7 @@ See article explanation: https://towardsdatascience.com/decoding-ethereum-smart-
 __author__ = '@yifei_huang'
 __author__ = 'spazcoin@gmail.com @spazvt'
 
-from eth_utils import event_abi_to_log_topic, to_hex
+from eth_utils import event_abi_to_log_topic
 from functools import lru_cache
 from hexbytes import HexBytes
 import json
@@ -63,15 +63,15 @@ def decode_log(data, topics, abi):
     if abi is not None:
         try:
             topic2abi = _get_topic2abi(abi)
-            
+
             log = {
-                'address': None, #Web3.toChecksumAddress(address),
-                'blockHash': None, #HexBytes(blockHash),
+                'address': None,  # Web3.toChecksumAddress(address),
+                'blockHash': None,  # HexBytes(blockHash),
                 'blockNumber': None,
-                'data': data, 
+                'data': data,
                 'logIndex': None,
                 'topics': [_get_hex_topic(_) for _ in topics],
-                'transactionHash': None, #HexBytes(transactionHash),
+                'transactionHash': None,  # HexBytes(transactionHash),
                 'transactionIndex': None
             }
             event_abi = topic2abi[log['topics'][0]]
@@ -81,13 +81,13 @@ def decode_log(data, topics, abi):
             target_schema = event_abi['inputs']
             decoded_data = convert_to_hex(data, target_schema)
 
-            return (evt_name, json.dumps(decoded_data), json.dumps(target_schema))
+            return evt_name, json.dumps(decoded_data), json.dumps(target_schema)
         except Exception:
             exception_info = traceback.format_exc()
-            return ('decode error', exception_info, None)
-        
+            return 'decode error', exception_info, None
+
     else:
-        return ('no matching abi', None, None)
+        return 'no matching abi', None, None
 
 
 # Example usage:

@@ -52,7 +52,7 @@ class MoonbeamScraper:
                 contracts = operations[operation]
                 transactions_config = chain_config.create_inner_config(contracts)
                 if transactions_config.skip:
-                    self.logger.info(f"Config asks to skip transactions.")
+                    self.logger.info("Config asks to skip transactions.")
                     continue
 
                 for contract in contracts:
@@ -95,7 +95,7 @@ class MoonbeamScraper:
                 account_transactions_payload = operations[operation]
                 account_transactions_config = chain_config.create_inner_config(account_transactions_payload)
                 if account_transactions_config.skip:
-                    self.logger.info(f"Config asks to skip account_transactions.")
+                    self.logger.info("Config asks to skip account_transactions.")
                     continue
 
                 if "accounts" in account_transactions_payload:
@@ -380,7 +380,7 @@ class MoonbeamScraper:
         self.transactions[account][timestamp]['action'] = 'token swap'
         # retrieve and cache the token info for all tokens
         for token in token_path:
-            token_info = self._retrieve_and_cache_token_info_from_contract_address(token)
+            self._retrieve_and_cache_token_info_from_contract_address(token)
 
         input_token = token_path[0]
         input_token_info = self.tokens[input_token]
@@ -1041,7 +1041,7 @@ class MoonbeamScraper:
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'redeem'
         if contract_method_name != 'redeem':
-            self.logger.info(f"decode_redeem_transaction: Not yet handling methods other than 'redeem'.")
+            self.logger.info("decode_redeem_transaction: Not yet handling methods other than 'redeem'.")
 
         decoded_logs = self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
@@ -1311,4 +1311,3 @@ class MoonbeamScraper:
             return {'name': '??', 'symbol': '??', 'decimals': '0'}
         else:
             return None
-

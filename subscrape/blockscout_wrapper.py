@@ -37,7 +37,6 @@ class BlockscoutWrapper:
         start_block = 0         # iterator for the page we want to query
         previous_block = 0      # to check if the iterator actually moved forward
         count = 0               # counter for how many items we queried already
-        limit = 0               # max amount of items to be queried. to be determined after the first call
 
         while not done:
             params["startblock"] = start_block
@@ -48,7 +47,7 @@ class BlockscoutWrapper:
             if obj["status"] == "0":
                 self.logger.info("received empty result")
                 return
-        
+
             elements = obj["result"]
 
             # process the elements

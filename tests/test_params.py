@@ -4,11 +4,12 @@ import subscrape
 
 account_id = "GXPPBuUaZYYYvsEquX55AQ1MRvgZ96kniEKyAVDSdv1SX96"
 
+
 def test():
-        
+
     config = {
-        "kusama":{
-            "extrinsics":{
+        "kusama": {
+            "extrinsics": {
                 "_params": {"address": account_id},
                 "staking": ["bond"]
             }
@@ -29,5 +30,6 @@ def test():
 
     first_extrinsic = next(iter(extrinsics.values()))
     assert first_extrinsic["account_id"] == account_id
+
 
 test()

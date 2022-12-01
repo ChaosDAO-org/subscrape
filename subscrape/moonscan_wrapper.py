@@ -43,7 +43,6 @@ class MoonscanWrapper:
         start_block = 0         # iterator for the page we want to query
         previous_block = 0      # to check if the iterator actually moved forward
         count = 0               # counter for how many items we queried already
-        limit = 0               # max amount of items to be queried. to be determined after the first call
 
         while not done:
             params["startblock"] = start_block
@@ -54,7 +53,7 @@ class MoonscanWrapper:
             if obj["status"] == "0":
                 self.logger.info(f"received empty result. message='{obj['message']}' and result='{obj['result']}'")
                 return
-        
+
             elements = obj["result"]
 
             # process the elements
@@ -117,4 +116,3 @@ class MoonscanWrapper:
         response_dict = json.loads(response)
         # response_dict['result'] should contain a long string representation of the tx receipt.
         return response_dict['result']
-

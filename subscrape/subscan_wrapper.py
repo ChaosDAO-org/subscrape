@@ -6,11 +6,11 @@ import json
 import logging
 from ratelimit import limits, sleep_and_retry
 
-#import http.client
-#http.client.HTTPConnection.debuglevel = 1
-#requests_log = logging.getLogger("requests.packages.urllib3")
-#requests_log.setLevel(logging.DEBUG)
-#requests_log.propagate = True
+# import http.client
+# http.client.HTTPConnection.debuglevel = 1
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
 SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
@@ -55,13 +55,13 @@ class SubscanWrapper:
             self.logger.info(response.headers)
             raise Exception()
         else:
-            #self.logger.debug(response.headers)
+            # self.logger.debug(response.headers)
             pass
 
-        #self.logger.debug(response.text)
+        # self.logger.debug(response.text)
         # unpack the payload
         obj = json.loads(response.text)
-        return obj["data"]        
+        return obj["data"]
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
@@ -80,13 +80,13 @@ class SubscanWrapper:
         :type filter: function
         :return: number of items processed
         """
-        assert(list_key is not None)
+        assert (list_key is not None)
 
-        done = False        # keep crunching until we are done
-        page = 0            # iterator for the page we want to query
-        rows_per_page = 100 # constant for the rows per page to query
-        count = 0           # counter for how many items we queried already
-        limit = 0           # max amount of items to be queried. to be determined after the first call
+        done = False            # keep crunching until we are done
+        page = 0                # iterator for the page we want to query
+        rows_per_page = 100     # constant for the rows per page to query
+        count = 0               # counter for how many items we queried already
+        limit = 0               # max amount of items to be queried. to be determined after the first call
 
         body["row"] = rows_per_page
 
@@ -94,7 +94,7 @@ class SubscanWrapper:
             body["page"] = page
             data = self.query(method, body=body)
             # determine the limit on the first run
-            if limit == 0: 
+            if limit == 0:
                 limit = data["count"]
                 self.logger.info(f"About to fetch {limit} entries.")
                 if limit == 0:

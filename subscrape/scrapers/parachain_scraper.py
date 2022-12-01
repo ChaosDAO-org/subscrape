@@ -15,9 +15,9 @@ class ParachainScraper:
         self.api = api
 
     def scrape(self, operations, chain_config) -> int:
-        """Performs all the operations it was given by determining the operation and then calling the corresponding 
+        """Performs all the operations it was given by determining the operation and then calling the corresponding
         method.
-        
+
         :param operations: A dict of operations and it's subdicts
         :type operations: dict
         :param chain_config: the `ScrapeConfig` to bubble down configuration properties
@@ -43,9 +43,9 @@ class ParachainScraper:
                 accounts = operations[operation]
                 items_scraped += self.scrape_transfers(accounts, chain_config)
             else:
-                self.logger.error(f"config contained an operation that does not exist: {operation}")            
+                self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
-        
+
         return items_scraped
 
     def scrape_module_calls(self, modules, chain_config, fetch_function) -> int:
@@ -70,7 +70,7 @@ class ParachainScraper:
 
             calls = modules[module]
             module_config = extrinsic_config.create_inner_config(calls)
-            
+
             for call in calls:
                 # ignore metadata
                 if call.startswith("_"):
@@ -167,7 +167,7 @@ class ParachainScraper:
     def scrape_transfers(self, accounts, chain_config) -> int:
         """
         Scrapes all transfers that belong to the list of accounts.
-        
+
         :param accounts: A dict of accounts on their names
         :type accounts: dict
         :param chain_config: the `ScrapeConfig`
@@ -181,7 +181,7 @@ class ParachainScraper:
             # ignore metadata
             if account.startswith("_"):
                 continue
-            
+
             # deduce config
             if type(account) is dict:
                 account_config = accounts_config.create_inner_config(accounts[account])
@@ -231,7 +231,7 @@ class ParachainScraper:
     def scrape_extrinsics_list(self, extrinsics_list, chain_config) -> int:
         """
         Scrapes all extrinsics from a list of extrinsic indexes.
-        
+
         :param extrinsics_list: A list of extrinsic indexes to scrape
         :type extrinsics_list: list
         :param chain_config: the `ScrapeConfig`
@@ -251,8 +251,8 @@ class ParachainScraper:
 
         return items_scraped
 
-"""
 
+"""
     def fetch_addresses(self):
         assert(len(self.addresses) == 0)
 
@@ -280,6 +280,5 @@ class ParachainScraper:
         address = account_display["address"]
         self.addresses.append(address)
         return True
-
 
 """
