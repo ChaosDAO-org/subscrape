@@ -1,8 +1,6 @@
-from numpy import block
 from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
-import pandas as pd
 
 
 def main():
@@ -35,8 +33,7 @@ def main():
         if extrinsic_idx > highest_tx_index:
             highest_tx_index = extrinsic_idx
             highest_tx_index_block = event["block_num"]
-        
- 
+
     # print the highest event index and block
     print("highest event index:", highest_event_index)
     print("highest event block:", highest_event_index_block)

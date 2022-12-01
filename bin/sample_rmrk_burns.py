@@ -1,5 +1,5 @@
-#batchall
-#"remark": "RMRK::BURN::2.0.0::12269737-e0b9bdcc456a36497a-KANCHAMP-LNDDC-00006123"
+# batchall
+# "remark": "RMRK::BURN::2.0.0::12269737-e0b9bdcc456a36497a-KANCHAMP-LNDDC-00006123"
 # address
 
 import csv
@@ -10,19 +10,21 @@ import logging
 import subscrape
 
 config = {
-    "kusama":{
-        "extrinsics":{
+    "kusama": {
+        "extrinsics": {
             "utility": ["batch_all"]
         }
     }
 }
 
 created_header = False
-interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_id", "account_index", "nonce", "success", "fee"]
-rows =  [["type", "value", "referral"]]
+interesting_rows = ["block_timestamp", "block_num", "extrinsic_index", "account_id", "account_index", "nonce",
+                    "success", "fee"]
+rows = [["type", "value", "referral"]]
 rows[0].extend(interesting_rows)
 
 db = SubscrapeDB("Kusama")
+
 
 def unwrap_params(params):
     result = {}
@@ -35,9 +37,10 @@ def unwrap_params(params):
 
 def extract_interesting_extrinsic_properties(extrinsic):
     result = []
-    for key in interesting_rows:            
+    for key in interesting_rows:
         result.append(extrinsic[key])
     return result
+
 
 def fetch_burns():
     extrinsics_storage = db.storage_manager_for_extrinsics_call("utility", "batch_all")
@@ -51,9 +54,9 @@ def fetch_burns():
             for call in calls:
                 if call["call_module"] == "System" and call["call_name"] == "remark":
                     if call["params"][0]["value"] == 2110:
-                        assert(len(calls) == 2) # make sure we are not missing anything
+                        assert (len(calls) == 2)  # make sure we are not missing anything
                         contribute_call = calls[0]
-                        assert(call == contribute_call)
+                        assert (call == contribute_call)
                         memo_call = calls[1]
                         if memo_call["call_module"] == "Crowdloan" and memo_call["call_name"] == "add_memo":
                             memo = memo_call["params"][1]["value"]
@@ -61,13 +64,11 @@ def fetch_burns():
                         else:
                             referral = json.dumps(memo_call)
                         value = contribute_call["params"][1]["value"]
-                        #public_key = ss58.ss58_decode(address)
-                        #ksm_address = ss58.ss58_encode(public_key, ss58_format=2)
+                        # public_key = ss58.ss58_decode(address)
+                        # ksm_address = ss58.ss58_encode(public_key, ss58_format=2)
                         row = ["batch", value, referral]
                         row.extend(extract_interesting_extrinsic_properties(extrinsic))
                         rows.append(row)
-        else:
-            pi = 3
 
 
 def main():
@@ -81,7 +82,6 @@ def main():
     with open(file_path, "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(rows)
-
 
 
 if __name__ == "__main__":

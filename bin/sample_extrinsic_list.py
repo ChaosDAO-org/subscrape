@@ -1,12 +1,11 @@
 
 from subscrape.db.subscrape_db import SubscrapeDB
-from substrateinterface.utils import ss58
 import logging
 import subscrape
 
 config = {
-    "kusama":{
-        "extrinsics-list":[
+    "kusama": {
+        "extrinsics-list": [
             "14238250-2"
         ]
     }
@@ -19,5 +18,3 @@ subscrape.scrape(config)
 logging.info("transforming")
 
 db = SubscrapeDB("Kusama")
-
-

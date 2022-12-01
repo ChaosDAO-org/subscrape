@@ -1,8 +1,10 @@
 eth_utils
+flake8
 hexbytes
 httpx[http2]
 openpyxl
 pandas
+pytest
 ratelimit
 simplejson
 sqlitedict

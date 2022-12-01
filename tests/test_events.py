@@ -1,6 +1,10 @@
-from subscrape.db.subscrape_db import SubscrapeDB
 import logging
+from pathlib import Path
+import sys
+repo_root = Path(__file__).parent.parent.resolve()
+sys.path.append(str(repo_root))
 import subscrape
+from subscrape.db.subscrape_db import SubscrapeDB
 
 
 def test():

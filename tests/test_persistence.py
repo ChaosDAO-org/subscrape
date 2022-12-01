@@ -23,7 +23,7 @@ def test():
     logging.info("scraping")
     items_scraped1 = subscrape.scrape(config)
     items_scraped2 = subscrape.scrape(config)
-    
+
     assert items_scraped1 == items_scraped2
 
 

@@ -63,7 +63,7 @@ def scraper_factory(name):
     if name == "moonriver" or name == "moonbeam":
         db_path = repo_root / 'data' / 'parachains'
         if not db_path.exists():
-            db_path.mkdir()
+            db_path.mkdir(parents=True, exist_ok=True)
         db_path = db_path / f'{name}_'
         moonscan_api = moonscan_factory(name)
         blockscout_api = blockscout_factory(name)
@@ -82,7 +82,7 @@ def scrape(chains) -> int:
     on the config file.
 
     :param chains: list of chains to scrape
-    :type chains: list
+    :type chains: dict
     :return: number of items scraped
     """
     items_scraped = 0

@@ -1,6 +1,7 @@
 import logging
 from sqlitedict import SqliteDict
 
+
 class SqliteDictWrapper:
     """
     A wrapper for the sqlitedict library.
@@ -35,7 +36,7 @@ class SqliteDictWrapper:
             self.logger.info(f"{self._log_description} - wrote {self._write_count} entries")
 
         return was_new_element
-    
+
     def flush(self):
         self.db.commit()
 

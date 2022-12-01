@@ -1,12 +1,12 @@
-from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 
+
 def test():
-        
+
     config = {
-        "mangatax":{
-            "extrinsics":{
+        "mangatax": {
+            "extrinsics": {
                 "timestamp": ["set"]
             },
         }
@@ -16,5 +16,6 @@ def test():
 
     logging.info("scraping")
     items_scraped = subscrape.scrape(config)
+
 
 test()

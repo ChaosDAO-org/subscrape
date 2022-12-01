@@ -147,14 +147,14 @@ class MoonbeamScraper:
             reference = reference.replace(" ", "_")
 
         # Export the transactions to a JSON file
-        json_file_path = Path(f"{self.db_path.parent}\\{self.db_path.stem}{reference}.json")
+        json_file_path = Path(self.db_path.parent) / f'{self.db_path.stem}{reference}.json'
         if json_file_path.exists():     # delete and recreate the file
             json_file_path.unlink()
         with json_file_path.open('w', encoding="UTF-8") as output_file:
             json.dump(self.transactions[reference], output_file, indent=4, sort_keys=False)
 
         # Export the transactions to an XLSX file
-        xlsx_file_path = Path(f"{self.db_path.parent}\\{self.db_path.stem}{reference}.xlsx")
+        xlsx_file_path = Path(self.db_path.parent) / f'{self.db_path.stem}{reference}.xlsx'
         if xlsx_file_path.exists():     # delete and recreate the file
             xlsx_file_path.unlink()
         data_frame = pandas.read_json(json_file_path).transpose()
@@ -180,7 +180,7 @@ class MoonbeamScraper:
 
         writer.close()
 
-        self.logger.info(f'All transactions exported in JSON to {json_file_path}.\n\r'
+        self.logger.info(f'All transactions exported in JSON to {json_file_path}.\n'
                          f'    and in XLSX format to {xlsx_file_path}')
 
     def _process_methods_in_transaction_factory(self, contract_method, method):
@@ -652,7 +652,18 @@ class MoonbeamScraper:
                                 f" '{contract_method_name}', expected log decoded LP input B quantity"
                                 f" {exact_amount_in_b_float} to be within 20% of the tx input quantity"
                                 f" {requested_input_b_quantity_float} but it's not.")
-        # There was no output info in the original request. Therefore, nothing to compare to.
+        if 'amount_out' in locals():
+            output_tolerance = exact_amount_out_float * 0.2  # 20% each side
+            if (exact_amount_out_float > amount_out + output_tolerance) \
+                    or (exact_amount_out_float < amount_out - output_tolerance):
+                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
+                                    f" '{contract_method_name}', expected log decoded LP output quantity"
+                                    f" {exact_amount_out_float} to be within 20% of the tx output quantity"
+                                    f" {amount_out} but it's not.")
+
+        else:
+            # There was no output info in the original request. Therefore, nothing to compare to.
+            pass
 
     def _decode_remove_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a liquidity removing contract interaction
