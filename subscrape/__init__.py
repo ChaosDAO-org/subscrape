@@ -1,14 +1,16 @@
 import logging
+import os
 from pathlib import Path
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
-from subscrape.subscan_wrapper import SubscanWrapper
-from subscrape.blockscout_wrapper import BlockscoutWrapper
-from subscrape.moonscan_wrapper import MoonscanWrapper
+from subscrape.apis.blockscout_wrapper import BlockscoutWrapper
+from subscrape.apis.moonscan_wrapper import MoonscanWrapper
 from subscrape.scrapers.parachain_scraper import ParachainScraper
 from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
+from subscrape.apis.subscan_wrapper import SubscanWrapper
 
 repo_root = Path(__file__).parent.parent.absolute()
+logger = logging.getLogger(__name__)
 
 
 def moonscan_factory(chain):
@@ -37,12 +39,16 @@ def blockscout_factory(chain):
     return BlockscoutWrapper(chain)
 
 
-def subscan_factory(chain):
+def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
     """
     Return a configured Subscan API interface, including API key to speed up transactions
 
     :param chain: name of the specific substrate chain
     :type chain: str
+    :param db: database to use for storing the scraped data
+    :type db: SubscrapeDB
+    :param chain_config: configuration for the specific chain
+    :type chain_config: ScrapeConfig
     """
     subscan_key = None
     subscan_key_path = repo_root / 'config' / 'subscan-key'
@@ -50,80 +56,98 @@ def subscan_factory(chain):
         with subscan_key_path.open(encoding="UTF-8", mode='r') as source:
             subscan_key = source.read()
 
-    return SubscanWrapper(chain, subscan_key)
+    scraper = SubscanWrapper(chain, db, subscan_key)
+    return scraper
 
 
-def scraper_factory(name):
+def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable = None):
     """
     Configure and return a configured object ready to scrape one or more Dotsama EVM or substrate-based chains
 
-    :param name: name of the specific chain
-    :type name: str
+    :param chain_name: name of the specific chain
+    :type chain_name: str
+    :param chain_config: configuration for the specific chain
+    :type chain_config: ScrapeConfig
+    :param db_factory: optional function to use to create a database connection. takes the chain config as parameter
+    :type db_factory: callable
     """
-    if name == "moonriver" or name == "moonbeam":
-        db_path = repo_root / 'data' / 'parachains'
-        if not db_path.exists():
-            db_path.mkdir(parents=True, exist_ok=True)
-        db_path = db_path / f'{name}_'
-        moonscan_api = moonscan_factory(name)
-        blockscout_api = blockscout_factory(name)
-        scraper = MoonbeamScraper(db_path, moonscan_api, blockscout_api, name)
+    if chain_name == "moonriver" or chain_name == "moonbeam":
+        db_connection_string = f"data/parachains"
+        if not os.path.exists(db_connection_string):
+            os.makedirs(db_connection_string)
+        db_connection_string += f'/{chain_name}_'
+        moonscan_api = moonscan_factory(chain_name)
+        blockscout_api = blockscout_factory(chain_name)
+        scraper = MoonbeamScraper(db_connection_string, moonscan_api, blockscout_api)
         return scraper
     else:
-        db = SubscrapeDB(name)
-        subscan_api = subscan_factory(name)
-        scraper = ParachainScraper(db, subscan_api)
+        # determine the database connection string
+        if chain_config.db_connection_string is None:
+            db_connection_string = "sqlite:///data/cache/default.db"
+        else:
+            db_connection_string = chain_config.db_connection_string
+        
+        # create the database object
+        if db_factory is None:
+            db = SubscrapeDB(db_connection_string)
+        else:
+            db = db_factory(chain_config)
+
+        subscan_api = subscan_factory(chain_name, db, chain_config)
+        scraper = ParachainScraper(subscan_api)
         return scraper
 
 
-def scrape(chains) -> int:
+async def scrape(chains_config, db_factory=None) -> list:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
 
-    :param chains: list of chains to scrape
-    :type chains: dict
-    :return: number of items scraped
+    :param chains_config: list of chains to scrape
+    :type chains_config: list
+    :param db_factory: optional function to use to create a database connection. takes the chain config as parameter
+    :type db_factory: function
+    :return: the list of scraped items
     """
-    items_scraped = 0
+    items = []
 
     try:
-        scrape_config = ScrapeConfig(chains)
+        scrape_config = ScrapeConfig(chains_config)
 
-        for chain in chains:
-            if chain.startswith("_"):
-                if chain == "_version" and chains[chain] != 1:
-                    logging.warning("config version != 1. It could contain runtime breaking contents")
+        for chain_name in chains_config:
+            if chain_name.startswith("_"):
+                if chain_name == "_version" and chains_config[chain_name] != 1:
+                    logger.warning("config version != 1. It could contain runtime breaking contents")
                 continue
-            operations = chains[chain]
+            operations = chains_config[chain_name]
             chain_config = scrape_config.create_inner_config(operations)
 
             # check if we should skip this chain
             if chain_config.skip:
-                logging.info(f"Config asks to skip chain {chain}")
+                logger.info(f"Config asks to skip chain {chain_name}")
                 continue
 
-            parachain_scraper = scraper_factory(chain)
-            items_scraped += parachain_scraper.scrape(operations, chain_config)
+            scraper = scraper_factory(chain_name, chain_config, db_factory)
+            new_items = await scraper.scrape(operations, chain_config)
+            items.extend(new_items)
     except Exception as e:
-        logging.error(f"Uncaught error during scraping: {e}")
+        logger.error(f"Uncaught error during scraping: {e}")
         import traceback
         # log traceback
-        logging.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise e
 
-    logging.info(f"Scraped {items_scraped} items")
-    return items_scraped
+    logger.info(f"Scraped {len(items)} items")
+    return items
 
 
-def wipe_storage():
+def wipe_cache():
     """
-    Delete everything in the 'data' folder
+    Wipe the cache folder
     """
-    data_path = repo_root / 'data'
-    if data_path.exists():
+    if os.path.exists("data/cache"):
         import shutil
-        logging.info("wiping data folder")
-        shutil.rmtree(data_path)
+        logger.info("wiping cache folder")
+        shutil.rmtree("data/cache/")
     else:
-        logging.info("data folder does not exist")
+        logger.info("cache folder does not exist")

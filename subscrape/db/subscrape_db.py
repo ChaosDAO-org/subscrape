@@ -1,18 +1,62 @@
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import os
-import io
-import json
 import logging
-from pathlib import Path
-from substrateinterface.utils import ss58
-from subscrape.db.sqlitedict_wrapper import SqliteDictWrapper
-from sqlitedict import SqliteDict
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey, ForeignKeyConstraint
+from sqlalchemy.orm import Session, Query, relationship
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy_utils import database_exists, create_database
 
-repo_root = Path(__file__).parent.parent.absolute()
+Base = declarative_base()
+
+class Block(Base):
+    __tablename__ = "blocks"
+    block_number = Column(Integer, unique=True, primary_key=True)
+
+class Extrinsic(Base):
+    __tablename__ = 'extrinsics'
+    chain = Column(String(50), primary_key=True)
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime)
+    module = Column(String(100))
+    call = Column(String(100))
+    origin_address = Column(String(100))
+    origin_public_key = Column(String(100))
+    nonce = Column(Integer)
+    extrinsic_hash = Column(String(100))
+    success = Column(Boolean)
+    params = Column(JSON)
+    # event
+    # event_count
+    fee = Column(Integer)
+    fee_used = Column(Integer)
+    error = Column(JSON)
+    finalized = Column(Boolean)
+    tip = Column(Integer)
+
+    events = relationship("Event", back_populates="extrinsic")
+
+class Event(Base):
+    __tablename__ = 'events'
+    chain = Column(String(50), primary_key=True)
+    id = Column(String(20), primary_key=True)
+    block_number = Column(Integer, ForeignKey('blocks.block_number'))
+    block_timestamp = Column(DateTime) # only present in the Subscan metadata
+    extrinsic_id = Column(String(20))
+    module = Column(String(100))
+    event = Column(String(100))
+    params = Column(JSON)
+    finalized = Column(Boolean)
+
+    __table_args__ = (
+        ForeignKeyConstraint([extrinsic_id, chain],
+                             [Extrinsic.id, Extrinsic.chain]),
+    )
+
+    extrinsic = relationship("Extrinsic", back_populates="events")
 
 
-# one DB per Parachain
 class SubscrapeDB:
     """
     This class is used to support online scraping of various types of data.
@@ -22,179 +66,124 @@ class SubscrapeDB:
     At the end of the process, flush_<type>() is called to make sure the state is properly saved.
     """
 
-    def __init__(self, parachain):
-        self._transfers_dirty = None
-        self.logger = logging.getLogger("SubscrapeDB")
+    def __init__(self, connection_string="sqlite:///data/cache/default.db"):
+        self.logger = logging.getLogger(__name__)
+        self._engine = create_engine(connection_string)
 
-        # make sure casing is correct
-        parachain = parachain.lower()
+        if not database_exists(self._engine.url):
+            # ensure that the folder exists
+            os.makedirs(os.path.dirname(connection_string.replace("sqlite:///", "")), exist_ok=True)
+            create_database(self._engine.url)
+            self._setup_db()
 
-        # make sure the parachains folder exists
-        parachain_data_path = str(repo_root / 'data' / 'parachains')
-        if not os.path.exists(parachain_data_path):
-            os.makedirs(parachain_data_path)
+        self._session = Session(bind=self._engine)
 
-        #: str: the root path to this db
-        self._path = f"{parachain_data_path}/{parachain}_"
-        #: str: the name of the chain this db represents
-        self._parachain = parachain
-        #: SqliteDict: the index of all extrinsics
-        self._extrinsics_meta_index = SqliteDict(f"{self._path}extrinsics_meta_index.sqlite", autocommit=True)
+    def _setup_db(self):
+        """
+        Creates the database tables if they do not exist.
+        """
+        Base.metadata.create_all(self._engine)
+        
 
+    def flush(self):
+        """
+        Flush the extrinsics to the database.
+        """
+        self._session.commit()
+
+    def close(self):
+        """
+        Close the database connection.
+        """
+        self._session.close()
+
+    def write_item(self, item: Base):
+        """
+        Write this item to the database.
+
+        :param item: The item to write
+        :type item: Base
+        """
+        self._session.add(item)
         self._extrinsics_storage_managers = {}
 
     """ # Extrinsics """
 
-    def storage_manager_for_extrinsics_call(self, module, call):
+    def query_extrinsics(self, chain: str = None, module: str = None, call: str = None, extrinsic_ids: list = None) -> Query:
         """
-        returns a `SectorizedStorageManager` to store and retrieve extrinsics
+        Returns a query object for extrinsics.
+
+        :param chain: The chain to filter for
+        :type chain: str
+        :param module: The module to filter for
+        :type module: str
+        :param call: The call to filter for
+        :type call: str
+        :return: The query object
+        :rtype: Query
         """
-        name = f"{self._parachain}.{module}.{call}"
-        if name in self._extrinsics_storage_managers:
-            return self._extrinsics_storage_managers[name]
+        query = self._session.query(Extrinsic)
+        if chain is not None:
+            query = query.filter(Extrinsic.chain == chain)
+        if module is not None:
+            query = query.filter(Extrinsic.module == module)
+        if call is not None:
+            query = query.filter(Extrinsic.call == call)
+        if extrinsic_ids is not None:
+            query = query.filter(Extrinsic.id.in_(extrinsic_ids))
 
-        path = f"{self._path}extrinsics_{module}_{call}.sqlite"
-        index_for_item = lambda item: item["extrinsic_index"]
-        sm = SqliteDictWrapper(path, name, index_for_item)
-        self._extrinsics_storage_managers[name] = sm
-        return sm
+        return query
 
-    def write_extrinsic(self, data):
+    def query_extrinsic(self, chain: str, extrinsic_id: str) -> Extrinsic:
         """
-        Write a single extrinsic to the storage.
-        This might be expensive when done with a lot of extrinsics,
-        but is the intended approach when the module and call of extrinsics being scraped is unknown
-        ahead of scraping.
+        Returns the extrinsic with the given id.
 
-        This method will determine the module and call, instantiate a new storage manager for the extrinsic,
-        and write the extrinsic to the storage.
-
-        :param data: The extrinsic to write
-        """
-
-        # determine the module and call of the extrinsic
-        module = data["call_module"]
-        call = data["call_module_function"]
-        extrinsic_index = data["extrinsic_index"]
-
-        # instantiate a new storage manager for the extrinsic
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        was_new_element = storage_manager.write_item(data)
-        storage_manager.flush()
-
-        self._extrinsics_meta_index[extrinsic_index] = {
-            "module": module,
-            "call": call
-        }
-
-        return was_new_element
-
-    def read_extrinsic(self, extrinsic_index):
-        """
-        Reads an extrinsic with a given index from the database.
-
-        :param extrinsic_index: The index of the extrinsic to read, e.g. "123456-12"
+        :param chain: The chain to filter for
+        :type chain: str
+        :param extrinsic_id: The id of the extrinsic
+        :type extrinsic_id: str
         :return: The extrinsic
+        :rtype: Extrinsic
         """
-        obj = self._extrinsics_meta_index[extrinsic_index]
-        module = obj["module"]
-        call = obj["call"]
-        storage_manager = self.storage_manager_for_extrinsics_call(module, call)
-        return storage_manager.read_item(extrinsic_index)
+        return self._session.query(Extrinsic).get((chain, extrinsic_id))
 
     """ # Events """
 
-    def storage_manager_for_events_call(self, module, event):
-        path = f"{self._path}events_{module}_{event}.sqlite"
-        log_description = f"{self._parachain}.{module}.{event}"
-        index_for_item = lambda item: f"{item['block_num']}-{item['event_idx']}"
-        return SqliteDictWrapper(path, log_description, index_for_item)
-
-    # Transfers
-
-    def _transfers_folder(self):
+    def query_events(self, chain: str = None, module: str = None, event: str = None, event_ids: list = None) -> Query:       
         """
-        Returns the folder where transfers are stored.
+        Returns a query object for events.
+
+        :param module: The module to filter for
+        :type module: str
+        :param event: The event to filter for
+        :type event: str
+        :param event_ids: The ids of the events to filter for
+        :type event_ids: list
+        :return: The query object
+        :rtype: Query
         """
-        return f"{self._path}transfers/"
+        query = self._session.query(Event)
+        if chain is not None:
+            query = query.filter(Event.chain == chain)
+        if module is not None:
+            query = query.filter(Event.module == module)
+        if event is not None:
+            query = query.filter(Event.event == event)
+        if event_ids is not None:
+            query = query.filter(Event.id.in_(event_ids))
+        return query
 
-    def _transfers_account_file(self, account):
+    def query_event(self, chain: str, event_id: str) -> Event:
         """
-        Will return the storage path for an account.
-        The address is normalized to the Substrate address format.
+        Reads an event with a given id from the database.
 
-        :param account: The account
-        :type account: str
+        :param chain: The chain to filter for
+        :type chain: str
+        :param event_id: The id of the event to read, e.g. "123456-12"
+        :type event_id: str
+        :return: The event
+        :rtype: Event
         """
-        public_key = ss58.ss58_decode(account)
-        substrate_address = ss58.ss58_encode(public_key, ss58_format=42)
-        file_path = self._transfers_folder() + substrate_address + ".json"
-        return file_path
+        result = self._session.query(Event).get((chain, event_id))
+        return result
 
-    def _clear_transfers_state(self):
-        """
-        Clears the internal state of a transfers
-        """
-        assert (not self._transfers_dirty)
-        self._transfers_account = None
-        self._transfers = None
-
-    def set_active_transfers_account(self, account):
-        """
-        Sets the active transfers account for the upcoming scrape.
-
-        :param account: The account we are about to scrape
-        :type account: str
-        """
-        self._clear_transfers_state()
-        self._transfers_account = account
-        self._transfers = []
-
-        # make sure folder exists
-        folder_path = self._transfers_folder()
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-    def write_transfer(self, transfer):
-        """
-        Write a new transfer object to the state.
-
-        :param transfer: The transfer to write
-        :type transfer: dict
-        """
-        self._transfers.append(transfer)
-        self._transfers_dirty = True
-        return True
-
-    def flush_transfers(self):
-        """
-        Flushes the unsaved transfers to disk.
-        """
-        if not self._transfers_dirty:
-            return
-
-        payload = json.dumps(self._transfers)
-
-        file_path = self._transfers_account_file(self._transfers_account)
-        self.logger.info(f"Writing {len(self._transfers)} entries")
-        file = io.open(file_path, "w")
-        file.write(payload)
-        file.close()
-
-        self._transfers_dirty = False
-
-    def transfers_iter(self, account):
-        """
-        Returns an iterable object of transfers for the given account.
-
-        :param account: The account to read transfers for
-        :type account: str
-        """
-        file_path = self._transfers_account_file(account)
-        if os.path.exists(file_path):
-            file = io.open(file_path)
-            file_payload = file.read()
-            return json.loads(file_payload)
-        else:
-            self.logger.warning(f"transfers from account {account} have been requested but do not exist on disk.")
-            return None

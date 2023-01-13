@@ -17,7 +17,7 @@ class MoonbeamScraper:
     """Scrape the Moonbeam or Moonriver chains for transactions/accounts of interest."""
 
     def __init__(self, db_path, moonscan_api, blockscout_api, chain_name):
-        self.logger = logging.getLogger("MoonbeamScraper")
+        self.logger = logging.getLogger(__name__)
         self.db_path = db_path
         self.chain_name = chain_name
         self.moonscan_api = moonscan_api
@@ -28,7 +28,7 @@ class MoonbeamScraper:
         self.tokens = {}  # cache of token contract basic info
         self.contracts_that_arent_tokens = []  # cache of addresses not recognized as tokens
 
-    def scrape(self, operations, chain_config):
+    async def scrape(self, operations, chain_config) -> list:
         """According to the operations specified, parse the blockchain specified to extract useful info/transactions.
 
         :param operations: a dict of operations specified in the config file. Each operation specifies the type of
@@ -42,7 +42,7 @@ class MoonbeamScraper:
         performed.
         :type chain_config: object
         """
-        items_scraped = 0
+        items_scraped = []
         for operation in operations:
             # ignore metadata
             if operation.startswith("_"):
@@ -126,7 +126,7 @@ class MoonbeamScraper:
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
-        items_scraped = len(self.transactions[account])
+            items_scraped.extend(len(self.transactions[account]))
         return items_scraped
 
     def _export_transactions(self, address, reference=None):

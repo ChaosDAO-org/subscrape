@@ -30,10 +30,9 @@ the delta must be deleted and the scraper run again.
 ## Usage
 
 ### Installation
-> virtualenv venv
-> venv\scripts\activate
-> pip install -Ur .\PipRequirements.txt
-> bin\scrape.py
+ virtualenv venv
+ venv\scripts\activate
+ pip install -Ur .\PipRequirements.txt
 
 ### API Keys
 If you have a Subscan API key, drop it in a file named `config/subscan-key`. If you have a Moonscan.io API key, note that they are network-specific, so place it either in a file named `config/moonscan-moonriver-key` or `config/moonscan-moonbeam-key`. Blockscout does not need an API key.

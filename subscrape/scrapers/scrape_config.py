@@ -8,8 +8,10 @@ class ScrapeConfig:
         self.filter = None
         self.processor_name = None
         self.skip = False
-        self.digits_per_sector = None
         self.params = None
+        self.db_connection_string = None
+        self.auto_hydrate = True
+        self.stop_on_known_data = True
         self._set_config(config)
 
     def _set_config(self, config):
@@ -21,6 +23,9 @@ class ScrapeConfig:
         :type config: dict
         """
         if type(config) is list:
+            return
+
+        if config is None:
             return
 
         filter_conditions = config.get("_filter", None)
@@ -35,13 +40,22 @@ class ScrapeConfig:
         if skip is not None:
             self.skip = skip
 
-        digits_per_sector = config.get("_digits_per_sector", None)
-        if digits_per_sector is not None:
-            self.digits_per_sector = digits_per_sector
-
         params = config.get("_params", None)
         if params is not None:
             self.params = params
+
+        # _db_path is only relevant on the chain level
+        db_connection_string = config.get("_db_connection_string", None)
+        if db_connection_string is not None:
+            self.db_connection_string = db_connection_string
+
+        auto_hydrate = config.get("_auto_hydrate", None)
+        if auto_hydrate is not None:
+            self.auto_hydrate = auto_hydrate
+
+        stop_on_known_data = config.get("_stop_on_known_data", None)
+        if stop_on_known_data is not None:
+            self.stop_on_known_data = stop_on_known_data
 
     def create_inner_config(self, config):
         """

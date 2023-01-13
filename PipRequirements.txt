@@ -4,11 +4,11 @@ hexbytes
 httpx[http2]
 openpyxl
 pandas
-pytest
+pytest-asyncio
 ratelimit
 simplejson
-sqlitedict
+sqlalchemy
+sqlalchemy-utils
 substrate-interface
 web3>5.0
 xlsxwriter
-

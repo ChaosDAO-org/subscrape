@@ -3,13 +3,15 @@ __author__ = 'spazcoin@gmail.com @spazvt'
 import json
 import logging
 from pathlib import Path
+import pytest
 import sys
 repo_root = Path(__file__).parent.parent.resolve()
 sys.path.append(str(repo_root))
 import subscrape
 
 
-def test_token_swaps():
+@pytest.mark.asyncio
+async def test_token_swaps():
 
     test_acct = "0xBa4123F4b2da090aeCef69Fd0946D42Ecd4C788E"
     config = {
@@ -25,8 +27,8 @@ def test_token_swaps():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("scraping")
-    items_scraped = subscrape.scrape(config)
-    assert items_scraped >= 10
+    items_scraped = await subscrape.scrape([config])
+    assert items_scraped[0] >= 10
     transactions = get_archived_transactions_from_json(test_acct, 'moonriver')
     for timestamp in transactions:
         tx = transactions[timestamp]
@@ -44,7 +46,8 @@ def test_token_swaps():
             assert_value_within_range(tx['output_a_quantity'], 465.032663)
 
 
-def get_archived_transactions_from_json(address, chain='moonriver'):
+@pytest.mark.asyncio
+async def get_archived_transactions_from_json(address, chain='moonriver'):
     """Return a list of all transactions (dict by timestamp) read from the JSON file generated when scraping.
 
     :param address: the moonriver/moonbeam account number of interest. This could be a basic account, or a contract
@@ -62,7 +65,8 @@ def get_archived_transactions_from_json(address, chain='moonriver'):
     return data
 
 
-def assert_value_within_range(actual, expected, tolerance_percent=1):
+@pytest.mark.asyncio
+async def assert_value_within_range(actual, expected, tolerance_percent=1):
     """Return a list of all transactions (dict by timestamp) read from the JSON file generated when scraping.
 
     :param actual: actual float value received

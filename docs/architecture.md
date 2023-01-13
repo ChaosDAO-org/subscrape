@@ -10,9 +10,7 @@ API: https://docs.api.subscan.io/
 If you have a Subscan API key, you can put it in `config\subscan-key` and it will be applied to your calls. This significantly increases the number of queries per second that can be submitted.
 
 ## ParachainScraper
-`ParachainScraper` knows how to use the `SubscanWrapper` to fetch data for a parachain and serialize it to disk.
-
-Currently it knows how to fetch extrinsics.
+`ParachainScraper` uses `SubscanWrapper` to fetch data for a parachain and serialize it to disk.
 
 ## MoonscanWrapper
 Analoguous to `SubscanWrapper` but for scraping transactions from Moonscan.io. If you have a Moonscan API key, you can put it in `config\moonscan-key` and it will be applied to your calls.
@@ -27,4 +25,7 @@ Analoguous to `ParachainScraper`. Can scan for `transactions` of a method from a
 `SubscanDB` serializes extracted data to disk and unserializes it later.
 
 ## ScrapeConfig
-`ScrapeConfig` is a helper class that helps bubble configuration properties from the outermost configuration elements to the innermost.
+`ScrapeConfig` is a helper class that helps bubble configuration properties from the outermost configuration elements to the innermost. It is fairly well integrated into the code, so usually the steps to add new config parameters are:
+- Add documentation to `docs/configuration.md`
+- Add a unit test to validate the behavior of the new config
+- Query the param in code and use it
