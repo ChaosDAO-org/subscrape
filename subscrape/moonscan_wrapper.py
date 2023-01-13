@@ -27,7 +27,7 @@ class MoonscanWrapper:
         """
         if self.api_key is not None:
             params["apikey"] = self.api_key
-        response = httpx.get(self.endpoint, params=params)
+        response = httpx.get(self.endpoint, params=params, timeout=30.0)
         self.logger.debug(response)
         return response.text
 

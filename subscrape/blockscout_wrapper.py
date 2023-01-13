@@ -21,7 +21,7 @@ class BlockscoutWrapper:
         :param params: Blockscout API call params that filter which transactions are returned.
         :type params: list
         """
-        response = httpx.get(self.endpoint, params=params)
+        response = httpx.get(self.endpoint, params=params, timeout=30.0)
         self.logger.debug(response)
         return response.text
 
