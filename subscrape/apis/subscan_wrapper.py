@@ -59,7 +59,6 @@ class SubscanWrapper:
         self._api_method_event = "/api/scan/event"
         self._api_method_events_call = "event_id"
 
-
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
     #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     async def _query(self, method, headers={}, body={}, client=None):
@@ -185,7 +184,6 @@ class SubscanWrapper:
             last_id = last_id_deducer(elements[-1])
             self.logger.debug(f"Last ID: {last_id}")
 
-
         return items
 
     def _create_extrinsic_metadata_processor(self, already_existing_extrinsic_pks: list):
@@ -219,20 +217,20 @@ class SubscanWrapper:
                 return None
 
             extrinsic = Extrinsic(
-                chain = self.chain,
-                id = extrinsic_id,
-                block_number = raw_extrinsic_metadata["block_num"],
-                block_timestamp = datetime.fromtimestamp(raw_extrinsic_metadata["block_timestamp"]),
-                module = raw_extrinsic_metadata["call_module"].lower(),
-                call = raw_extrinsic_metadata["call_module_function"].lower(),
-                origin_address = address,
-                origin_public_key = ss58.ss58_decode(address) if address is not None else None,
-                nonce = raw_extrinsic_metadata["nonce"],
-                extrinsic_hash = raw_extrinsic_metadata["extrinsic_hash"],
-                success = raw_extrinsic_metadata["success"],
-                fee = raw_extrinsic_metadata["fee"],
-                fee_used = raw_extrinsic_metadata["fee_used"],
-                finalized = raw_extrinsic_metadata["finalized"],
+                chain=self.chain,
+                id=extrinsic_id,
+                block_number=raw_extrinsic_metadata["block_num"],
+                block_timestamp=datetime.fromtimestamp(raw_extrinsic_metadata["block_timestamp"]),
+                module=raw_extrinsic_metadata["call_module"].lower(),
+                call=raw_extrinsic_metadata["call_module_function"].lower(),
+                origin_address=address,
+                origin_public_key=ss58.ss58_decode(address) if address is not None else None,
+                nonce=raw_extrinsic_metadata["nonce"],
+                extrinsic_hash=raw_extrinsic_metadata["extrinsic_hash"],
+                success=raw_extrinsic_metadata["success"],
+                fee=raw_extrinsic_metadata["fee"],
+                fee_used=raw_extrinsic_metadata["fee_used"],
+                finalized=raw_extrinsic_metadata["finalized"],
             )
 
             self.db.write_item(extrinsic)
@@ -269,10 +267,10 @@ class SubscanWrapper:
             block_number = int(raw_event_metadata["event_index"].split("-")[0])
 
             event = Event(
-                chain = self.chain,
-                id = event_id,
+                chain=self.chain,
+                id=event_id,
                 block_number=block_number,
-                block_timestamp = datetime.fromtimestamp(raw_event_metadata["block_timestamp"]),
+                block_timestamp=datetime.fromtimestamp(raw_event_metadata["block_timestamp"]),
                 extrinsic_id=raw_event_metadata["extrinsic_index"],
                 module=raw_event_metadata["module_id"].lower(),
                 event=raw_event_metadata["event_id"].lower(),
@@ -313,7 +311,6 @@ class SubscanWrapper:
         extrinsic.error = raw_extrinsic["error"]
         extrinsic.finalized = raw_extrinsic["finalized"]
         extrinsic.tip = raw_extrinsic["tip"]
-
 
     def update_event_from_raw_event(self, event: Event, raw_event: dict):
         """
@@ -377,7 +374,6 @@ class SubscanWrapper:
             items = await self.fetch_extrinsics(extrinsic_indexes)
 
         return items
-
 
     async def fetch_extrinsics(self, extrinsic_indexes: list, update_existing: bool = True) -> list:
         """
@@ -494,8 +490,8 @@ class SubscanWrapper:
         """
         Fetches the event with the specified index and writes it to the db.
 
-        :param event_index: The event index to fetch
-        :type event_index: str
+        :param event_indexes: The event indexes to fetch
+        :type event_indexes: list
         :param update_existing: Whether to update the event if it already exists in the db. Defaults to True.
         :type update_existing: bool
         :return: The events

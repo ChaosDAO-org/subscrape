@@ -18,6 +18,7 @@ Currently not supported:
 While subscrape is still being developed, all extracted transactions are currently dumped to an output JSON file instead of a carefully structure spreadsheet. Normal (non-contract) transactions will have a basic format like:
 ```
     "1633543326": {
+        "timeStamp": 1633543326,
         "utcdatetime": "2021-10-06 18:02:06",
         "hash": "0x8bc0d70495c963e0c09d8c9c35e84b44a74e021315a267e678c28bf2601873c4",
         "from": "0x97c98d2f4a587942aa8c069b30e17895c6e7957a",
@@ -34,6 +35,7 @@ The `1633543326` key is simply the unix timestamp so that all of the transaction
 For DEX token swaps, additional data is decoded and the output format expands to:
 ```
     "1633155912": {
+        "timeStamp": 1633155912,
         "utcdatetime": "2021-10-02 06:25:12",
         "hash": "0x0e005163ef61ad6f4979da99c69931e19982cc008c35bb8a7f76de8b1d51068f",
         "from": "0x97c98d2f4a587942aa8c069b30e17895c6e7957a",
@@ -43,12 +45,12 @@ For DEX token swaps, additional data is decoded and the output format expands to
         "gas": "756248",
         "gasPrice": "1000000000",
         "gasUsed": "125865",
-        "input_token_name": "SolarBeam Token",
-        "input_symbol": "SOLAR",
-        "output_token_name": "MOONKAFE",
-        "output_symbol": "KAFE",
-        "input_quantity": 48.940982204694954,
-        "output_quantity": 73.31949903615119
+        "input_a_token_name": "SolarBeam Token",
+        "input_a_token_symbol": "SOLAR",
+        "output_a_token_name": "MOONKAFE",
+        "output_a_token_symbol": "KAFE",
+        "input_a_quantity": 48.940982204694954,
+        "output_a_quantity": 73.31949903615119
     },
 ```
 Here you can see that transaction `0x0e005163ef61ad6f4979da99c69931e19982cc008c35bb8a7f76de8b1d51068f` involved swapping SOLAR tokens for KAFE tokens. The `input_quantity` and `output_quantity` are the exact values of the swap transaction after moonbeam_scraper decodes the DEX trace transactions.

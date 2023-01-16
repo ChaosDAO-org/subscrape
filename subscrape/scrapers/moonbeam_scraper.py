@@ -27,6 +27,8 @@ class MoonbeamScraper:
         self.contracts_with_known_decode_errors = []
         self.tokens = {}  # cache of token contract basic info
         self.contracts_that_arent_tokens = []  # cache of addresses not recognized as tokens
+        if type(self.db_path) is not Path:
+            self.db_path = Path(self.db_path)
 
     async def scrape(self, operations, chain_config) -> list:
         """According to the operations specified, parse the blockchain specified to extract useful info/transactions.
@@ -101,32 +103,18 @@ class MoonbeamScraper:
                 if "accounts" in account_transactions_payload:
                     accounts = account_transactions_payload['accounts']
                     for account in accounts:
-                        # ignore metadata
-                        if account.startswith("_"):
-                            continue
-
-                        # deduce config
-                        if type(accounts) is dict:
-                            # todo: for this operation, 'method' hasn't been defined yet.
-                            account_config = account_transactions_config.create_inner_config(methods[method])
-                        else:
-                            account_config = account_transactions_config
-
-                        if account_config.skip:
-                            self.logger.info(f"Config asks to skip account {account}")
-                            continue
-
                         self.transactions[account] = {}
                         processor = self._process_transactions_on_account_factory(account)
                         self.logger.info(f"Fetching transactions for {account} from {self.moonscan_api.endpoint}")
-                        self.moonscan_api.fetch_and_process_transactions(account, processor)
+                        self.moonscan_api.fetch_and_process_transactions(account, processor,
+                                                                         config=account_transactions_config)
                         self._export_transactions(account)
                 else:
                     self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
-            items_scraped.extend(len(self.transactions[account]))
+            items_scraped.append(len(self.transactions[account]))
         return items_scraped
 
     def _export_transactions(self, address, reference=None):
@@ -147,7 +135,7 @@ class MoonbeamScraper:
             reference = reference.replace(" ", "_")
 
         # Export the transactions to a JSON file
-        json_file_path = Path(self.db_path.parent) / f'{self.db_path.stem}{reference}.json'
+        json_file_path = self.db_path.parent / f'{self.db_path.stem}{reference}.json'
         if json_file_path.exists():     # delete and recreate the file
             json_file_path.unlink()
         with json_file_path.open('w', encoding="UTF-8") as output_file:
@@ -163,7 +151,8 @@ class MoonbeamScraper:
         tx_sheet_name = 'Transactions'
         data_frame.to_excel(writer, sheet_name=tx_sheet_name, index=False, freeze_panes=(1, 1))
         worksheet = writer.sheets[tx_sheet_name]
-        worksheet.autofilter(0, 0, num_rows, num_columns - 1)
+        if len(self.transactions[address]) > 0:
+            worksheet.autofilter(0, 0, num_rows, num_columns - 1)
 
         # Auto-adjust columns' width
         for column in data_frame:
@@ -171,12 +160,14 @@ class MoonbeamScraper:
             col_idx = data_frame.columns.get_loc(column)
             worksheet.set_column(col_idx, col_idx, column_width)
 
+        # hide column 'timeStamp' because to users the utcdatetime is probably more useful.
+        worksheet.set_column('A:A', None, None, {'hidden': True})
         # hide column 'valueInWei' because we prefer the 'value' float value.
-        worksheet.set_column('E:E', None, None, {'hidden': True})
+        worksheet.set_column('F:F', None, None, {'hidden': True})
         # hide columns for gas, since tx gas isn't a concern on Moonbeam/Moonriver
-        worksheet.set_column('G:I', None, None, {'hidden': True})
+        worksheet.set_column('H:J', None, None, {'hidden': True})
         # Shorten the 'hash', 'from', and 'to' address columns
-        worksheet.set_column('B:D', width=20)
+        worksheet.set_column('C:E', width=20)
 
         writer.close()
 
@@ -207,9 +198,10 @@ class MoonbeamScraper:
             :param transaction: all details for a specific transaction on the specified account.
             :type transaction: dict
             """
-            timestamp = transaction['timeStamp']
-            acct_tx = {'utcdatetime': str(datetime.utcfromtimestamp(int(timestamp))), 'hash': transaction['hash'],
-                       'from': transaction['from'], 'to': transaction['to'], 'valueInWei': transaction['value'],
+            timestamp = int(transaction['timeStamp'])
+            acct_tx = {'timeStamp': timestamp, 'utcdatetime': str(datetime.utcfromtimestamp(timestamp)),
+                       'hash': transaction['hash'], 'from': transaction['from'], 'to': transaction['to'],
+                       'valueInWei': transaction['value'],
                        'value': eth_utils.from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
             self.transactions[account][timestamp] = acct_tx
@@ -375,7 +367,7 @@ class MoonbeamScraper:
         """
         tx_hash = transaction['hash']
         contract_address = transaction['to']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         token_path = decoded_func_params['path']
         self.transactions[account][timestamp]['action'] = 'token swap'
         # retrieve and cache the token info for all tokens
@@ -514,7 +506,7 @@ class MoonbeamScraper:
         :type decoded_func_params: dict
         """
         tx_hash = transaction['hash']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'add liquidity'
         if contract_method_name == 'addLiquidity':
@@ -678,7 +670,7 @@ class MoonbeamScraper:
         :type decoded_func_params: dict
         """
         tx_hash = transaction['hash']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'remove liquidity'
         if contract_method_name == 'removeLiquidity':
@@ -805,7 +797,7 @@ class MoonbeamScraper:
         :type decoded_func_params: dict
         """
         tx_hash = transaction['hash']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'deposit'
 
@@ -867,7 +859,7 @@ class MoonbeamScraper:
         :type decoded_func_params: dict
         """
         tx_hash = transaction['hash']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'withdraw'
 
@@ -1048,7 +1040,7 @@ class MoonbeamScraper:
         :type decoded_func_params: dict
         """
         tx_hash = transaction['hash']
-        timestamp = transaction['timeStamp']
+        timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'redeem'
         if contract_method_name != 'redeem':
@@ -1261,7 +1253,7 @@ class MoonbeamScraper:
         # for each new entry for this transaction hash, increment the timestamp by one. In case other additional
         #  entries have already been created, check for the next integer timestamp after which isn't already a valid
         #  key/entry.
-        orig_timestamp = transaction['timeStamp']
+        orig_timestamp = int(transaction['timeStamp'])
         new_timestamp = orig_timestamp
         for x in range(1, 100):     # 1-3 should be sufficient, but 100 ensures an empty slot should be found.
             new_timestamp = str(int(new_timestamp) + 1)

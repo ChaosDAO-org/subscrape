@@ -37,6 +37,7 @@ class Extrinsic(Base):
 
     events = relationship("Event", back_populates="extrinsic")
 
+
 class Event(Base):
     __tablename__ = 'events'
     chain = Column(String(50), primary_key=True)
@@ -83,7 +84,6 @@ class SubscrapeDB:
         Creates the database tables if they do not exist.
         """
         Base.metadata.create_all(self._engine)
-        
 
     def flush(self):
         """

@@ -19,7 +19,8 @@ async def test_token_swaps():
             "account_transactions": {
                 "accounts": [
                     test_acct
-                ]
+                ],
+                "_filter": [{"timeStamp": [{">=": 1638169446}, {"<=": 1638248544}]}]
             }
         }
     }
@@ -27,27 +28,28 @@ async def test_token_swaps():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("scraping")
-    items_scraped = await subscrape.scrape([config])
-    assert items_scraped[0] >= 10
+    items_scraped = await subscrape.scrape(config)
+    assert items_scraped[0] >= 2
     transactions = get_archived_transactions_from_json(test_acct, 'moonriver')
     for timestamp in transactions:
         tx = transactions[timestamp]
         if tx['hash'] == '0x066f0e5a15d4c0094caa83addf6e60ea35c21b9212dfdc998ca89809307c3b82':
-            print(f'for hash {tx["hash"]} the full transaction is {tx}')
+            logging.info(f'for hash {tx["hash"]} the full transaction is {tx}')
             assert tx['input_a_token_symbol'] == 'ZLK'
             assert tx['output_a_token_symbol'] == 'USDC'
             assert_value_within_range(tx['input_a_quantity'], 7.743865640456116)
             assert_value_within_range(tx['output_a_quantity'], 22.428698)
         elif tx['hash'] == '0x921e89b531d8ad251e065a5cedc2fdaeacd3ca5fd9120bfbef5c2c9054b22263':
-            print(f'for hash {tx["hash"]} the full transaction is {tx}')
+            logging.info(f'for hash {tx["hash"]} the full transaction is {tx}')
             assert tx['input_a_token_symbol'] == 'WMOVR'
             assert tx['output_a_token_symbol'] == 'USDC'
             assert_value_within_range(tx['input_a_quantity'], 1.519)
             assert_value_within_range(tx['output_a_quantity'], 465.032663)
+        else:
+            continue
 
 
-@pytest.mark.asyncio
-async def get_archived_transactions_from_json(address, chain='moonriver'):
+def get_archived_transactions_from_json(address, chain='moonriver'):
     """Return a list of all transactions (dict by timestamp) read from the JSON file generated when scraping.
 
     :param address: the moonriver/moonbeam account number of interest. This could be a basic account, or a contract
@@ -65,8 +67,7 @@ async def get_archived_transactions_from_json(address, chain='moonriver'):
     return data
 
 
-@pytest.mark.asyncio
-async def assert_value_within_range(actual, expected, tolerance_percent=1):
+def assert_value_within_range(actual, expected, tolerance_percent=1):
     """Return a list of all transactions (dict by timestamp) read from the JSON file generated when scraping.
 
     :param actual: actual float value received

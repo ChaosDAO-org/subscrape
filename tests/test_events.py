@@ -1,8 +1,9 @@
-from subscrape.db.subscrape_db import SubscrapeDB
 import logging
 import subscrape
 import pytest
 from subscrape.db.subscrape_db import Event
+from subscrape.db.subscrape_db import SubscrapeDB
+
 
 @pytest.mark.asyncio
 async def test_fetch_events_list():
@@ -11,8 +12,8 @@ async def test_fetch_events_list():
     event_index = "14238250-39"
     
     config = {
-        chain:{
-            "events-list":[
+        chain: {
+            "events-list": [
                 event_index
             ]
         }
@@ -43,7 +44,7 @@ async def test_fetch_and_hydrate_event(auto_hydrate):
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": auto_hydrate,
             "events": None,
             "_params": {
@@ -70,6 +71,7 @@ async def test_fetch_and_hydrate_event(auto_hydrate):
         assert event.params is None, "Non-hydrated events should have no params"
 
     db.close()
+
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_module_event():
@@ -105,6 +107,7 @@ async def test_fetch_events_by_module_event():
 
     db.close()
 
+
 @pytest.mark.asyncio
 async def test_fetch_events_by_module():
     
@@ -134,7 +137,7 @@ async def test_fetch_events_by_module():
     events = db.query_events(chain = chain, module = module_name, event = event_names[0]).all()
     events = [e for e in events if e.id == "14966317-39"]
     assert len(events) == 1, "Expected 1 event"
-    event:Event = events[0]
+    event: Event = events[0]
     assert event.extrinsic_id == '14966317-2'
 
     events = db.query_events(chain = chain, module = module_name, event = event_names[1]).all()
@@ -144,6 +147,7 @@ async def test_fetch_events_by_module():
     assert event.extrinsic_id == '14938460-4'
 
     db.close()
+
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_address():
@@ -183,7 +187,7 @@ async def test_fetch_events_repeatedly():
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
             "events": None,
             "_params": {
@@ -201,7 +205,6 @@ async def test_fetch_events_repeatedly():
     logging.info("scraping the second time")
     await subscrape.scrape(config)
 
-
     logging.info("testing")
     db = SubscrapeDB()
     events_query = db.query_events()
@@ -211,9 +214,10 @@ async def test_fetch_events_repeatedly():
 
     db.close()
 
+
 @pytest.mark.asyncio
 async def test_fetch_events_stop_on_known_data():
-    '''
+    """
     This unit test tests the proper behavior of the scraper when it encounters a block that it has already scraped.
     In the default case, `stop_on_known_data` is set to True, so the scraper should stop scraping when it encounters
     a block that it has already scraped.
@@ -224,12 +228,12 @@ async def test_fetch_events_stop_on_known_data():
 
     We counted the number of events in the database before and after the second scrape, and know exactly how many
     events there should be.
-    '''
+    """
     
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
             "events": None,
             "_params": {

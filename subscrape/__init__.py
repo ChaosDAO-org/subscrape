@@ -72,13 +72,14 @@ def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable
     :type db_factory: callable
     """
     if chain_name == "moonriver" or chain_name == "moonbeam":
-        db_connection_string = f"data/parachains"
-        if not os.path.exists(db_connection_string):
-            os.makedirs(db_connection_string)
-        db_connection_string += f'/{chain_name}_'
+        db_path = Path(__file__).parent.parent / 'data' / 'parachains'
+        if not db_path.is_dir():
+            db_path.mkdir(parents=True)
+        db_path = db_path / f'{chain_name}_'
         moonscan_api = moonscan_factory(chain_name)
         blockscout_api = blockscout_factory(chain_name)
-        scraper = MoonbeamScraper(db_connection_string, moonscan_api, blockscout_api)
+        scraper = MoonbeamScraper(db_path=db_path, moonscan_api=moonscan_api, blockscout_api=blockscout_api,
+                                  chain_name=chain_name)
         return scraper
     else:
         # determine the database connection string

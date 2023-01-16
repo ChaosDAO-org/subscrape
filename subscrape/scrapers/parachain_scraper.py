@@ -5,6 +5,7 @@ import logging
 import string
 from subscrape.apis.subscan_wrapper import SubscanWrapper
 
+
 # A generic scraper for parachains
 class ParachainScraper:
     """Scrape a substrate-based (non-EVM) chain for transactions/accounts of interest."""
@@ -74,8 +75,8 @@ class ParachainScraper:
             if (type(module) is string or type(module) is str) and module.startswith("_"):
                 continue
 
-            # if we want to scrape all extrinsics, we set call to None, otherwise we take the list of calls from the module
-            if module == None:
+            # if we want to scrape all extrinsics, we set call to None. Otherwise, take list of calls from the module
+            if module is None:
                 calls = None
             else:
                 calls = modules[module]

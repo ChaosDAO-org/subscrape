@@ -40,7 +40,8 @@ Users define a `scrape_config.json` file in the `config` folder to instruct `sub
         "account_transactions": {
             "accounts": [
                 "0x1a93b23281cc1cde4c4741353f3064709a16197d"
-            ]
+            ],
+            "_filter": [{"timeStamp": [{">=": 1638169446}, {"<=": 1638248544}]}]
         }
     }
 }
@@ -95,7 +96,11 @@ When scraping either Substrate chains or EVM chains, the following additional mo
 Will skip the current scope of the config.
 
 #### Filter: _filter
-`"_filter": [{"block_timestamp": [{"<":1644796800}]}],`
+Use the `_filter` keyword to specify conditions that transactions must meet in order to not be ignored. For instance:
+
+`"_filter": [{"block_timestamp": [{">=": 1638169446}, {"<=": 1638248544}]}]`
+
+Multiple types of filters can be applied at the same level, and the following operators are supported: `==`, `<,` `<=`, `>`, `>=`. If the filter is improperly configured, no transactions will be filtered out.
 
 ### Params: _params
 This allows you to set params which are sent to the API. For example, you can set

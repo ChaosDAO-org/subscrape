@@ -25,13 +25,15 @@ class BlockscoutWrapper:
         self.logger.debug(response)
         return response.text
 
-    def iterate_pages(self, element_processor, params={}):
+    def iterate_pages(self, element_processor, params={}, tx_filter=None):
         """Repeatedly fetch transactions from Blockscout matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param element_processor: method to process each transaction as it is received
         :type element_processor: function
         :param params: Blockscout API call params that filter which transactions are returned.
         :type params: function
+        :param tx_filter: method that returns True if certain transactions should be filtered out of the results
+        :type tx_filter: function
         """
         done = False            # keep crunching until we are done
         start_block = 0         # iterator for the page we want to query
@@ -52,6 +54,8 @@ class BlockscoutWrapper:
 
             # process the elements
             for element in elements:
+                if tx_filter is not None and tx_filter(element):
+                    continue
                 element_processor(element)
 
             # update counters and check if we should exit
@@ -63,7 +67,7 @@ class BlockscoutWrapper:
                 done = True
             previous_block = start_block
 
-    def fetch_and_process_transactions(self, address, element_processor):
+    def fetch_and_process_transactions(self, address, element_processor, config=None):
         """Fetch all transactions for a given address (account/contract) and use the given processor method to filter
         or post-process each transaction as we work through them.
 
@@ -74,10 +78,15 @@ class BlockscoutWrapper:
         retrieved from the API. Processing transactions as they come in, instead of storing all transaction data helps
         cut down on required storage.
         :type element_processor: function
+        :param config: the `ScrapeConfig`
+        :type config: ScrapeConfig
         """
         params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
                   "endblock": "99999999", "sort": "asc"}
-        self.iterate_pages(element_processor, params=params)
+        if config and hasattr(config, 'filter'):
+            self.iterate_pages(element_processor, params=params, tx_filter=config.filter)
+        else:
+            self.iterate_pages(element_processor, params=params)
 
     def get_contract_abi(self, contract_address):
         """Get a contract's ABI (so that its transactions can be decoded).

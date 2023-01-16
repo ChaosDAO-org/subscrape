@@ -87,15 +87,51 @@ class ScrapeConfig:
             for group in conditions:
                 for key in group:
                     if key not in extrinsic:
-                        return True
-                    actual_value = extrinsic[key]
+                        return False    # allow all if filter misconfigured
+                    actual_value = int(extrinsic[key])
                     predicates = group[key]
                     for predicate in predicates:
-                        if "<" in predicate:
+                        if "==" in predicate:
+                            value = predicate["=="]
+                            if type(value) is not int:
+                                value = int(value)
+                            if actual_value == value:
+                                continue
+                            else:
+                                return True
+                        elif "<" in predicate:
                             value = predicate["<"]
+                            if type(value) is not int:
+                                value = int(value)
                             if actual_value < value:
                                 continue
                             else:
                                 return True
+                        elif "<=" in predicate:
+                            value = predicate["<="]
+                            if type(value) is not int:
+                                value = int(value)
+                            if actual_value <= value:
+                                continue
+                            else:
+                                return True
+                        elif ">" in predicate:
+                            value = predicate[">"]
+                            if type(value) is not int:
+                                value = int(value)
+                            if actual_value > value:
+                                continue
+                            else:
+                                return True
+                        elif ">=" in predicate:
+                            value = predicate[">="]
+                            if type(value) is not int:
+                                value = int(value)
+                            if actual_value >= value:
+                                continue
+                            else:
+                                return True
+                        else:
+                            continue
             return False
         return filter
