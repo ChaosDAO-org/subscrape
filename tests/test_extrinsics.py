@@ -3,6 +3,7 @@ import logging
 import subscrape
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_list():
     
@@ -34,7 +35,6 @@ async def test_fetch_extrinsics_list():
     assert type(extrinsic.params) is list
     
     db.close()
-
 
 
 @pytest.mark.asyncio
@@ -101,6 +101,7 @@ async def test_fetch_extrinsics_by_module_call():
     assert extrinsic.extrinsic_hash == '0x9f2a81d8d92884122d122d806276da7ff9b440a0a273bc3898cbd4072d5f62e1'
     
     db.close()
+
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_module():

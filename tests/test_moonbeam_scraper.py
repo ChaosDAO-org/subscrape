@@ -5,14 +5,14 @@ import logging
 from pathlib import Path
 import pytest
 import sys
+
 repo_root = Path(__file__).parent.parent.resolve()
 sys.path.append(str(repo_root))
 import subscrape
 
 
 @pytest.mark.asyncio
-async def test_token_swaps():
-
+async def test__decode_token_swap_transaction():
     test_acct = "0xBa4123F4b2da090aeCef69Fd0946D42Ecd4C788E"
     config = {
         "moonriver": {
@@ -96,4 +96,6 @@ def assert_value_within_range(actual, expected, tolerance_percent=1):
     assert actual_float <= upper_limit
 
 
-test_token_swaps()
+test__decode_token_swap_transaction()
+
+

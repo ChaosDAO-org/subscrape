@@ -7,7 +7,7 @@ import asyncio
 async def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    db_connection_string = "sqlite:///data/cache/sample_events.db"
+    db_connection_string="sqlite:///data/cache/sample_events.db"
     chain = "kusama"
     module_name = "auctions"
     event_name = "auctionclosed"
