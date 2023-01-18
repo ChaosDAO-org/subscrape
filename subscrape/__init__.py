@@ -138,7 +138,7 @@ async def scrape(chains_config, db_factory=None) -> list:
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise e
 
-    logger.info(f"Scraped {len(items)} items")
+    logger.info(f"Scraped a total of {len(items)} items")
     return items
 
 

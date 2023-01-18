@@ -9,9 +9,11 @@ from sqlalchemy_utils import database_exists, create_database
 
 Base = declarative_base()
 
+
 class Block(Base):
     __tablename__ = "blocks"
     block_number = Column(Integer, unique=True, primary_key=True)
+
 
 class Extrinsic(Base):
     __tablename__ = 'extrinsics'
@@ -149,10 +151,12 @@ class SubscrapeDB:
 
     """ # Events """
 
-    def query_events(self, chain: str = None, module: str = None, event: str = None, event_ids: list = None) -> Query:       
+    def query_events(self, chain: str = None, module: str = None, event: str = None, event_ids: list = None) -> Query:
         """
         Returns a query object for events.
 
+        :param chain: The chain to filter for
+        :type chain: str
         :param module: The module to filter for
         :type module: str
         :param event: The event to filter for

@@ -43,6 +43,7 @@ class MoonbeamScraper:
         :param chain_config: structure specifying whether to skip or filter certain sections of the operations to be
         performed.
         :type chain_config: object
+        :return: A list of scraped items
         """
         items_scraped = []
         for operation in operations:
@@ -109,12 +110,12 @@ class MoonbeamScraper:
                         self.moonscan_api.fetch_and_process_transactions(account, processor,
                                                                          config=account_transactions_config)
                         self._export_transactions(account)
+                        items_scraped.extend(self.transactions[account])
                 else:
                     self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
-            items_scraped.append(len(self.transactions[account]))
         return items_scraped
 
     def _export_transactions(self, address, reference=None):

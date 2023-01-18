@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 import pytest
 import sys
+import time
 
 repo_root = Path(__file__).parent.parent.resolve()
 sys.path.append(str(repo_root))
@@ -25,9 +26,7 @@ async def test__decode_token_swap_transaction():
         }
     }
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-
-    logging.info("scraping")
+    logging.info(f"begin 'test__decode_token_swap_transaction' scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert items_scraped[0] >= 2
     transactions = get_archived_transactions_from_json(test_acct, 'moonriver')

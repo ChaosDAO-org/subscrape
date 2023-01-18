@@ -15,15 +15,19 @@ license = { file="LICENSE" }
 requires-python = ">=3.7"
 dependencies = [
   "eth_utils",
+  "flake8",
   "hexbytes",
   "httpx[http2]",
+  "openpyxl",
   "pandas",
+  "pytest-asyncio",
   "ratelimit",
   "simplejson",
   "sqlalchemy",
   "sqlalchemy-utils",
   "substrate-interface",
-  "web3>5.0"
+  "web3>5.0",
+  "xlsxwriter"
 
 ]
 classifiers = [
@@ -40,3 +44,7 @@ classifiers = [
 pythonpath = [
   "."
 ]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"

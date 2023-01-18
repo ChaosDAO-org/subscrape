@@ -5,9 +5,14 @@ import httpx
 import json
 import logging
 from ratelimit import limits, sleep_and_retry
+import time
 
 # "Powered by https://moonbeam.moonscan.io APIs"
 # https://moonbeam.moonscan.io/apis#contracts
+
+MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 0.5  # not published, but we ran into issues
+MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 3  # "5 calls per sec/IP" but occasionally rate limit hit with 4calls/sec
+MAX_CALLS_PER_SEC = MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
 
 
 class MoonscanWrapper:
@@ -16,9 +21,12 @@ class MoonscanWrapper:
         self.logger = logging.getLogger(__name__)
         self.endpoint = f"https://api-{chain}.moonscan.io/api"
         self.api_key = api_key
+        global MAX_CALLS_PER_SEC
+        if api_key is not None:
+            MAX_CALLS_PER_SEC = MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    @limits(calls=3, period=1)      # API limits us to 5 calls/second. Occasionally rate limit hit with 4calls/sec.
+    @limits(calls=MAX_CALLS_PER_SEC, period=1)
     def query(self, params):
         """Rate limited call to fetch another page of data from the Moonscan.io block explorer website
 
@@ -53,7 +61,8 @@ class MoonscanWrapper:
             # unpack the payload
             obj = json.loads(response)
             if obj["status"] == "0":
-                self.logger.info(f"received empty result. message='{obj['message']}' and result='{obj['result']}'")
+                self.logger.info(f"received empty result. message='{obj['message']}' and result='{obj['result']}'"
+                                 f" at {time.strftime('%X')}")
                 return
 
             elements = obj["result"]
@@ -106,7 +115,8 @@ class MoonscanWrapper:
         response = self.query(params)   # will add on the optional API key
         response_dict = json.loads(response)
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
-            self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"')
+            self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"'
+                             f' at {time.strftime("%X")}')
             return None
         else:
             # response_dict['result'] should contain a long string representation of the contract abi.
