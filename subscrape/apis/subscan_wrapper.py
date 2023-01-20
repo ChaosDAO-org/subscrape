@@ -60,7 +60,7 @@ class SubscanWrapper:
         self._api_method_events_call = "event_id"
 
     @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    #@limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
+    # @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     async def _query(self, method, headers={}, body={}, client=None):
         """Rate limited call to fetch another page of data from the Subscan.io block explorer website
 
@@ -68,8 +68,10 @@ class SubscanWrapper:
         :type method: str
         :param headers: Subscan.io API call headers.
         :type headers: list
-        :param headers: Subscan.io API call body. Typically, used to specify each page being requested.
+        :param body: Subscan.io API call body. Typically, used to specify each page being requested.
         :type body: list
+        :param client: client to use for sending http requests for blockchain data. If None, defaults to `httpx`.
+        :type client: object
         """
         if client is None:
             client = httpx.AsyncClient()
@@ -104,7 +106,7 @@ class SubscanWrapper:
             finally:
                 self.lock.release()
 
-        #self.logger.debug(response.text)
+        # self.logger.debug(response.text)
         # unpack the payload
         obj = json.loads(response.text)
         return obj["data"]        

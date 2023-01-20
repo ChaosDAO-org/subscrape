@@ -1,12 +1,11 @@
 __author__ = 'spazcoin@gmail.com @spazvt, Tommi Enenkel @alice_und_bob'
 
 from datetime import datetime
-from pathlib import Path
-
 import eth_utils
 import logging
 from numpy.core.defchararray import lower
 import pandas
+from pathlib import Path
 import simplejson as json
 
 from subscrape.decode.decode_evm_transaction import decode_tx
@@ -91,7 +90,7 @@ class MoonbeamScraper:
                         processor = self._process_methods_in_transaction_factory(contract_method, method)
                         self.logger.info(f"Fetching transactions for {contract_method} from"
                                          f" {self.moonscan_api.endpoint}")
-                        self.moonscan_api.fetch_and_process_transactions(contract, processor)
+                        await self.moonscan_api.fetch_and_process_transactions(contract, processor)
                         self._export_transactions(contract, contract_method)
 
             elif operation == "account_transactions":
@@ -107,7 +106,7 @@ class MoonbeamScraper:
                         self.transactions[account] = {}
                         processor = self._process_transactions_on_account_factory(account)
                         self.logger.info(f"Fetching transactions for {account} from {self.moonscan_api.endpoint}")
-                        self.moonscan_api.fetch_and_process_transactions(account, processor,
+                        await self.moonscan_api.fetch_and_process_transactions(account, processor,
                                                                          config=account_transactions_config)
                         self._export_transactions(account)
                         items_scraped.extend(self.transactions[account])
@@ -193,7 +192,7 @@ class MoonbeamScraper:
         return _process_method_in_transaction
 
     def _process_transactions_on_account_factory(self, account):
-        def _process_transaction_on_account(transaction):
+        async def _process_transaction_on_account(transaction):
             """Process each transaction for an account, capturing the necessary info.
 
             :param transaction: all details for a specific transaction on the specified account.
@@ -229,7 +228,7 @@ class MoonbeamScraper:
                 # assume this was a call to a contract since input data was provided
                 contract_address = transaction['to']
 
-                self.retrieve_and_cache_contract_abi(contract_address)
+                await self.retrieve_and_cache_contract_abi(contract_address)
 
                 if contract_address in self.abis and self.abis[contract_address] is not None:
                     decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
@@ -255,24 +254,24 @@ class MoonbeamScraper:
                                                     'swapExactTokensForETHSupportingFeeOnTransferTokens',
                                                     'swapExactETHForTokens', 'swapETHForExactTokens',
                                                     'addLiquiditySingleNativeCurrency'}:
-                            self._decode_token_swap_transaction(account, transaction, contract_method_name,
-                                                                decoded_func_params)
+                            await self._decode_token_swap_transaction(account, transaction, contract_method_name,
+                                                                      decoded_func_params)
                         elif contract_method_name in {'addLiquidity', 'addLiquidityETH'}:
-                            self._decode_add_liquidity_transaction(account, transaction, contract_method_name,
-                                                                   decoded_func_params)
+                            await self._decode_add_liquidity_transaction(account, transaction, contract_method_name,
+                                                                         decoded_func_params)
                         elif contract_method_name in {'removeLiquidity', 'removeLiquidityETH',
                                                       'removeLiquidityETHWithPermit'}:
-                            self._decode_remove_liquidity_transaction(account, transaction, contract_method_name,
-                                                                      decoded_func_params)
+                            await self._decode_remove_liquidity_transaction(account, transaction, contract_method_name,
+                                                                            decoded_func_params)
                         elif contract_method_name in {'deposit', 'depositWithPermit', 'depositEth', 'depositETH'}:
-                            self._decode_deposit_transaction(account, transaction, contract_method_name,
-                                                             decoded_func_params)
+                            await self._decode_deposit_transaction(account, transaction, contract_method_name,
+                                                                   decoded_func_params)
                         elif contract_method_name in {'withdraw', 'leave'}:
-                            self._decode_withdraw_transaction(account, transaction, contract_method_name,
-                                                              decoded_func_params)
+                            await self._decode_withdraw_transaction(account, transaction, contract_method_name,
+                                                                    decoded_func_params)
                         elif contract_method_name in {'redeem'}:
-                            self._decode_redeem_transaction(account, transaction, contract_method_name,
-                                                            decoded_func_params)
+                            await self._decode_redeem_transaction(account, transaction, contract_method_name,
+                                                                  decoded_func_params)
                         else:
                             # todo: handle (and don't ignore) 'stake' contract methods
                             # 'claim' and 'collect' probably remain ignored for DPS.
@@ -306,17 +305,17 @@ class MoonbeamScraper:
 
         return _process_transaction_on_account
 
-    def retrieve_and_cache_contract_abi(self, contract_address):
+    async def retrieve_and_cache_contract_abi(self, contract_address):
         """Retrieve and cache the abi for a contract
 
         :param contract_address: contract address
         :type contract_address: str
         """
         if contract_address not in self.abis:
-            self.abis[contract_address] = self.moonscan_api.get_contract_abi(contract_address)
+            self.abis[contract_address] = await self.moonscan_api.get_contract_abi(contract_address)
         return self.abis[contract_address]
 
-    def decode_logs(self, transaction):
+    async def decode_logs(self, transaction):
         """Decode transaction receipts/logs from a contract interaction
 
         :param transaction: dict containing details of the blockchain transaction
@@ -325,8 +324,8 @@ class MoonbeamScraper:
         """
         tx_hash = transaction['hash']
         contract_address = transaction['to']
-        receipt = self.moonscan_api.get_transaction_receipt(tx_hash)
-        # receipt = self.blockscout_api.get_transaction_receipt(tx_hash)    # todo: test blockscout receipts
+        receipt = await self.moonscan_api.get_transaction_receipt(tx_hash)
+        # receipt = await self.blockscout_api.get_transaction_receipt(tx_hash)    # todo: test blockscout receipts
         if type(receipt) is not dict or 'logs' not in receipt or len(receipt['logs']) == 0:
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, no"
                                 f" logs/traces present for transaction receipt: {receipt}")
@@ -335,7 +334,7 @@ class MoonbeamScraper:
         decoded_logs = []
         for log in logs:
             token_address = log['address']
-            contract_abi = self.retrieve_and_cache_contract_abi(token_address)
+            contract_abi = await self.retrieve_and_cache_contract_abi(token_address)
 
             if token_address in self.abis and self.abis[token_address] is not None:
                 (evt_name, decoded_event_data, schema) = decode_log(log['data'], log['topics'], contract_abi)
@@ -354,7 +353,7 @@ class MoonbeamScraper:
                     decoded_logs.append((evt_name, decoded_event_data, schema, token_address))
         return decoded_logs
 
-    def _decode_token_swap_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_token_swap_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a token swap contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -373,7 +372,7 @@ class MoonbeamScraper:
         self.transactions[account][timestamp]['action'] = 'token swap'
         # retrieve and cache the token info for all tokens
         for token in token_path:
-            self._retrieve_and_cache_token_info_from_contract_address(token)
+            await self._retrieve_and_cache_token_info_from_contract(token)
 
         input_token = token_path[0]
         input_token_info = self.tokens[input_token]
@@ -408,7 +407,7 @@ class MoonbeamScraper:
 
         #  We only have an estimate based on the inputs so far. Use the trace logs to find
         #      the exact swap quantities
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}. Therefore defaulting to"
                                 f" transaction input/output values.")
@@ -494,7 +493,7 @@ class MoonbeamScraper:
                                 f" {exact_amount_out_float} to be within 20% of the tx output quantity"
                                 f" {requested_output_quantity_float} but it's not.")
 
-    def _decode_add_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_add_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a liquidity adding contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -537,8 +536,8 @@ class MoonbeamScraper:
         requested_input_a_quantity_float = None
         requested_input_b_quantity_float = None
         if input_token_a is not None:
-            input_token_a_info = self._retrieve_and_cache_token_info_from_contract_address(input_token_a)
-            input_token_b_info = self._retrieve_and_cache_token_info_from_contract_address(input_token_b)
+            input_token_a_info = await self._retrieve_and_cache_token_info_from_contract(input_token_a)
+            input_token_b_info = await self._retrieve_and_cache_token_info_from_contract(input_token_b)
             self.transactions[account][timestamp]['input_a_token_name'] = input_token_a_info['name']
             self.transactions[account][timestamp]['input_a_token_symbol'] = input_token_a_info['symbol']
             self.transactions[account][timestamp]['input_b_token_name'] = input_token_b_info['name']
@@ -549,7 +548,7 @@ class MoonbeamScraper:
 
         #  We only have an estimate based on the inputs so far. Use the trace logs to find
         #      the exact liquidity quantities
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}. Therefore defaulting to"
                                 f" transaction input/output values.")
@@ -572,7 +571,7 @@ class MoonbeamScraper:
                 exact_mint_input_a_quantity_int = decoded_event_params['amount0']
                 exact_mint_input_b_quantity_int = decoded_event_params['amount1']
                 output_token = token_address  # LP token transferred as a result of minting it
-                output_token_info = self._retrieve_and_cache_token_info_from_contract_address(output_token)
+                output_token_info = await self._retrieve_and_cache_token_info_from_contract(output_token)
             elif evt_name == 'Transfer':
                 decoded_event_quantity_int = self._extract_quantity_from_params(transaction, evt_name,
                                                                                 decoded_event_params)
@@ -658,7 +657,7 @@ class MoonbeamScraper:
             # There was no output info in the original request. Therefore, nothing to compare to.
             pass
 
-    def _decode_remove_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_remove_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a liquidity removing contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -695,8 +694,8 @@ class MoonbeamScraper:
         else:
             self.logger.error(f'contract method {contract_method_name} not recognized')
 
-        output_token_a_info = self._retrieve_and_cache_token_info_from_contract_address(output_token_a)
-        output_token_b_info = self._retrieve_and_cache_token_info_from_contract_address(output_token_b)
+        output_token_a_info = await self._retrieve_and_cache_token_info_from_contract(output_token_a)
+        output_token_b_info = await self._retrieve_and_cache_token_info_from_contract(output_token_b)
         self.transactions[account][timestamp]['output_a_token_name'] = output_token_a_info['name']
         self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_a_info['symbol']
         self.transactions[account][timestamp]['output_b_token_name'] = output_token_b_info['name']
@@ -707,7 +706,7 @@ class MoonbeamScraper:
 
         #  We only have an estimate based on the inputs so far. Use the trace logs to find
         #      the exact liquidity quantities
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}. Therefore defaulting to"
                                 f" transaction input/output values.")
@@ -727,7 +726,7 @@ class MoonbeamScraper:
                 exact_output_a_quantity_int = decoded_event_params['amount0']
                 exact_output_b_quantity_int = decoded_event_params['amount1']
                 input_token = token_address  # LP token transferred as a result of minting it
-                input_token_info = self._retrieve_and_cache_token_info_from_contract_address(input_token)
+                input_token_info = await self._retrieve_and_cache_token_info_from_contract(input_token)
             elif evt_name == 'Transfer':
                 decoded_event_quantity_int = self._extract_quantity_from_params(transaction, evt_name,
                                                                                 decoded_event_params)
@@ -781,7 +780,7 @@ class MoonbeamScraper:
                                 f" {exact_amount_out_b_float} to be within 20% of the tx output quantity"
                                 f" {requested_output_b_quantity_float} but it's not.")
 
-    def _decode_deposit_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_deposit_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a deposit contract interaction
         Possible contracts using a 'deposit' method:
         * Deposit MOVR into WMOVR token contract to receive WMOVR
@@ -802,7 +801,7 @@ class MoonbeamScraper:
         contract_address = transaction['to']
         self.transactions[account][timestamp]['action'] = 'deposit'
 
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}.")
             return
@@ -825,7 +824,7 @@ class MoonbeamScraper:
             decoded_event_destination_address = self._extract_destination_address_from_params(transaction, evt_name,
                                                                                               decoded_event_params)
             if decoded_event_source_address == account:
-                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                token_info = await self._retrieve_and_cache_token_info_from_contract(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
                     if 'input_a_quantity' in self.transactions[account][timestamp]:
@@ -836,7 +835,7 @@ class MoonbeamScraper:
                     self.transactions[account][timestamp_key]['input_a_token_name'] = token_info['name']
                     self.transactions[account][timestamp_key]['input_a_token_symbol'] = token_info['symbol']
             elif decoded_event_destination_address == account:
-                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                token_info = await self._retrieve_and_cache_token_info_from_contract(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
                     if 'output_a_quantity' in self.transactions[account][timestamp]:
@@ -847,7 +846,7 @@ class MoonbeamScraper:
                     self.transactions[account][timestamp_key]['output_a_token_name'] = token_info['name']
                     self.transactions[account][timestamp_key]['output_a_token_symbol'] = token_info['symbol']
 
-    def _decode_withdraw_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_withdraw_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a withdraw contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -897,7 +896,7 @@ class MoonbeamScraper:
         #         quantity_float = decoded_func_quantity_int / (10 ** int(possible_token_info['decimals']))
         #     self.transactions[account][timestamp]['output_a_quantity'] = quantity_float
 
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}.")
             return
@@ -926,7 +925,7 @@ class MoonbeamScraper:
             decoded_event_destination_address = self._extract_destination_address_from_params(transaction, evt_name,
                                                                                               decoded_event_params)
             if decoded_event_source_address == account:
-                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                token_info = await self._retrieve_and_cache_token_info_from_contract(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
                     if 'input_a_quantity' in self.transactions[account][timestamp]:
@@ -937,7 +936,7 @@ class MoonbeamScraper:
                     self.transactions[account][timestamp_key]['input_a_token_name'] = token_info['name']
                     self.transactions[account][timestamp_key]['input_a_token_symbol'] = token_info['symbol']
             elif decoded_event_destination_address == account:
-                token_info = self._retrieve_and_cache_token_info_from_contract_address(token_address)
+                token_info = await self._retrieve_and_cache_token_info_from_contract(token_address)
                 if token_info is not None:
                     quantity_float = int(decoded_event_quantity_int) / (10 ** int(token_info['decimals']))
                     if 'output_a_quantity' in self.transactions[account][timestamp]:
@@ -1028,7 +1027,7 @@ class MoonbeamScraper:
         #         self.transactions[account][timestamp_key]['output_a_token_name'] = output_token_info['name']
         #         self.transactions[account][timestamp_key]['output_a_token_symbol'] = output_token_info['symbol']
 
-    def _decode_redeem_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def _decode_redeem_transaction(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a redeem contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -1047,7 +1046,7 @@ class MoonbeamScraper:
         if contract_method_name != 'redeem':
             self.logger.info("decode_redeem_transaction: Not yet handling methods other than 'redeem'.")
 
-        decoded_logs = self.decode_logs(transaction)
+        decoded_logs = await self.decode_logs(transaction)
         if not decoded_logs or len(decoded_logs) == 0:
             self.logger.warning(f"No logs/traces present for transaction {tx_hash}.")
             return
@@ -1070,7 +1069,7 @@ class MoonbeamScraper:
                 if lower(decoded_event_destination_address) == lower(transaction['from']):
                     # Transfers of the redeem token back into the original address
                     exact_quantity_int += decoded_event_quantity_int
-                    token_info = self._retrieve_and_cache_token_info_from_contract_address(decoded_event_source_address)
+                    token_info = await self._retrieve_and_cache_token_info_from_contract(decoded_event_source_address)
             elif evt_name == 'Withdrawal' and \
                     lower(decoded_event_source_address) == lower(transaction['to']):
                 # Final withdrawal tx back to source addr. Not used on all DEXs.
@@ -1088,7 +1087,7 @@ class MoonbeamScraper:
                     or lower_contract_address == '0xe2f71c68db7ecc0c9a907ad2e40e2394c5cac367':
                 # these contracts redeem ROME bonds to receive sROME
                 token_info = self._get_custom_token_info('sROME')
-            if lower_contract_address == '0xafaff19679ab6baf75ed8098227be189ba47ba0f':
+            elif lower_contract_address == '0xafaff19679ab6baf75ed8098227be189ba47ba0f':
                 # this contract returns ZLK
                 token_info = self._get_custom_token_info('ZLK')
             else:
@@ -1211,7 +1210,7 @@ class MoonbeamScraper:
 
         return decoded_event_destination_address
 
-    def _retrieve_and_cache_token_info_from_contract_address(self, contract_address):
+    async def _retrieve_and_cache_token_info_from_contract(self, contract_address):
         """Get token info (from block explorer and contract interface) from a contract address. Cache the token info
         for future use and build up a list of contract addresses that are not tokens.
 
@@ -1225,7 +1224,7 @@ class MoonbeamScraper:
         elif contract_address in self.tokens:
             token_info = self.tokens[contract_address]
         else:
-            possible_token_info = self.blockscout_api.get_token_info(contract_address)
+            possible_token_info = await self.blockscout_api.get_token_info(contract_address)
             if possible_token_info is None:
                 self.contracts_that_arent_tokens.append(contract_address)
             elif possible_token_info['decimals'] == '':
