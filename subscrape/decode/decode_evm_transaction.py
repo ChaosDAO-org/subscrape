@@ -10,7 +10,7 @@ import traceback
 from functools import lru_cache
 from web3 import Web3
 from web3.auto import w3
-from eth_utils import event_abi_to_log_topic, to_hex
+from eth_utils import to_hex
 
 
 def decode_tuple(t, target_field):
@@ -40,34 +40,34 @@ def decode_tuple(t, target_field):
     return output
 
 
-def decode_list_tuple(l, target_field):
+def decode_list_tuple(list_to_decode, target_field):
     """
     utility function to convert byte codes into hex strings within a tuple list.
 
-    :param l: tuple list of items to convert
-    :type l: list
+    :param list_to_decode: tuple list of items to convert
+    :type list_to_decode: list
     :param target_field: list of structures from the abi, for determining the human-readable label for data
     :type target_field: list
     """
-    output = l
-    for i in range(len(l)):
-        output[i] = decode_tuple(l[i], target_field)
+    output = list_to_decode
+    for i in range(len(list_to_decode)):
+        output[i] = decode_tuple(list_to_decode[i], target_field)
     return output
 
 
-def decode_list(l):
+def decode_list(list_to_decode):
     """
     utility function to convert byte codes into hex strings within a list.
 
-    :param l: list of items to convert
-    :type l: list
+    :param list_to_decode: list of items to convert
+    :type list_to_decode: list
     """
-    output = l
-    for i in range(len(l)):
-        if isinstance(l[i], (bytes, bytearray)):
-            output[i] = to_hex(l[i])
+    output = list_to_decode
+    for i in range(len(list_to_decode)):
+        if isinstance(list_to_decode[i], (bytes, bytearray)):
+            output[i] = to_hex(list_to_decode[i])
         else:
-            output[i] = l[i]
+            output[i] = list_to_decode[i]
     return output
 
 
@@ -149,4 +149,3 @@ def decode_tx(address, input_data, abi):
 # output = decode_tx('0x7a250d5630b4cf539739df2c5dacb4c659f2488d', '0x38ed1739000000000000000000000000000000000000000000000000000000009502f900000000000000000000000000000000000000000000a07e38bf71936cbe39594100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000003c02cebb49f6e8f1fc96158099ffa064bbfee38b00000000000000000000000000000000000000000000000000000000616e11230000000000000000000000000000000000000000000000000000000000000003000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000528b3e98c63ce21c6f680b713918e0f89dfae555', sample_abi)
 # print('function called: ', output[0])
 # print('arguments: ', json.dumps(json.loads(output[1]), indent=2))
-

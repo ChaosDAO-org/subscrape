@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from subscrape.scrapers.moonbeam_scraper import MoonbeamScraper
 from subscrape.apis.blockscout_wrapper import BlockscoutWrapper
 from subscrape.apis.moonscan_wrapper import MoonscanWrapper
@@ -8,7 +9,9 @@ from subscrape.db.subscrape_db import SubscrapeDB
 from subscrape.scrapers.scrape_config import ScrapeConfig
 from subscrape.apis.subscan_wrapper import SubscanWrapper
 
+repo_root = Path(__file__).parent.parent.absolute()
 logger = logging.getLogger(__name__)
+
 
 def moonscan_factory(chain):
     """
@@ -18,9 +21,10 @@ def moonscan_factory(chain):
     :type chain: str
     """
     moonscan_key = None
-    if os.path.exists("config/moonscan-key"):
-        f = open("config/moonscan-key")
-        moonscan_key = f.read()
+    moonscan_key_path = repo_root / 'config' / f'moonscan-{chain}-key'
+    if moonscan_key_path.exists():
+        with moonscan_key_path.open(encoding="UTF-8", mode='r') as source:
+            moonscan_key = source.read()
 
     return MoonscanWrapper(chain, moonscan_key)
 
@@ -47,9 +51,10 @@ def subscan_factory(chain, db: SubscrapeDB, chain_config: ScrapeConfig):
     :type chain_config: ScrapeConfig
     """
     subscan_key = None
-    if os.path.exists("config/subscan-key"):
-        f = open("config/subscan-key")
-        subscan_key = f.read()
+    subscan_key_path = repo_root / 'config' / 'subscan-key'
+    if subscan_key_path.exists():
+        with subscan_key_path.open(encoding="UTF-8", mode='r') as source:
+            subscan_key = source.read()
 
     scraper = SubscanWrapper(chain, db, subscan_key)
     return scraper
@@ -67,13 +72,14 @@ def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable
     :type db_factory: callable
     """
     if chain_name == "moonriver" or chain_name == "moonbeam":
-        db_connection_string = f"data/parachains"
-        if not os.path.exists(db_connection_string):
-            os.makedirs(db_connection_string)
-        db_connection_string += f'/{chain_name}_'
+        db_path = Path(__file__).parent.parent / 'data' / 'parachains'
+        if not db_path.is_dir():
+            db_path.mkdir(parents=True)
+        db_path = db_path / f'{chain_name}_'
         moonscan_api = moonscan_factory(chain_name)
         blockscout_api = blockscout_factory(chain_name)
-        scraper = MoonbeamScraper(db_connection_string, moonscan_api, blockscout_api)
+        scraper = MoonbeamScraper(db_path=db_path, moonscan_api=moonscan_api, blockscout_api=blockscout_api,
+                                  chain_name=chain_name)
         return scraper
     else:
         # determine the database connection string
@@ -93,13 +99,13 @@ def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable
         return scraper
 
 
-async def scrape(chains_config, db_factory = None) -> list:
+async def scrape(chains_config, db_factory=None) -> list:
     """
     For each specified chain, get an appropriate scraper and then scrape the chain for transactions of interest based
     on the config file.
 
-    :param chains: list of chains to scrape
-    :type chains: list
+    :param chains_config: list of chains to scrape
+    :type chains_config: list
     :param db_factory: optional function to use to create a database connection. takes the chain config as parameter
     :type db_factory: function
     :return: the list of scraped items
@@ -107,7 +113,6 @@ async def scrape(chains_config, db_factory = None) -> list:
     items = []
 
     try:
-
         scrape_config = ScrapeConfig(chains_config)
 
         for chain_name in chains_config:
@@ -133,8 +138,9 @@ async def scrape(chains_config, db_factory = None) -> list:
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise e
 
-    logger.info(f"Scraped {len(items)} items")
+    logger.info(f"Scraped a total of {len(items)} items")
     return items
+
 
 def wipe_cache():
     """

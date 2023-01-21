@@ -34,8 +34,8 @@ the delta must be deleted and the scraper run again.
  venv\scripts\activate
  pip install -Ur .\PipRequirements.txt
 
-### Subscan API Key
-If you have a Subscan API key, drop it in a file named `config/subscan-key`. Similarly, if you have a Moonscan.io API key, drop it in a file named  `config/moonscan-key`.
+### API Keys
+If you have a Subscan API key, drop it in a file named `config/subscan-key`. If you have a Moonscan.io API key, note that they are network-specific, so place it either in a file named `config/moonscan-moonriver-key` or `config/moonscan-moonbeam-key`. Blockscout does not need an API key.
 
 ### Example applications
 Here are several specific examples of how the `subscrape` library has been used in the past. There are several example application scripts in the `/bin/` folder.

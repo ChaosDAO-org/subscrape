@@ -1,4 +1,5 @@
 eth_utils
+flake8
 hexbytes
 httpx[http2]
 openpyxl
@@ -9,4 +10,5 @@ simplejson
 sqlalchemy
 sqlalchemy-utils
 substrate-interface
-web3>5.0 
+web3>5.0
+xlsxwriter

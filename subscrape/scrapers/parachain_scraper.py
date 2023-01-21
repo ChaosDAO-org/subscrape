@@ -5,6 +5,7 @@ import logging
 import string
 from subscrape.apis.subscan_wrapper import SubscanWrapper
 
+
 # A generic scraper for parachains
 class ParachainScraper:
     """Scrape a substrate-based (non-EVM) chain for transactions/accounts of interest."""
@@ -16,7 +17,7 @@ class ParachainScraper:
     async def scrape(self, operations, chain_config) -> list:
         """Performs all the operations it was given by determining the operation and then calling the corresponding 
         method.
-        
+
         :param operations: A dict of operations and it's subdicts
         :type operations: dict
         :param chain_config: the `ScrapeConfig` to bubble down configuration properties
@@ -42,7 +43,7 @@ class ParachainScraper:
                 events_list = operations[operation]
                 new_items = await self.api.fetch_events(events_list)
             else:
-                self.logger.error(f"config contained an operation that does not exist: {operation}")            
+                self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
 
             items.extend(new_items)
@@ -74,8 +75,8 @@ class ParachainScraper:
             if (type(module) is string or type(module) is str) and module.startswith("_"):
                 continue
 
-            # if we want to scrape all extrinsics, we set call to None, otherwise we take the list of calls from the module
-            if module == None:
+            # if we want to scrape all extrinsics, we set call to None. Otherwise, take list of calls from the module
+            if module is None:
                 calls = None
             else:
                 calls = modules[module]
