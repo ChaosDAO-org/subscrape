@@ -33,13 +33,13 @@ async def test__decode_token_swap_transaction():
     for timestamp in transactions:
         tx = transactions[timestamp]
         if tx['hash'] == '0x066f0e5a15d4c0094caa83addf6e60ea35c21b9212dfdc998ca89809307c3b82':
-            logging.info(f'for hash {tx["hash"]} the full transaction is {tx}')
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
             assert tx['input_a_token_symbol'] == 'ZLK'
             assert tx['output_a_token_symbol'] == 'USDC'
             assert_value_within_range(tx['input_a_quantity'], 7.743865640456116)
             assert_value_within_range(tx['output_a_quantity'], 22.428698)
         elif tx['hash'] == '0x921e89b531d8ad251e065a5cedc2fdaeacd3ca5fd9120bfbef5c2c9054b22263':
-            logging.info(f'for hash {tx["hash"]} the full transaction is {tx}')
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
             assert tx['input_a_token_symbol'] == 'WMOVR'
             assert tx['output_a_token_symbol'] == 'USDC'
             assert_value_within_range(tx['input_a_quantity'], 1.519)
@@ -93,8 +93,4 @@ def assert_value_within_range(actual, expected, tolerance_percent=1):
     upper_limit = expected_float + tolerance
     assert actual_float >= lower_limit
     assert actual_float <= upper_limit
-
-
-test__decode_token_swap_transaction()
-
 
