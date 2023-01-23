@@ -2,19 +2,18 @@ __author__ = 'spazcoin@gmail.com @spazvt'
 __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import asyncio
+import math
 from datetime import datetime
 import httpx
 import json
 import logging
-from ratelimit import limits, sleep_and_retry
 import time
 
 # "Powered by https://moonbeam.moonscan.io APIs"
 # https://moonbeam.moonscan.io/apis#contracts
 
-MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 1  # not published, but we ran into issues with higher values
-MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 3  # "5 calls per sec/IP" but occasionally rate limit hit with 4calls/sec
-MAX_CALLS_PER_SEC = MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
+MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 0.195  # Empirically determined. Above this, API rate limit errors occur.
+MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 5      # "5 calls per sec/IP"
 
 
 class MoonscanWrapper:
@@ -23,15 +22,21 @@ class MoonscanWrapper:
         self.logger = logging.getLogger(__name__)
         self.endpoint = f"https://api-{chain}.moonscan.io/api"
         self.api_key = api_key
-        global MAX_CALLS_PER_SEC
+        if api_key is None:
+            self.max_calls_per_sec = MOONSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY
+        else:
+            self.max_calls_per_sec = MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
+        self.min_wait_between_queries = 1 / self.max_calls_per_sec
+        self.logger.info(f'Moonscan.io rate limit set to {self.max_calls_per_sec} API calls per second.'
+                         f' Minimum wait time between queries is {self.min_wait_between_queries:.3f} seconds.')
         if api_key is not None:
-            MAX_CALLS_PER_SEC = MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
-        self.logger.info(f'Moonscan.io rate limit set to {MAX_CALLS_PER_SEC} API calls per second.')
-        self.semaphore = asyncio.Semaphore(MAX_CALLS_PER_SEC)
+            api_key_sec_between_queries = 1 / MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
+            self.logger.info(f'Moonscan.io rate limit could be {MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY} calls/sec'
+                             f' ({api_key_sec_between_queries:.3f} sec between queries) if you had an API key.')
+        self.time_of_last_request = 0
+        self.semaphore = asyncio.Semaphore(math.ceil(self.max_calls_per_sec))
         self.lock = asyncio.Lock()
 
-    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    # @limits(calls=MAX_CALLS_PER_SEC, period=1)
     async def _query(self, params, client=None):
         """Rate limited call to fetch another page of data from the Moonscan.io block explorer website
 
@@ -50,12 +55,18 @@ class MoonscanWrapper:
 
         response = None
         should_request = True
+        if self.time_of_last_request == 0:
+            self.time_of_last_request = time.time()
         while should_request:  # loop until we get a response
-            before = datetime.now()
+            time_now = time.time()
+            time_since_last_request = time_now - self.time_of_last_request
+            self.time_of_last_request = time_now
             async with self.semaphore:
+                self.logger.debug(f"sending httpx request at {datetime.now().strftime('%H:%M:%S.%f')[:-3]} and"
+                                  f" {time_since_last_request:.3f} sec since the last query. {params['action']=}")
                 response = await client.get(self.endpoint, params=params, timeout=30.0)
-            after = datetime.now()
-            self.logger.debug("request took: " + str(after - before))
+            time_since_last_request = time.time() - self.time_of_last_request
+            self.logger.debug(f"request took: {time_since_last_request:.3} seconds. {self.time_of_last_request=:.3f}")
 
             # lock to prevent multiple threads from trying to sleep at the same time
             await self.lock.acquire()
@@ -68,7 +79,22 @@ class MoonscanWrapper:
                     self.logger.info(response.headers)
                     raise Exception(f"Error: {response.status_code}")
                 else:
-                    should_request = False
+                    response_json = json.loads(response.text)
+                    if response_json['result'] == "Max rate limit reached, please use API Key for higher rate limit":
+                        self.logger.warning("API rate limit exceeded. Waiting 30 seconds and retrying...")
+                        await asyncio.sleep(30)
+                    else:
+                        should_request = False
+                        if ('status' in response_json and response_json['status'] == "0") \
+                                or ('message' in response_json and response_json['message'] == "NOTOK"):
+                            self.logger.warning(f'Moonscan API query failed for {params=} because'
+                                                f' "{response_json["result"]}" at'
+                                                f' {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
+                        else:
+                            # We received a normal response.
+                            # Check if we should sleep a little to avoid exceeding the rate limit
+                            if time_since_last_request < self.min_wait_between_queries:
+                                await asyncio.sleep(self.min_wait_between_queries - time_since_last_request)
             finally:
                 self.lock.release()
 
@@ -96,8 +122,8 @@ class MoonscanWrapper:
             response_obj = await self._query(params)
 
             if response_obj["status"] == "0":
-                self.logger.info(f"received empty result. message='{response_obj['message']}' and result='{response_obj['result']}'"
-                                 f" at {time.strftime('%X')}")
+                self.logger.info(f"received empty result. message='{response_obj['message']}' and"
+                                 f" result='{response_obj['result']}' at {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
                 return
 
             elements = response_obj["result"]
@@ -150,7 +176,7 @@ class MoonscanWrapper:
         response_dict = await self._query(params)   # will add on the optional API key
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
             self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"'
-                             f' at {time.strftime("%X")}')
+                             f' at {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
             return None
         else:
             # response_dict['result'] should contain a long string representation of the contract abi.

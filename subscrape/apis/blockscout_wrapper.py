@@ -6,7 +6,6 @@ from datetime import datetime
 import httpx
 import json
 import logging
-from ratelimit import limits, sleep_and_retry
 
 
 class BlockscoutWrapper:
@@ -18,8 +17,6 @@ class BlockscoutWrapper:
         self.semaphore = asyncio.Semaphore(5)
         self.lock = asyncio.Lock()
 
-    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
-    # @limits(calls=5, period=1)      # No API limit stated on Blockscout website, so choose conservative 5 calls/sec
     async def __query(self, params, client=None):
         """Rate limited call to fetch another page of data from the Blockscout block explorer website
 
@@ -50,7 +47,7 @@ class BlockscoutWrapper:
                     await asyncio.sleep(1)
                 elif response.status_code != 200:
                     self.logger.info(f"Status Code: {response.status_code}")
-                    self.logger.info(response.headers)
+                    self.logger.info(response)
                     raise Exception(f"Error: {response.status_code}")
                 else:
                     should_request = False

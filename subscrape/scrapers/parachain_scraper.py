@@ -15,7 +15,7 @@ class ParachainScraper:
         self.api: SubscanWrapper = api
 
     async def scrape(self, operations, chain_config) -> list:
-        """Performs all the operations it was given by determining the operation and then calling the corresponding 
+        """Performs all the operations it was given by determining the operation and then calling the corresponding
         method.
 
         :param operations: A dict of operations and it's subdicts
@@ -47,7 +47,7 @@ class ParachainScraper:
                 exit
 
             items.extend(new_items)
-        
+
         return items
 
     async def scrape_module_calls(self, modules, chain_config, fetch_function) -> list:
@@ -82,7 +82,7 @@ class ParachainScraper:
                 calls = modules[module]
 
             module_config = extrinsic_config.create_inner_config(calls)
-            
+
             # if we want to scrape all calls, calls is None. In that case, we just set it to a list containing None
             if calls is None:
                 calls = [None]

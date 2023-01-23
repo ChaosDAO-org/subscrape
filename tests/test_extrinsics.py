@@ -11,7 +11,7 @@ async def test_fetch_extrinsics_list():
     extrinsic_idx = "14238250-2"
     
     config = {
-        chain:{
+        chain: {
             "extrinsics-list":[
                 extrinsic_idx
             ],
@@ -44,7 +44,7 @@ async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": auto_hydrate,
             "extrinsics": None,
             "_params": {
@@ -76,9 +76,9 @@ async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
 async def test_fetch_extrinsics_by_module_call():
         
     config = {
-        "kusama":{
+        "kusama": {
             "_auto_hydrate": False,
-            "extrinsics":{
+            "extrinsics": {
                 "bounties": ["propose_bounty"]
             }
         }
@@ -93,7 +93,7 @@ async def test_fetch_extrinsics_by_module_call():
     logging.info("testing")
 
     db = SubscrapeDB()
-    extrinsics = db.query_extrinsics(module = "bounties", call = "propose_bounty").all()
+    extrinsics = db.query_extrinsics(module="bounties", call="propose_bounty").all()
 
     extrinsics = [e for e in extrinsics if e.id == "14061443-2"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
@@ -125,13 +125,13 @@ async def test_fetch_extrinsics_by_module():
 
     db = SubscrapeDB()
 
-    extrinsics = db.query_extrinsics(module = "bounties", call = "propose_bounty")
+    extrinsics = db.query_extrinsics(module="bounties", call="propose_bounty")
     extrinsics = [e for e in extrinsics if e.id == "12935940-3"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
     extrinsic = extrinsics[0]
     assert extrinsic.extrinsic_hash == '0x28b3e9dc097036a98b43b9792745be89d3fecbbca71200b45a2aba901c7cc5af'
 
-    extrinsics = db.query_extrinsics(module = "bounties", call = "extend_bounty_expiry")
+    extrinsics = db.query_extrinsics(module="bounties", call="extend_bounty_expiry")
     extrinsics = [e for e in extrinsics if e.id == "14534356-3"]
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
     extrinsic = extrinsics[0]
@@ -139,13 +139,14 @@ async def test_fetch_extrinsics_by_module():
 
     db.close()
 
+
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_address():
     
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
             "extrinsics": None,
             "_params": {
@@ -170,14 +171,13 @@ async def test_fetch_extrinsics_by_address():
     db.close()
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_repeatedly():
     
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
             "extrinsics": None,
             "_params": {

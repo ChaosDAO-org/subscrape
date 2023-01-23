@@ -7,10 +7,10 @@ from subscrape.db.subscrape_db import SubscrapeDB
 
 @pytest.mark.asyncio
 async def test_fetch_events_list():
-    
+
     chain = "kusama"
     event_index = "14238250-39"
-    
+
     config = {
         chain: {
             "events-list": [
@@ -35,12 +35,12 @@ async def test_fetch_events_list():
     assert type(event.params) is list
 
     db.close()
-    
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("auto_hydrate", [True, False])
 async def test_fetch_and_hydrate_event(auto_hydrate):
-    
+
     chain = "kusama"
 
     config = {
@@ -75,15 +75,15 @@ async def test_fetch_and_hydrate_event(auto_hydrate):
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_module_event():
-    
+
     chain = "kusama"
     module_name = "council"
     event_name = "proposed"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
-            "events":{
+            "events": {
                 module_name: [event_name]
             }
         }
@@ -98,7 +98,7 @@ async def test_fetch_events_by_module_event():
     logging.info("testing")
 
     db = SubscrapeDB()
-    events = db.query_events(chain = chain, module = module_name, event = event_name).all()
+    events = db.query_events(chain=chain, module=module_name, event=event_name).all()
 
     events = [e for e in events if e.id == "52631-4"]
     assert len(events) == 1, "Expected 1 event"
@@ -110,15 +110,15 @@ async def test_fetch_events_by_module_event():
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_module():
-    
+
     chain = "kusama"
     module_name = "council"
     event_names = ["proposed", "voted"]
 
     config = {
-        "kusama":{
+        "kusama": {
             "_auto_hydrate": False,
-            "events":{
+            "events": {
                 "council": None,
             }
         }
@@ -134,13 +134,13 @@ async def test_fetch_events_by_module():
 
     db = SubscrapeDB()
 
-    events = db.query_events(chain = chain, module = module_name, event = event_names[0]).all()
+    events = db.query_events(chain=chain, module=module_name, event=event_names[0]).all()
     events = [e for e in events if e.id == "14966317-39"]
     assert len(events) == 1, "Expected 1 event"
     event: Event = events[0]
     assert event.extrinsic_id == '14966317-2'
 
-    events = db.query_events(chain = chain, module = module_name, event = event_names[1]).all()
+    events = db.query_events(chain=chain, module=module_name, event=event_names[1]).all()
     events = [e for e in events if e.id == "14938460-47"]
     assert len(events) == 1, "Expected 1 event"
     event = events[0]
@@ -151,11 +151,11 @@ async def test_fetch_events_by_module():
 
 @pytest.mark.asyncio
 async def test_fetch_events_by_address():
-    
+
     chain = "kusama"
 
     config = {
-        chain:{
+        chain: {
             "_auto_hydrate": False,
             "events": None,
             "_params": {
@@ -183,7 +183,7 @@ async def test_fetch_events_by_address():
 
 @pytest.mark.asyncio
 async def test_fetch_events_repeatedly():
-    
+
     chain = "kusama"
 
     config = {
@@ -229,7 +229,7 @@ async def test_fetch_events_stop_on_known_data():
     We counted the number of events in the database before and after the second scrape, and know exactly how many
     events there should be.
     """
-    
+
     chain = "kusama"
 
     config = {
