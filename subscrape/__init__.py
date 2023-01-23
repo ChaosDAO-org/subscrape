@@ -87,7 +87,7 @@ def scraper_factory(chain_name, chain_config: ScrapeConfig, db_factory: callable
             db_connection_string = "sqlite:///data/cache/default.db"
         else:
             db_connection_string = chain_config.db_connection_string
-        
+
         # create the database object
         if db_factory is None:
             db = SubscrapeDB(db_connection_string)

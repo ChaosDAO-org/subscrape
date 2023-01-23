@@ -10,11 +10,11 @@ from substrateinterface.utils import ss58
 import asyncio
 from subscrape.scrapers.scrape_config import ScrapeConfig
 
-#import http.client
-#http.client.HTTPConnection.debuglevel = 1
-#requests_log = logging.getLogger("requests.packages.urllib3")
-#requests_log.setLevel(logging.DEBUG)
-#requests_log.propagate = True
+# import http.client
+# http.client.HTTPConnection.debuglevel = 1
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 SUBSCAN_MAX_CALLS_PER_SEC_WITHOUT_API_KEY = 2
 SUBSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY = 30
@@ -84,7 +84,7 @@ class SubscanWrapper:
 
         response = None
         should_request = True
-        while should_request: # loop until we get a response
+        while should_request:   # loop until we get a response
             before = datetime.now()
             async with self.semaphore:
                 response = await client.post(url, headers=headers, data=body)
@@ -109,17 +109,17 @@ class SubscanWrapper:
         # self.logger.debug(response.text)
         # unpack the payload
         obj = json.loads(response.text)
-        return obj["data"]        
+        return obj["data"]
 
     # iterates through all pages until it processed all elements
     # or gets False from the processor
     async def _iterate_pages(
         self,
-        method, 
-        element_processor, 
+        method,
+        element_processor,
         list_key,
         last_id_deducer,
-        body={}, 
+        body={},
         filter=None,
         stop_on_known_data=True,
         ) -> list:
@@ -142,10 +142,10 @@ class SubscanWrapper:
         :return: the items processed
         """
 
-        done = False        # keep crunching until we are done
-        rows_per_page = 100 # constant for the rows per page to query
-        items = []          # the items we will return
-        limit = 0           # max amount of items to be queried. to be determined after the first call
+        done = False            # keep crunching until we are done
+        rows_per_page = 100     # constant for the rows per page to query
+        items = []              # the items we will return
+        limit = 0               # max amount of items to be queried. to be determined after the first call
 
         body["row"] = rows_per_page
         last_id = None
@@ -237,14 +237,14 @@ class SubscanWrapper:
 
             self.db.write_item(extrinsic)
             return extrinsic
-        
+
         return _extrinsic_metadata_processor
 
     def _create_event_metadata_processor(self, already_existing_event_pks: list):
         """
         Creates a function that processes event metadata and stores it in the database.
         `already_existing_event_pks` is used to prevent duplicate events from being written to the database.
-        
+
         :param already_existing_event_pks: a list of event primary keys that already exist in the database
         :type already_existing_event_pks: list
         :return: The function that can be used to process an element in the list
@@ -265,7 +265,7 @@ class SubscanWrapper:
             if (self.chain, event_id) in already_existing_event_pks:
                 return None
 
-            # block_number is the the string until the hyphen
+            # block_number is the string until the hyphen
             block_number = int(raw_event_metadata["event_index"].split("-")[0])
 
             event = Event(
@@ -281,13 +281,13 @@ class SubscanWrapper:
 
             self.db.write_item(event)
             return event
-        
+
         return _event_metadata_processor
 
     def update_extrinsic_from_raw_extrinsic(self, extrinsic: Extrinsic, raw_extrinsic: dict):
         """
         Updates an extrinsic with the data from the raw extrinsic.
-        
+
         :param extrinsic: The extrinsic to update
         :type extrinsic: Extrinsic
         :param raw_extrinsic: The raw extrinsic
@@ -324,7 +324,7 @@ class SubscanWrapper:
         :type raw_event: dict
         """
 
-        # Subscan API is delivering the extrinsic id instead of the event id 
+        # Subscan API is delivering the extrinsic id instead of the event id
         # in the event_index field. So let's work around that.
         event.id = f'{raw_event["block_num"]}-{raw_event["event_idx"]}'
         event.chain = self.chain
@@ -351,7 +351,7 @@ class SubscanWrapper:
         self.logger.info(f"Fetching extrinsic {module}.{call} from {self.endpoint}")
 
         # create a list of already fetched extrinsics
-        already_fetched_extrinsics = self.db.query_extrinsics(chain = self.chain, module = module, call = call).all()
+        already_fetched_extrinsics = self.db.query_extrinsics(chain=self.chain, module=module, call=call).all()
         already_fetched_extrinsic_pks = [(e.chain, e.id) for e in already_fetched_extrinsics]
 
         body = {"module": module, "call": call}
@@ -370,7 +370,7 @@ class SubscanWrapper:
 
         self.db.flush()
 
-        if config.auto_hydrate == True:
+        if config.auto_hydrate is True:
             self.logger.info(f"Hydrating extrinsics {module}.{call} from {self.endpoint}")
             extrinsic_indexes = [e.id for e in items]
             items = await self.fetch_extrinsics(extrinsic_indexes)
@@ -381,8 +381,8 @@ class SubscanWrapper:
         """
         Fetches the extrinsic with the specified index and writes it to the db.
 
-        :param extrinsic_index: The extrinsix index to fetch
-        :type extrinsic_index: str
+        :param extrinsic_indexes: The extrinsic indexes to fetch
+        :type extrinsic_indexes: str
         :param update_existing: Whether to update the extrinsic if it already exists in the db. Defaults to True.
         :type update_existing: bool
         :return: The extrinsics
@@ -393,11 +393,11 @@ class SubscanWrapper:
         
         self.logger.info("Building list of extrinsics to fetch...")
 
-        already_fetched_extrinsics = self.db.query_extrinsics(chain = self.chain, extrinsic_ids = extrinsic_indexes).all()
+        already_fetched_extrinsics = self.db.query_extrinsics(chain=self.chain, extrinsic_ids=extrinsic_indexes).all()
         already_fetched_extrinsic_ids = [e.id for e in already_fetched_extrinsics]
 
         # if we do not update existing items, we only need to fetch the ones that are not in the db
-        if update_existing == False:
+        if update_existing is False:
             extrinsic_indexes = already_fetched_extrinsic_ids
 
         self.logger.info(f"Fetching {len(extrinsic_indexes)} extrinsics from {self.endpoint}")
@@ -410,7 +410,7 @@ class SubscanWrapper:
                 batch = extrinsic_indexes[:1000]
                 if len(batch) == 0:
                     break
-                
+
                 futures = []
                 for extrinsic_index in batch:
                     body = {"extrinsic_index": extrinsic_index}
@@ -422,10 +422,10 @@ class SubscanWrapper:
                     futures.append(future)
 
                 raw_extrinsics = await asyncio.gather(*futures)
-                
+
                 for raw_extrinsic in raw_extrinsics:
                     extrinsic_id = self._extrinsic_index_deducer(raw_extrinsic)
-                    
+
                     if extrinsic_id in already_fetched_extrinsic_ids:
                         extrinsic = self.db.query_extrinsic(self.chain, extrinsic_id)
                     else:
@@ -462,7 +462,7 @@ class SubscanWrapper:
         self.logger.info(f"Fetching events {module}.{call} from {self.endpoint}")
 
         # create a list of already fetched event ids
-        already_fetched_events = self.db.query_events(chain = self.chain, module = module, event = call).all()
+        already_fetched_events = self.db.query_events(chain=self.chain, module=module, event=call).all()
         already_fetched_event_pks = [(e.chain, e.id) for e in already_fetched_events]
 
         body = {"module": module, self._api_method_events_call: call}
@@ -481,7 +481,7 @@ class SubscanWrapper:
 
         self.db.flush()
 
-        if config.auto_hydrate == True:
+        if config.auto_hydrate is True:
             self.logger.info(f"Hydrating events from {module}.{call} from {self.endpoint}")
             event_indexes = [e.id for e in items]
             items = await self.fetch_events(event_indexes)
@@ -501,12 +501,12 @@ class SubscanWrapper:
         """
 
         items = []
-        
-        already_fetched_events = self.db.query_events(chain = self.chain, event_ids = event_indexes).all()
+
+        already_fetched_events = self.db.query_events(chain=self.chain, event_ids=event_indexes).all()
         already_fetched_event_ids = [e.id for e in already_fetched_events]
 
         # if we do not update existing items, we only need to fetch the ones that are not in the db
-        if update_existing == False:
+        if update_existing is False:
             event_indexes = already_fetched_event_ids
 
         self.logger.info(f"Fetching {len(event_indexes)} events from {self.endpoint}")
@@ -519,12 +519,12 @@ class SubscanWrapper:
                 batch = event_indexes[:1000]
                 if len(batch) == 0:
                     break
-                
+
                 futures = []
                 for event_index in batch:
                     body = {"event_index": event_index}
                     task = self._query(method, body=body)
-                    
+
                     self.logger.debug(f"Spawning task for {event_index}")
                     future = asyncio.ensure_future(task)
                     await asyncio.sleep(1/MAX_CALLS_PER_SEC)
@@ -534,7 +534,7 @@ class SubscanWrapper:
 
                 for raw_event in raw_events:
                     event_id = self._event_index_deducer(raw_event)
-                    
+
                     if event_id in already_fetched_event_ids:
                         event = self.db.query_event(self.chain, event_id)
                     else:

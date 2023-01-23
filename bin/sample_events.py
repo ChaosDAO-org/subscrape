@@ -27,8 +27,8 @@ async def main():
 
     logging.info("transforming...")
     db = SubscrapeDB(db_connection_string)
-    
-    events = db.query_events(chain = chain, module = module_name, event = event_name).all()
+
+    events = db.query_events(chain=chain, module=module_name, event=event_name).all()
 
     # print all event ids
     for event in events:

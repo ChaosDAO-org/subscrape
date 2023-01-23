@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 import platform
 import sys
-import time
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 import subscrape
 
