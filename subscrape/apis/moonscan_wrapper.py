@@ -37,7 +37,7 @@ class MoonscanWrapper:
         self.semaphore = asyncio.Semaphore(math.ceil(self.max_calls_per_sec))
         self.lock = asyncio.Lock()
 
-    async def _query(self, params, client=None):
+    async def __query(self, params, client=None):
         """Rate limited call to fetch another page of data from the Moonscan.io block explorer website
 
         :param params: Moonscan.io API call params that filter which transactions are returned.
@@ -102,7 +102,7 @@ class MoonscanWrapper:
         response_json = json.loads(response.text)
         return response_json
 
-    async def _iterate_pages(self, element_processor, params={}, tx_filter=None):
+    async def __iterate_pages(self, element_processor, params={}, tx_filter=None):
         """Repeatedly fetch transactions from Moonscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param element_processor: method to process each transaction as it is received
@@ -119,7 +119,7 @@ class MoonscanWrapper:
 
         while not done:
             params["startblock"] = start_block
-            response_obj = await self._query(params)
+            response_obj = await self.__query(params)
 
             if response_obj["status"] == "0":
                 self.logger.info(f"received empty result. message='{response_obj['message']}' and"
@@ -160,9 +160,9 @@ class MoonscanWrapper:
         params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
                   "endblock": "99999999", "sort": "asc"}
         if config and hasattr(config, 'filter'):
-            await self._iterate_pages(element_processor, params=params, tx_filter=config.filter)
+            await self.__iterate_pages(element_processor, params=params, tx_filter=config.filter)
         else:
-            await self._iterate_pages(element_processor, params=params)
+            await self.__iterate_pages(element_processor, params=params)
 
     async def get_contract_abi(self, contract_address):
         """Get a contract's ABI (so that its transactions can be decoded).
@@ -173,7 +173,7 @@ class MoonscanWrapper:
         :rtype: str or None
         """
         params = {"module": "contract", "action": "getabi", "address": contract_address}
-        response_dict = await self._query(params)   # will add on the optional API key
+        response_dict = await self.__query(params)   # will add on the optional API key
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
             self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"'
                              f' at {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
@@ -191,6 +191,6 @@ class MoonscanWrapper:
         :rtype: dict or None
         """
         params = {"module": "proxy", "action": "eth_getTransactionReceipt", "txhash": tx_hash}
-        response_dict = await self._query(params)   # will add on the optional API key
+        response_dict = await self.__query(params)   # will add on the optional API key
         # response_dict['result'] should contain a long string representation of the tx receipt.
         return response_dict['result']

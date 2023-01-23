@@ -49,9 +49,9 @@ class SubscanWrapper:
         self.lock = asyncio.Lock()
 
         self._extrinsic_index_deducer = lambda e: e["extrinsic_index"]
-        #self._events_index_deducer = lambda e: f"{e['event_index']}"
+        # self._events_index_deducer = lambda e: f"{e['event_index']}"
         self._event_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
-        #self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
+        # self._transfers_index_deducer = lambda e: f"{e['block_num']}-{e['event_idx']}"
         self._last_id_deducer = lambda e: e["id"]
         self._api_method_extrinsics = "/api/v2/scan/extrinsics"
         self._api_method_extrinsic = "/api/scan/extrinsic"
@@ -59,7 +59,7 @@ class SubscanWrapper:
         self._api_method_event = "/api/scan/event"
         self._api_method_events_call = "event_id"
 
-    @sleep_and_retry                # be patient and sleep this thread to avoid exceeding the rate limit
+    @sleep_and_retry  # be patient and sleep this thread to avoid exceeding the rate limit
     # @limits(calls=MAX_CALLS_PER_SEC, period=1)     # API limits us to 30 calls every second
     async def _query(self, method, headers={}, body={}, client=None):
         """Rate limited call to fetch another page of data from the Subscan.io block explorer website
@@ -84,7 +84,7 @@ class SubscanWrapper:
 
         response = None
         should_request = True
-        while should_request:   # loop until we get a response
+        while should_request:  # loop until we get a response
             before = datetime.now()
             async with self.semaphore:
                 response = await client.post(url, headers=headers, data=body)
@@ -114,15 +114,15 @@ class SubscanWrapper:
     # iterates through all pages until it processed all elements
     # or gets False from the processor
     async def _iterate_pages(
-        self,
-        method,
-        element_processor,
-        list_key,
-        last_id_deducer,
-        body={},
-        filter=None,
-        stop_on_known_data=True,
-        ) -> list:
+            self,
+            method,
+            element_processor,
+            list_key,
+            last_id_deducer,
+            body={},
+            filter=None,
+            stop_on_known_data=True,
+    ) -> list:
         """Repeatedly fetch transactions from Subscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param method: Subscan.io API call method.
@@ -156,7 +156,7 @@ class SubscanWrapper:
 
             data = await self._query(method, body=body)
             # determine the limit on the first run
-            if limit == 0: 
+            if limit == 0:
                 limit = data["count"]
                 self.logger.info(f"About to fetch {limit} entries.")
                 if limit == 0:
@@ -366,7 +366,7 @@ class SubscanWrapper:
             body=body,
             filter=config.filter,
             stop_on_known_data=config.stop_on_known_data,
-            )
+        )
 
         self.db.flush()
 
@@ -390,7 +390,7 @@ class SubscanWrapper:
         """
 
         items = []
-        
+
         self.logger.info("Building list of extrinsics to fetch...")
 
         already_fetched_extrinsics = self.db.query_extrinsics(chain=self.chain, extrinsic_ids=extrinsic_indexes).all()
@@ -418,7 +418,7 @@ class SubscanWrapper:
 
                     self.logger.debug(f"Spawning task for {extrinsic_index}")
                     future = asyncio.ensure_future(task)
-                    await asyncio.sleep(1/MAX_CALLS_PER_SEC)
+                    await asyncio.sleep(1 / MAX_CALLS_PER_SEC)
                     futures.append(future)
 
                 raw_extrinsics = await asyncio.gather(*futures)
@@ -527,7 +527,7 @@ class SubscanWrapper:
 
                     self.logger.debug(f"Spawning task for {event_index}")
                     future = asyncio.ensure_future(task)
-                    await asyncio.sleep(1/MAX_CALLS_PER_SEC)
+                    await asyncio.sleep(1 / MAX_CALLS_PER_SEC)
                     futures.append(future)
 
                 raw_events = await asyncio.gather(*futures)

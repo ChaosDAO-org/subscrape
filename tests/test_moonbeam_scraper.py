@@ -93,4 +93,3 @@ def assert_value_within_range(actual, expected, tolerance_percent=1):
     upper_limit = expected_float + tolerance
     assert actual_float >= lower_limit
     assert actual_float <= upper_limit
-
