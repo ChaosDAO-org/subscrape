@@ -29,7 +29,7 @@ class MoonscanWrapper:
         self.min_wait_between_queries = 1 / self.max_calls_per_sec
         self.logger.info(f'Moonscan.io rate limit set to {self.max_calls_per_sec} API calls per second.'
                          f' Minimum wait time between queries is {self.min_wait_between_queries:.3f} seconds.')
-        if api_key is not None:
+        if api_key is None:
             api_key_sec_between_queries = 1 / MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
             self.logger.info(f'Moonscan.io rate limit could be {MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY} calls/sec'
                              f' ({api_key_sec_between_queries:.3f} sec between queries) if you had an API key.')
@@ -87,9 +87,8 @@ class MoonscanWrapper:
                         should_request = False
                         if ('status' in response_json and response_json['status'] == "0") \
                                 or ('message' in response_json and response_json['message'] == "NOTOK"):
-                            self.logger.warning(f'Moonscan API query failed for {params=} because'
-                                                f' "{response_json["result"]}" at'
-                                                f' {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
+                            self.logger.warning(f'Moonscan API query failed with response "{response_json["result"]}"'
+                                                f' at {datetime.now().strftime("%H:%M:%S.%f")[:-3]} with {params=}')
                         else:
                             # We received a normal response.
                             # Check if we should sleep a little to avoid exceeding the rate limit

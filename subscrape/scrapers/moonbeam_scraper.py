@@ -141,6 +141,9 @@ class MoonbeamScraper:
         else:
             reference = reference.replace(" ", "_")
 
+        if len(self.transactions[reference]) == 0:
+            return
+
         # Export the transactions to a JSON file
         json_file_path = self.db_path.parent / f'{self.db_path.stem}{reference}.json'
         if json_file_path.exists():     # delete and recreate the file
