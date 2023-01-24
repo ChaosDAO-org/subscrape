@@ -6,6 +6,7 @@ import copy
 class ScrapeConfig:
     def __init__(self, config):
         self.filter = None
+        self.filter_conditions = None
         self.processor_name = None
         self.skip = False
         self.params = None
@@ -31,6 +32,7 @@ class ScrapeConfig:
         filter_conditions = config.get("_filter", None)
         if filter_conditions is not None:
             self.filter = self._filter_factory(filter_conditions)
+            self.filter_conditions = filter_conditions
 
         processor_name = config.get("_processor", None)
         if processor_name is not None:
@@ -134,4 +136,5 @@ class ScrapeConfig:
                         else:
                             continue
             return False
+
         return filter

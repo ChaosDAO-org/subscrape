@@ -13,6 +13,27 @@ import subscrape
 
 
 @pytest.mark.asyncio
+async def test__extract_addresses_calling_contract_method():
+    # Specifically, adding liquidity to the Solarbeam DEX
+    config = {
+        "moonriver": {
+            "transactions": {
+                "0xaa30ef758139ae4a7f798112902bf6d65612045f": [
+                    "0xe8e33700"
+                ],
+                "_filter": [{"blockNumber": [{">=": 992929}, {"<=": 993002}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__process_method_in_transaction' scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 2
+    assert ('0x48630c63beba19bbdc6e57d7d9c98735f5dd3d37' in items_scraped)
+    assert ('0xad2b8e18cc7bddde1fe7e254d78abf1188b6c8f4' in items_scraped)
+
+
+@pytest.mark.asyncio
 async def test__decode_token_swap_transaction():
     test_acct = "0xBa4123F4b2da090aeCef69Fd0946D42Ecd4C788E"
     config = {

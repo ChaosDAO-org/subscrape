@@ -63,7 +63,7 @@ class MoonscanWrapper:
             self.time_of_last_request = time_now
             async with self.semaphore:
                 self.logger.debug(f"sending httpx request at {datetime.now().strftime('%H:%M:%S.%f')[:-3]} and"
-                                  f" {time_since_last_request:.3f} sec since the last query. {params['action']=}")
+                                  f" {time_since_last_request:.3f} sec since the last query. {params=}")
                 response = await client.get(self.endpoint, params=params, timeout=30.0)
             time_since_last_request = time.time() - self.time_of_last_request
             self.logger.debug(f"request took: {time_since_last_request:.3} seconds. {self.time_of_last_request=:.3f}")
@@ -113,12 +113,15 @@ class MoonscanWrapper:
         :type tx_filter: function
         """
         done = False            # keep crunching until we are done
-        start_block = 0         # iterator for the page we want to query
         previous_block = 0      # to check if the iterator actually moved forward
         count = 0               # counter for how many items we queried already
+        if 'startblock' in params:
+            start_block = int(params['startblock'])
+        else:
+            start_block = 0
 
         while not done:
-            params["startblock"] = start_block
+            params["startblock"] = str(start_block)
             response_obj = await self.__query(params)
 
             if response_obj["status"] == "0":
@@ -136,9 +139,9 @@ class MoonscanWrapper:
 
             # update counters and check if we should exit
             count += len(elements)
-            self.logger.info(count)
+            self.logger.debug(count)
 
-            start_block = element["blockNumber"]
+            start_block = int(element["blockNumber"])
             if start_block == previous_block:
                 done = True
             previous_block = start_block
@@ -157,9 +160,42 @@ class MoonscanWrapper:
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
         """
-        params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
-                  "endblock": "99999999", "sort": "asc"}
-        if config and hasattr(config, 'filter'):
+        start_block = 1
+        end_block = 99999999
+        if config.filter_conditions is not None:
+            for group in config.filter_conditions:
+                if 'blockNumber' in group:
+                    predicates = group['blockNumber']
+                    for predicate in predicates:
+                        if '==' in predicate:
+                            value = predicate['==']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value
+                            end_block = value
+                        elif '<' in predicate:
+                            value = predicate['<']
+                            if type(value) is not int:
+                                value = int(value)
+                            end_block = value - 1
+                        elif '<=' in predicate:
+                            value = predicate['<=']
+                            if type(value) is not int:
+                                value = int(value)
+                            end_block = value
+                        elif '>' in predicate:
+                            value = predicate['>']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value + 1
+                        elif '>=' in predicate:
+                            value = predicate['>=']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value
+        params = {"module": "account", "action": "txlist", "address": address,
+                  "startblock": str(start_block), "endblock": str(end_block), "sort": "asc"}
+        if config and config.filter is not None:
             await self.__iterate_pages(element_processor, params=params, tx_filter=config.filter)
         else:
             await self.__iterate_pages(element_processor, params=params)

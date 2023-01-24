@@ -59,7 +59,7 @@ class MoonbeamScraper:
 
                 for contract in contracts:
                     # ignore metadata
-                    if operation.startswith("_"):
+                    if contract.startswith("_"):
                         continue
 
                     methods = contracts[contract]
@@ -90,8 +90,11 @@ class MoonbeamScraper:
                         processor = self.__process_methods_in_transaction_factory(contract_method, method)
                         self.logger.info(f"Fetching transactions for {contract_method} from"
                                          f" {self.moonscan_api.endpoint}")
-                        await self.moonscan_api.fetch_and_process_transactions(contract, processor)
+                        await self.moonscan_api.fetch_and_process_transactions(contract, processor,
+                                                                               config=method_config)
                         self.__export_transactions(contract, contract_method)
+                        for account in self.transactions[contract_method]:
+                            items_scraped.append(account)
 
             elif operation == "account_transactions":
                 account_transactions_payload = operations[operation]
@@ -100,18 +103,22 @@ class MoonbeamScraper:
                     self.logger.info("Config asks to skip account_transactions.")
                     continue
 
-                if "accounts" in account_transactions_payload:
-                    accounts = account_transactions_payload['accounts']
-                    for account in accounts:
-                        self.transactions[account] = {}
-                        processor = self.__process_transactions_on_account_factory(account)
-                        self.logger.info(f"Fetching transactions for {account} from {self.moonscan_api.endpoint}")
-                        await self.moonscan_api.fetch_and_process_transactions(account, processor,
-                                                                         config=account_transactions_config)
-                        self.__export_transactions(account)
-                        items_scraped.extend(self.transactions[account])
-                else:
-                    self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
+                for option in account_transactions_payload:
+                    if option == "accounts":
+                        accounts = account_transactions_payload['accounts']
+                        for account in accounts:
+                            self.transactions[account] = {}
+                            processor = self.__process_transactions_on_account_factory(account)
+                            self.logger.info(f"Fetching transactions for {account} from {self.moonscan_api.endpoint}")
+                            await self.moonscan_api.fetch_and_process_transactions(account, processor,
+                                                                                   config=account_transactions_config)
+                            self.__export_transactions(account)
+                            items_scraped.extend(self.transactions[account])
+
+                    elif option.startswith("_"):
+                        continue
+                    else:
+                        self.logger.error(f"'accounts' not listed in config for operation '{operation}'.")
             else:
                 self.logger.error(f"config contained an operation that does not exist: {operation}")
                 exit
@@ -141,11 +148,25 @@ class MoonbeamScraper:
         with json_file_path.open('w', encoding="UTF-8") as output_file:
             json.dump(self.transactions[reference], output_file, indent=4, sort_keys=False)
 
+        first_key = list(self.transactions[reference].keys())[0]
+        first_value = self.transactions[reference][first_key]
+        if type(first_value) is int:
+            self.logger.info(f'All transactions exported in JSON to {json_file_path}.')
+            return
+        elif type(first_value) is dict:
+            pandas_dataframe_orient = 'index'
+        elif type(first_value) is list:
+            pandas_dataframe_orient = 'records'
+        else:
+            self.logger.info(f'All transactions exported in JSON to {json_file_path}.')
+            self.logger.warning(f"unexpected type. first account transaction entry has type '{type(first_value)}'")
+            return
+
         # Export the transactions to an XLSX file
         xlsx_file_path = Path(self.db_path.parent) / f'{self.db_path.stem}{reference}.xlsx'
         if xlsx_file_path.exists():     # delete and recreate the file
             xlsx_file_path.unlink()
-        data_frame = pandas.read_json(json_file_path).transpose()
+        data_frame = pandas.read_json(json_file_path, orient=pandas_dataframe_orient)
         (num_rows, num_columns) = data_frame.shape
         writer = pandas.ExcelWriter(xlsx_file_path, engine='xlsxwriter')
         tx_sheet_name = 'Transactions'
@@ -175,7 +196,7 @@ class MoonbeamScraper:
                          f'    and in XLSX format to {xlsx_file_path}')
 
     def __process_methods_in_transaction_factory(self, contract_method, method):
-        def __process_method_in_transaction(transaction):
+        async def __process_method_in_transaction(transaction):
             """Process each transaction from a specific method of a contract, counting the number of transactions for
             each account.
 
