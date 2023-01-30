@@ -66,7 +66,7 @@ async def test__no_entries_returned():
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction_Solarbeam__swapExactTokensForTokens():
+async def test__decode_token_swap_tx_Solarbeam__swapExactTokensForTokens():
     # also testing: swap transaction on Solarbeam DEX. filter range on "timeStamp"
     test_acct = "0xBa4123F4b2da090aeCef69Fd0946D42Ecd4C788E"
     config = {
@@ -80,7 +80,7 @@ async def test__decode_token_swap_transaction_Solarbeam__swapExactTokensForToken
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction_Solarbeam__swapExactTokensForTokens'"
+    logging.info(f"begin 'test__decode_token_swap_tx_Solarbeam__swapExactTokensForTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 2
@@ -109,7 +109,7 @@ async def test__decode_token_swap_transaction_Solarbeam__swapExactTokensForToken
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction_Zenlink__swapExactTokensForTokens():
+async def test__decode_token_swap_tx_Zenlink__swapExactTokensForTokens():
     # also testing: swap transaction on Zenlink DEX. two hops.
     test_acct = "0x2b46c40b6d1f4d77a6719f92864cf40bb049e366"
     config = {
@@ -123,7 +123,7 @@ async def test__decode_token_swap_transaction_Zenlink__swapExactTokensForTokens(
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction_Zenlink__swapExactTokensForTokens'"
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapExactTokensForTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -145,21 +145,21 @@ async def test__decode_token_swap_transaction_Zenlink__swapExactTokensForTokens(
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapExactTokensForETH():
-    # also testing: swap transaction on Solarbeam DEX. filter '==' on blockNumber
-    test_acct = "0x299cd1c791464827ddfb147612244a2c59da91a0"
+async def test__decode_token_swap_tx_Zenlink__swapTokensForExactTokens():
+    # also testing: swap transaction on Zenlink DEX.
+    test_acct = "0x79a8a9ff5717248a5fc0f00cc9920bd4bba77823"
     config = {
         "moonriver": {
             "account_transactions": {
                 "accounts": [
                     test_acct
                 ],
-                "_filter": [{"blockNumber": [{"==": 3471171}]}]
+                "_filter": [{"blockNumber": [{"==": 1224237}]}]
             }
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapExactTokensForETH'"
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapTokensForExactTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -167,13 +167,13 @@ async def test__decode_token_swap_transaction__swapExactTokensForETH():
     transaction_found = False
     for timestamp in transactions:
         tx = transactions[timestamp]
-        if tx['hash'] == '0x0f379919b8dff50c1d83cf92c3aa7eca75e5558251ecf99e9e7fb660faf74c95':
+        if tx['hash'] == '0x3b10057c7d19702732e48d7ec63f1b4f2299dccef79780263d28edbe61e2ed29':
             transaction_found = True
             logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-            assert tx['input_a_token_symbol'] == 'FRAX'
-            assert tx['output_a_token_symbol'] == 'WMOVR'
-            _assert_value_within_range(tx['input_a_quantity'], 100)
-            _assert_value_within_range(tx['output_a_quantity'], 11.526796881289545)
+            assert tx['input_a_token_symbol'] == 'USDC'
+            assert tx['output_a_token_symbol'] == 'WBTC'
+            _assert_value_within_range(tx['input_a_quantity'], 462.79385)
+            _assert_value_within_range(tx['output_a_quantity'], 0.01)
         else:
             continue
     assert transaction_found
@@ -181,115 +181,7 @@ async def test__decode_token_swap_transaction__swapExactTokensForETH():
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapExactETHForTokens():
-    # also testing: swap transaction on Huckleberry DEX. "blockNumber" range in <= >= order. two hop tx
-    test_acct = "0x8e7fbb49f436d0e8a50c02f631e729a57a9a0aca"
-    config = {
-        "moonriver": {
-            "account_transactions": {
-                "accounts": [
-                    test_acct
-                ],
-                "_filter": [{"blockNumber": [{"<=": 3421768}, {">=": 3421760}]}]
-            }
-        }
-    }
-
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapExactETHForTokens'"
-                 f" scraping at {time.strftime('%X')}")
-    items_scraped = await subscrape.scrape(config)
-    assert len(items_scraped) >= 1
-    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
-    transaction_found = False
-    for timestamp in transactions:
-        tx = transactions[timestamp]
-        if tx['hash'] == '0xf4a51bb43a24e5bf7047d563ec831762659a1535bdbcb056764ac4298f4d3b08':
-            transaction_found = True
-            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-            assert tx['input_a_token_symbol'] == 'WMOVR'
-            assert tx['output_a_token_symbol'] == 'DOT.m'
-            _assert_value_within_range(tx['input_a_quantity'], 1)
-            _assert_value_within_range(tx['output_a_quantity'], 1.2598567127)
-        else:
-            continue
-    assert transaction_found
-
-
-@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
-@pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapExactTokensForTokensSupportingFeeOnTransferTokens():
-    # also testing: swap transaction on Huckleberry DEX. filter '==' on blockNumber
-    test_acct = "0x85cf0915c8d3695b03da739e3eaefd5388eb5eef"
-    config = {
-        "moonriver": {
-            "account_transactions": {
-                "accounts": [
-                    test_acct
-                ],
-                "_filter": [{"blockNumber": [{"==": 3313868}]}]
-            }
-        }
-    }
-
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapExactTokensForTokensSupportingFeeOnTransferTokens'"
-                 f" scraping at {time.strftime('%X')}")
-    items_scraped = await subscrape.scrape(config)
-    assert len(items_scraped) >= 1
-    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
-    transaction_found = False
-    for timestamp in transactions:
-        tx = transactions[timestamp]
-        if tx['hash'] == '0xbc065d9aa4fd90a0fb1df3ddfaab633cd3866e5dc069c6ce47f33593d3aa8972':
-            transaction_found = True
-            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-            assert tx['input_a_token_symbol'] == 'WMOVR'
-            assert tx['output_a_token_symbol'] == 'BTC.m'
-            _assert_value_within_range(tx['input_a_quantity'], 0.008232571613605909)
-            _assert_value_within_range(tx['output_a_quantity'], 0.00000302)
-        else:
-            continue
-    assert transaction_found
-
-
-@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
-@pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapTokensForExactETH():
-    # also testing: swap transaction on Huckleberry DEX. "blockNumber" range in <= >= with equal block number. Two hops.
-    test_acct = "0xfc2f3c2b6872d6ad347e78f096026274326ab081"
-    config = {
-        "moonriver": {
-            "account_transactions": {
-                "accounts": [
-                    test_acct
-                ],
-                "_filter": [{"blockNumber": [{"<=": 3427502}, {">=": 3427502}]}]
-            }
-        }
-    }
-
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapTokensForExactETH'"
-                 f" scraping at {time.strftime('%X')}")
-    items_scraped = await subscrape.scrape(config)
-    assert len(items_scraped) >= 1
-    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
-    transaction_found = False
-    for timestamp in transactions:
-        tx = transactions[timestamp]
-        if tx['hash'] == '0x1b036cd6d161622a5f610680b2fc15aee96103a4a884d9338ecb59f65b31753f':
-            transaction_found = True
-            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-            assert tx['input_a_token_symbol'] == 'FTM.m'
-            assert tx['output_a_token_symbol'] == 'WMOVR'
-            _assert_value_within_range(tx['input_a_quantity'], 1.507652227912820355)
-            _assert_value_within_range(tx['output_a_quantity'], 0.06)
-        else:
-            continue
-    assert transaction_found
-
-
-@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
-@pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapTokensForExactTokens():
+async def test__decode_token_swap_tx_Huckleberry__swapTokensForExactTokens():
     # also testing: swap transaction on Huckleberry DEX. "timeStamp" range in <= >= order. Two hop.
     test_acct = "0xfc2f3c2b6872d6ad347e78f096026274326ab081"
     config = {
@@ -303,7 +195,7 @@ async def test__decode_token_swap_transaction__swapTokensForExactTokens():
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapTokensForExactTokens'"
+    logging.info(f"begin 'test__decode_token_swap_tx_Huckleberry__swapTokensForExactTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -325,7 +217,190 @@ async def test__decode_token_swap_transaction__swapTokensForExactTokens():
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swapExactNativeCurrencyForTokens():
+async def test__decode_token_swap_tx_Huckleberry__swapExactTokensForTokensSupportingFeeOnTransferTokens():
+    # also testing: swap transaction on Huckleberry DEX. filter '==' on blockNumber
+    test_acct = "0x85cf0915c8d3695b03da739e3eaefd5388eb5eef"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 3313868}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Huckleberry__swapExactTokensForTokensSupportingFeeOnTransferTokens'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    logging.info('Note: for this specific unit test, subscrape will emit a warning like "expected log decoded output'
+                 ' quantity 3.02e-06 to be within 20% of the requested tx output quantity 0.0 but its not."'
+                 ' Evidently the original contract call set amountOutMin=0 so this is expected behavior.')
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0xbc065d9aa4fd90a0fb1df3ddfaab633cd3866e5dc069c6ce47f33593d3aa8972':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'WMOVR'
+            assert tx['output_a_token_symbol'] == 'BTC.m'
+            _assert_value_within_range(tx['input_a_quantity'], 0.008232571613605909)
+            _assert_value_within_range(tx['output_a_quantity'], 0.00000302)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Solarbeam__swapExactTokensForETH():
+    # also testing: swap transaction on Solarbeam DEX. filter '==' on blockNumber
+    test_acct = "0x299cd1c791464827ddfb147612244a2c59da91a0"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 3471171}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Solarbeam__swapExactTokensForETH'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0x0f379919b8dff50c1d83cf92c3aa7eca75e5558251ecf99e9e7fb660faf74c95':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'FRAX'
+            assert tx['output_a_token_symbol'] == 'WMOVR'
+            _assert_value_within_range(tx['input_a_quantity'], 100)
+            _assert_value_within_range(tx['output_a_quantity'], 11.526796881289545)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Huckleberry__swapExactETHForTokens():
+    # also testing: swap transaction on Huckleberry DEX. "blockNumber" range in <= >= order. two hop tx
+    test_acct = "0x8e7fbb49f436d0e8a50c02f631e729a57a9a0aca"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"<=": 3421768}, {">=": 3421760}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Huckleberry__swapExactETHForTokens'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0xf4a51bb43a24e5bf7047d563ec831762659a1535bdbcb056764ac4298f4d3b08':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'WMOVR'
+            assert tx['output_a_token_symbol'] == 'DOT.m'
+            _assert_value_within_range(tx['input_a_quantity'], 1)
+            _assert_value_within_range(tx['output_a_quantity'], 1.2598567127)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Huckleberry__swapTokensForExactETH():
+    # also testing: swap transaction on Huckleberry DEX. "blockNumber" range in <= >= with equal block number. Two hops.
+    test_acct = "0xfc2f3c2b6872d6ad347e78f096026274326ab081"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"<=": 3427502}, {">=": 3427502}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Huckleberry__swapTokensForExactETH'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0x1b036cd6d161622a5f610680b2fc15aee96103a4a884d9338ecb59f65b31753f':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'FTM.m'
+            assert tx['output_a_token_symbol'] == 'WMOVR'
+            _assert_value_within_range(tx['input_a_quantity'], 1.507652227912820355)
+            _assert_value_within_range(tx['output_a_quantity'], 0.06)
+        else:
+            continue
+    assert transaction_found
+
+
+# @pytest.mark.skipif(not new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+# @pytest.mark.asyncio
+# async def test__decode_token_swap_tx__swapETHForExactTokens():
+#     # also testing:
+#     test_acct = "XXXXXXXXXXXXX"
+#     config = {
+#         "moonriver": {
+#             "account_transactions": {
+#                 "accounts": [
+#                     test_acct
+#                 ],
+#                 "_filter": [{"blockNumber": [{"==": XXXXXXX}]}]
+#             }
+#         }
+#     }
+#
+#     logging.info(f"begin 'test__decode_token_swap_tx__swapETHForExactTokens'"
+#                  f" scraping at {time.strftime('%X')}")
+#     items_scraped = await subscrape.scrape(config)
+#     assert len(items_scraped) >= 1
+#     transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+#     transaction_found = False
+#     for timestamp in transactions:
+#         tx = transactions[timestamp]
+#         if tx['hash'] == 'XXXXXXXXXXXXXXXXX':
+#             transaction_found = True
+#             logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+#             assert tx['input_a_token_symbol'] == 'XXXX'
+#             assert tx['output_a_token_symbol'] == 'XXXX'
+#             _assert_value_within_range(tx['input_a_quantity'], 1111111)
+#             _assert_value_within_range(tx['output_a_quantity'], 1111111)
+#         else:
+#             continue
+#     assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Zenlink__swapExactNativeCurrencyForTokens():
     # also testing: swap transaction on Zenlink DEX.
     test_acct = "0xe1fa699860444be91d366c21de8fef56e3dec77a"
     config = {
@@ -339,7 +414,7 @@ async def test__decode_token_swap_transaction__swapExactNativeCurrencyForTokens(
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction__swapExactNativeCurrencyForTokens'"
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapExactNativeCurrencyForTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -359,10 +434,119 @@ async def test__decode_token_swap_transaction__swapExactNativeCurrencyForTokens(
     assert transaction_found
 
 
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Zenlink__swapExactTokensForNativeCurrency():
+    # also testing: swap transaction on Zenlink DEX.
+    test_acct = "0x335391f2006c318dc318230bdec020031d7dac75"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 1221284}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapExactTokensForNativeCurrency'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0xd1139087f55ac1b9d377c408afed9ca86478b725f7266d7c5d15e22ba5cd1a81':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'USDC'
+            assert tx['output_a_token_symbol'] == 'WMOVR'
+            _assert_value_within_range(tx['input_a_quantity'], 1185.327082)
+            _assert_value_within_range(tx['output_a_quantity'], 6.056467880187909967)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Zenlink__swapTokensForExactNativeCurrency():
+    # also testing: swap transaction on Zenlink DEX.
+    test_acct = "0x8fbebbb93019dc8e56630507e206d8ad00842d41"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 1219176}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapTokensForExactNativeCurrency'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0xf72916c26906789b1b6768d8347652e47d042181f8a1545ebbe80018fa2ce111':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'ZLK'
+            assert tx['output_a_token_symbol'] == 'WMOVR'
+            _assert_value_within_range(tx['input_a_quantity'], 963.663306508578689591)
+            _assert_value_within_range(tx['output_a_quantity'], 10)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_token_swap_tx_Zenlink__swapNativeCurrencyForExactTokens():
+    # also testing: swap transaction on Zenlink DEX.
+    test_acct = "0x9191c75bb0681a71f7d254484f2eb749c8934dac"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 1218897}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_token_swap_tx_Zenlink__swapNativeCurrencyForExactTokens'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0xc28ed3d98f9e6404828b73280eda5db1cc19aaca70dac03fed62bfdbf2273431':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'WMOVR'
+            assert tx['output_a_token_symbol'] == 'ZLK'
+            _assert_value_within_range(tx['input_a_quantity'], 10.591632213710223118)
+            _assert_value_within_range(tx['output_a_quantity'], 1000)
+        else:
+            continue
+    assert transaction_found
+
+
 @pytest.mark.skipif(not new_only or test_scope not in {'kbtc'},
                     reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_token_swap_transaction__swap():
+async def test__decode_token_swap_tx_SolarbeamStableSwap__swap():
     # also testing: StableSwap AMM on Solarbeam DEX.
     test_acct = "0x27e6a60146c5341d2e5577b219a2961f2d180579"
     config = {
@@ -376,7 +560,7 @@ async def test__decode_token_swap_transaction__swap():
         }
     }
 
-    logging.info(f"begin 'test__decode_token_swap_transaction__swap'"
+    logging.info(f"begin 'test__decode_token_swap_tx_SolarbeamStableSwap__swap'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -396,8 +580,9 @@ async def test__decode_token_swap_transaction__swap():
     assert transaction_found
 
 
+# @pytest.mark.skipif(not new_only or test_scope not in {'all', 'swaps'}, reason="reduce API queries during debug/dev")
 # @pytest.mark.asyncio
-# async def test__decode_token_swap_transaction__():
+# async def test__decode_token_swap_tx__():
 #     # also testing: swap transaction on Zenlink DEX.
 #     test_acct = "XXXXXXXXXXXXX"
 #     config = {
@@ -411,7 +596,7 @@ async def test__decode_token_swap_transaction__swap():
 #         }
 #     }
 #
-#     logging.info(f"begin 'test__decode_token_swap_transaction__'"
+#     logging.info(f"begin 'test__decode_token_swap_tx__'"
 #                  f" scraping at {time.strftime('%X')}")
 #     items_scraped = await subscrape.scrape(config)
 #     assert len(items_scraped) >= 1
@@ -437,7 +622,7 @@ async def test__decode_token_swap_transaction__swap():
 
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'}, reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_add_liquidity_transaction__addLiquidity():
+async def test__decode_add_liquidity_tx_Zenlink__addLiquidity():
     # also testing: Zenlink transactions
     test_acct = "0xa3d2c4af7496069d264e9357f9f39f79a656a1c8"
     config = {
@@ -451,7 +636,7 @@ async def test__decode_add_liquidity_transaction__addLiquidity():
         }
     }
 
-    logging.info(f"begin 'test__decode_add_liquidity_transaction__addLiquidity'"
+    logging.info(f"begin 'test__decode_add_liquidity_tx_Zenlink__addLiquidity'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -473,10 +658,48 @@ async def test__decode_add_liquidity_transaction__addLiquidity():
     assert transaction_found
 
 
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'}, reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_add_liquidity_tx_Solarbeam__addLiquidityETH():
+    # also testing:
+    test_acct = "0xc794047d59f11bef4035241ab403c9a419d7da8d"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 3513919}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_add_liquidity_tx_Solarbeam__addLiquidityETH'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0x6c56b95468fc04805d4d714ddd8edd46e61548a095460b7f912de7303383c3bf':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'MFAM'
+            assert tx['input_b_token_symbol'] == 'WMOVR'
+            assert tx['output_a_token_symbol'] == 'SLP'
+            _assert_value_within_range(tx['input_a_quantity'], 109972.053560515580176075)
+            _assert_value_within_range(tx['input_b_quantity'], 23.840224856355448048)
+            _assert_value_within_range(tx['output_a_quantity'], 1520.682022451843464574)
+        else:
+            continue
+    assert transaction_found
+
+
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'},
                     reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_add_liquidity_transaction__addLiquidityNativeCurrency():
+async def test__decode_add_liquidity_tx_Zenlink__addLiquidityNativeCurrency():
     # also testing: Zenlink transactions
     test_acct = "0x725f5b2e92164c38ef25a70f0807b71a7f0e770a"
     config = {
@@ -490,7 +713,7 @@ async def test__decode_add_liquidity_transaction__addLiquidityNativeCurrency():
         }
     }
 
-    logging.info(f"begin 'test__decode_add_liquidity_transaction__addLiquidityNativeCurrency'"
+    logging.info(f"begin 'test__decode_add_liquidity_tx_Zenlink__addLiquidityNativeCurrency'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -512,46 +735,85 @@ async def test__decode_add_liquidity_transaction__addLiquidityNativeCurrency():
     assert transaction_found
 
 
-# this Zenlink ETH/vETH -> LP requires a large refactor. Therefore ignore for now.
-# @pytest.mark.asyncio
-# async def test__decode_add_liquidity_transaction__addLiquiditySingleToken():
-#     # also testing: Zenlink exchange ETH for vETH and receive ZLK-LP
-#     test_acct = "0x0a83985e4a6e8dae2b67bed4f2d9268f6806ce00"
-#     config = {
-#         "moonriver": {
-#             "account_transactions": {
-#                 "accounts": [
-#                     test_acct
-#                 ],
-#                 "_filter": [{"blockNumber": [{"==": 2411562}]}]
-#             }
-#         }
-#     }
-#
-#     logging.info(f"begin 'test__decode_add_liquidity_transaction__addLiquiditySingleToken'"
-#                  f" scraping at {time.strftime('%X')}")
-#     items_scraped = await subscrape.scrape(config)
-#     assert len(items_scraped) >= 1
-#     transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
-#     transaction_found = False
-#     for timestamp in transactions:
-#         tx = transactions[timestamp]
-#         if tx['hash'] == '0x311d38bf46501961abdee8c9d808f9990fb7d91bd658039022bedd05ccad4581':
-#             transaction_found = True
-#             logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-#             assert tx['input_a_token_symbol'] == 'ETH'
-#             assert tx['output_a_token_symbol'] == 'ZLK-LP'
-#             _assert_value_within_range(tx['input_a_quantity'], 0.0218565212226356)
-#             _assert_value_within_range(tx['output_a_quantity'], 0.023807051928692573)
-#         else:
-#             continue
-#     assert transaction_found
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'},
+                    reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_add_liquidity_tx_Zenlink__addLiquiditySingleNativeCurrency():
+    test_acct = "0x9f7aa4f003817352e9770e579be7efcd37ba1990"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 1222466}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_add_liquidity_tx_Zenlink__addLiquiditySingleNativeCurrency'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0x67f837a13804964808ff8d92a20ecadd9087ec352a2ce0524667c52022775169':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'WMOVR'
+            assert tx['output_a_token_symbol'] == 'ZLK-LP'
+            _assert_value_within_range(tx['input_a_quantity'], 7.523520565458797)
+            _assert_value_within_range(tx['output_a_quantity'], 0.000051110515327605)
+        else:
+            continue
+    assert transaction_found
+
+
+@pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'},
+                    reason="reduce API queries during debug/dev")
+@pytest.mark.asyncio
+async def test__decode_add_liquidity_tx_Zenlink__addLiquiditySingleToken():
+    # Testing Zenlink exchange ETH for vETH and receive ZLK-LP
+    # Oddly this transaction only specifies ETH->vETH in the token path instead of full ETH->vETH->ZLK-LP.
+    # The series of events are ETH->vETH, send vETH back to acct, then provide both ETH and vETH for ZLK-LP.
+    test_acct = "0x0a83985e4a6e8dae2b67bed4f2d9268f6806ce00"
+    config = {
+        "moonriver": {
+            "account_transactions": {
+                "accounts": [
+                    test_acct
+                ],
+                "_filter": [{"blockNumber": [{"==": 2411562}]}]
+            }
+        }
+    }
+
+    logging.info(f"begin 'test__decode_add_liquidity_tx_Zenlink__addLiquiditySingleToken'"
+                 f" scraping at {time.strftime('%X')}")
+    items_scraped = await subscrape.scrape(config)
+    assert len(items_scraped) >= 1
+    transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
+    transaction_found = False
+    for timestamp in transactions:
+        tx = transactions[timestamp]
+        if tx['hash'] == '0x311d38bf46501961abdee8c9d808f9990fb7d91bd658039022bedd05ccad4581':
+            transaction_found = True
+            logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
+            assert tx['input_a_token_symbol'] == 'ETH'
+            assert tx['output_a_token_symbol'] == 'ZLK-LP'
+            _assert_value_within_range(tx['input_a_quantity'], 0.04364793008913)
+            _assert_value_within_range(tx['output_a_quantity'], 0.023807051928692573)
+        else:
+            continue
+    assert transaction_found
 
 
 @pytest.mark.skipif(not new_only or test_scope not in {'kbtc'},
                     reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
+async def test__decode_add_liquidity_tx_SolarbeamStableSwap__kbtc_stableswap_solarbeam():
     # also testing: Add liquidity to kBTC-BTC StableSwap on Solarbeam DEX.
     test_acct = "0xc365926c71dae2c7e39d176c9406239318301a3c"
     config = {
@@ -565,7 +827,7 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
         }
     }
 
-    logging.info(f"begin 'test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam'"
+    logging.info(f"begin 'test__decode_add_liquidity_tx_SolarbeamStableSwap__kbtc_stableswap_solarbeam'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -585,9 +847,10 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
     assert transaction_found
 
 
+# @pytest.mark.skipif(not new_only or test_scope not in {'all', 'liquidity'}, reason="reduce API queries during debug/dev")
 # @pytest.mark.asyncio
-# async def test__decode_add_liquidity_transaction__():
-#     # also testing: Zenlink transactions
+# async def test__decode_add_liquidity_tx__():
+#     # also testing:
 #     test_acct = "XXXXXXXXXX"
 #     config = {
 #         "moonriver": {
@@ -595,12 +858,12 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
 #                 "accounts": [
 #                     test_acct
 #                 ],
-#                 "_filter": [{"blockNumber": [{"==": }]}]
+#                 "_filter": [{"blockNumber": [{"==": xxxxxxxxxx}]}]
 #             }
 #         }
 #     }
 #
-#     logging.info(f"begin 'test__decode_add_liquidity_transaction__XXXXXXXXXXXXXXXX'"
+#     logging.info(f"begin 'test__decode_add_liquidity_tx__XXXXXXXXXXXXXXXX'"
 #                  f" scraping at {time.strftime('%X')}")
 #     items_scraped = await subscrape.scrape(config)
 #     assert len(items_scraped) >= 1
@@ -611,49 +874,12 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
 #         if tx['hash'] == 'XXXXXXXXXXX':
 #             transaction_found = True
 #             logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-#             assert tx['input_a_token_symbol'] == 'xcKSM'
-#             assert tx['input_b_token_symbol'] == 'WMOVR'
-#             assert tx['output_a_token_symbol'] == 'ZLK-LP'
-#             _assert_value_within_range(tx['input_a_quantity'], 3.635995421334)
-#             _assert_value_within_range(tx['input_b_quantity'], 14.999999999996282704)
-#             _assert_value_within_range(tx['output_a_quantity'], 1)
-#         else:
-#             continue
-#     assert transaction_found
-
-
-# @pytest.mark.asyncio
-# async def test__decode_add_liquidity_transaction__():
-#     # also testing: Zenlink transactions
-#     test_acct = "XXXXXXXXXX"
-#     config = {
-#         "moonriver": {
-#             "account_transactions": {
-#                 "accounts": [
-#                     test_acct
-#                 ],
-#                 "_filter": [{"blockNumber": [{"==": }]}]
-#             }
-#         }
-#     }
-#
-#     logging.info(f"begin 'test__decode_add_liquidity_transaction__XXXXXXXXXXXXXXXX'"
-#                  f" scraping at {time.strftime('%X')}")
-#     items_scraped = await subscrape.scrape(config)
-#     assert len(items_scraped) >= 1
-#     transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
-#     transaction_found = False
-#     for timestamp in transactions:
-#         tx = transactions[timestamp]
-#         if tx['hash'] == 'XXXXXXXXXXX':
-#             transaction_found = True
-#             logging.debug(f'for hash {tx["hash"]} the full transaction is {tx}')
-#             assert tx['input_a_token_symbol'] == 'xcKSM'
-#             assert tx['input_b_token_symbol'] == 'WMOVR'
-#             assert tx['output_a_token_symbol'] == 'ZLK-LP'
-#             _assert_value_within_range(tx['input_a_quantity'], 3.635995421334)
-#             _assert_value_within_range(tx['input_b_quantity'], 14.999999999996282704)
-#             _assert_value_within_range(tx['output_a_quantity'], 1)
+#             assert tx['input_a_token_symbol'] == 'xxxxxx'
+#             assert tx['input_b_token_symbol'] == 'xxxxxx'
+#             assert tx['output_a_token_symbol'] == 'xxxxxxx'
+#             _assert_value_within_range(tx['input_a_quantity'], xxxxxx)
+#             _assert_value_within_range(tx['input_b_quantity'], xxxxxxx)
+#             _assert_value_within_range(tx['output_a_quantity'], xxxxxxxxx)
 #         else:
 #             continue
 #     assert transaction_found
@@ -663,8 +889,9 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
 # ######### REMOVE LIQUIDITY TESTS ############################
 # #############################################################
 
+# @pytest.mark.skipif(not new_only or test_scope not in {'all', 'liquidity'}, reason="reduce API queries during debug/dev")
 # @pytest.mark.asyncio
-# async def test__decode_remove_liquidity_transaction__():
+# async def test__decode_remove_liquidity_tx__():
 #     # also testing: Zenlink transactions
 #     test_acct = "XXXXXXXXXX"
 #     config = {
@@ -678,7 +905,7 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
 #         }
 #     }
 #
-#     logging.info(f"begin 'test__decode_remove_liquidity_transaction__XXXXXXXXXXXXXXXX'"
+#     logging.info(f"begin 'test__decode_remove_liquidity_tx__XXXXXXXXXXXXXXXX'"
 #                  f" scraping at {time.strftime('%X')}")
 #     items_scraped = await subscrape.scrape(config)
 #     assert len(items_scraped) >= 1
@@ -703,7 +930,7 @@ async def test__decode_add_liquidity_transaction__kbtc_stableswap_solarbeam():
 @pytest.mark.skipif(new_only or test_scope not in {'all', 'liquidity'},
                     reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_remove_liquidity_transaction__removeLiquidityNativeCurrency():
+async def test__decode_remove_liquidity_tx_Zenlink__removeLiquidityNativeCurrency():
     # also testing: Zenlink transactions
     test_acct = "0x96cc80292fa3a7045611eb84ae09df8bd15936d2"
     config = {
@@ -717,7 +944,7 @@ async def test__decode_remove_liquidity_transaction__removeLiquidityNativeCurren
         }
     }
 
-    logging.info(f"begin 'test__decode_remove_liquidity_transaction__removeLiquidityNativeCurrency'"
+    logging.info(f"begin 'test__decode_remove_liquidity_tx_Zenlink__removeLiquidityNativeCurrency'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1
@@ -742,7 +969,7 @@ async def test__decode_remove_liquidity_transaction__removeLiquidityNativeCurren
 @pytest.mark.skipif(not new_only or test_scope not in {'kbtc'},
                     reason="reduce API queries during debug/dev")
 @pytest.mark.asyncio
-async def test__decode_remove_liquidity_transaction__kbtc_stableswap_solarbeam():
+async def test__decode_remove_liquidity_tx_SolarbeamStableSwap__kbtc_stableswap_solarbeam():
     # also testing: Remove liquidity from kBTC-BTC StableSwap on Solarbeam DEX.
     test_acct = "0xb4c9531a60e252c871d51923bc9f153f1d371ca8"
     config = {
@@ -756,7 +983,7 @@ async def test__decode_remove_liquidity_transaction__kbtc_stableswap_solarbeam()
         }
     }
 
-    logging.info(f"begin 'test__decode_remove_liquidity_transaction__kbtc_stableswap_solarbeam'"
+    logging.info(f"begin 'test__decode_remove_liquidity_tx_SolarbeamStableSwap__kbtc_stableswap_solarbeam`'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
     assert len(items_scraped) >= 1

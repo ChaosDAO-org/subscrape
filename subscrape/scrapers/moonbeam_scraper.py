@@ -251,79 +251,80 @@ class MoonbeamScraper:
                 self.transactions[account][timestamp]['output_b_token_symbol'] = ''
                 self.transactions[account][timestamp]['output_b_quantity'] = ''
 
-            if 'input' in transaction and len(transaction['input']) >= 8:
-                # assume this was a call to a contract since input data was provided
-                contract_address = transaction['to'].lower()
+            if 'input' not in transaction or len(transaction['input']) < 8:
+                # not enough data was provided, so probably not a contract call. exit early.
+                return
 
-                await self.retrieve_and_cache_contract_abi(contract_address)
+            contract_address = transaction['to'].lower()
+            await self.retrieve_and_cache_contract_abi(contract_address)
+            if contract_address not in self.abis or self.abis[contract_address] is None:
+                # without an ABI to interpret the call data or events, we can't do anything else
+                return
 
-                if contract_address in self.abis and self.abis[contract_address] is not None:
-                    decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
+            decoded_transaction = decode_tx(contract_address, transaction['input'], self.abis[contract_address])
 
-                    if decoded_transaction[0] == 'decode error':
-                        if contract_address not in self.contracts_with_known_decode_errors:
-                            self.contracts_with_known_decode_errors.append(contract_address)
-                            decode_traceback = decoded_transaction[1]
-                            self.logger.warning(f'Unable to decode contract interaction with contract '
-                                                f'{contract_address} in transaction:\r\n'
-                                                f'{transaction}\r\n\r\n'
-                                                f'{decode_traceback}\r\n'
-                                                f'---- Now continuing processing the rest of the transactions ----\r\n')
-                    else:
-                        # successfully decoded the input data to the contract interaction
-                        contract_method_name = decoded_transaction[0]
-                        self.transactions[account][timestamp]['contract_method_name'] = contract_method_name
-                        decoded_func_params = json.loads(decoded_transaction[1])
+            if decoded_transaction[0] == 'decode error':
+                if contract_address not in self.contracts_with_known_decode_errors:
+                    self.contracts_with_known_decode_errors.append(contract_address)
+                    decode_traceback = decoded_transaction[1]
+                    self.logger.warning(f'Unable to decode contract interaction with contract '
+                                        f'{contract_address} in transaction:\r\n'
+                                        f'{transaction}\r\n\r\n'
+                                        f'{decode_traceback}\r\n'
+                                        f'---- Now continuing processing the rest of the transactions ----\r\n')
+            else:
+                # successfully decoded the input data to the contract interaction
+                contract_method_name = decoded_transaction[0]
+                self.transactions[account][timestamp]['contract_method_name'] = contract_method_name
+                decoded_func_params = json.loads(decoded_transaction[1])
 
-                        if contract_method_name in {'swapExactTokensForTokens', 'swapTokensForExactTokens',
-                                                    'swapExactTokensForETH', 'swapTokensForExactETH',
-                                                    'swapExactTokensForTokensSupportingFeeOnTransferTokens',
-                                                    'swapExactTokensForETHSupportingFeeOnTransferTokens',
-                                                    'swapExactETHForTokens', 'swapETHForExactTokens',
-                                                    'swapExactNativeCurrencyForTokens',
-                                                    'addLiquiditySingleNativeCurrency', 'addLiquiditySingleToken'}:
-                            await self.__decode_token_swap_transaction(account, transaction, contract_method_name,
-                                                                       decoded_func_params)
-                        elif contract_method_name in {'addLiquidity', 'addLiquidityETH', 'addLiquidityNativeCurrency'}:
-                            await self.__decode_add_liquidity_transaction(account, transaction, contract_method_name,
-                                                                          decoded_func_params)
-                        elif contract_method_name in {'removeLiquidity', 'removeLiquidityETH',
-                                                      'removeLiquidityETHWithPermit', 'removeLiquidityNativeCurrency'}:
-                            await self.__decode_remove_liquidity_transaction(account, transaction, contract_method_name,
-                                                                             decoded_func_params)
-                        elif contract_method_name in {'deposit', 'depositWithPermit', 'depositEth', 'depositETH'}:
-                            await self.__decode_deposit_transaction(account, transaction, contract_method_name,
-                                                                    decoded_func_params)
-                        elif contract_method_name in {'withdraw', 'leave'}:
-                            await self.__decode_withdraw_transaction(account, transaction, contract_method_name,
-                                                                     decoded_func_params)
-                        elif contract_method_name in {'redeem'}:
-                            await self.__decode_redeem_transaction(account, transaction, contract_method_name,
-                                                                   decoded_func_params)
-                        else:
-                            # todo: handle (and don't ignore) 'stake' contract methods
-                            # 'claim' and 'collect' probably remain ignored for DPS.
-                            # 'approve', 'nominate', 'revoke_nomination' permanently ignore because not financially related.
-                            self.transactions[account][timestamp]['action'] = contract_method_name
-                            if contract_method_name not in {'enter', 'leave',
-                                                            'increaseAmountWithPermit',
-                                                            'approve', 'claim', 'collect',
-                                                            'stake', 'unstake', 'delegate',
-                                                            'nominator_bond_more', 'nominator_bond_less',
-                                                            'execute_delegation_request', 'cancel_delegation_request',
-                                                            'schedule_delegator_bond_less',
-                                                            'schedule_revoke_delegation',
-                                                            'delegator_bond_more', 'delegator_bond_less',
-                                                            'nominate', 'revoke_nomination', 'createProxyWithNonce',
-                                                            'exchangeOldForCanonical', 'createProfile',
-                                                            'deactivateProfile', 'transfer',
-                                                            'claimFlagship', 'buyVoyage', 'repairFlagships',
-                                                            'lockVoyageItems', 'claimRewards', 'setApprovalForAll',
-                                                            'lockToClaimRewards', 'claimLockedRewards', 'increaseLock',
-                                                            'standard_vote', 'flipCoin', 'listToken', 'delistToken',
-                                                            'transferFrom', 'safeTransferFrom', 'createWithPermit'}:
-                                self.logger.info(f'contract method {contract_method_name} not yet supported for '
-                                                 f'contract {contract_address}.')
+                if contract_method_name in {'swapExactTokensForTokens', 'swapTokensForExactTokens',
+                                            'swapExactTokensForETH', 'swapTokensForExactETH',
+                                            'swapExactTokensForTokensSupportingFeeOnTransferTokens',
+                                            'swapExactTokensForETHSupportingFeeOnTransferTokens',
+                                            'swapExactETHForTokens', 'swapETHForExactTokens',
+                                            'swapExactNativeCurrencyForTokens', 'swapExactTokensForNativeCurrency',
+                                            'swapNativeCurrencyForExactTokens', 'swapTokensForExactNativeCurrency'}:
+                    await self.__decode_token_swap_tx(account, transaction, contract_method_name, decoded_func_params)
+                elif contract_method_name in {'addLiquidity', 'addLiquidityETH', 'addLiquidityNativeCurrency',
+                                              'addLiquiditySingleToken',
+                                              'addLiquiditySingleNativeCurrency'}:
+                    await self.__decode_add_liquidity_tx(account, transaction, contract_method_name,
+                                                         decoded_func_params)
+                elif contract_method_name in {'removeLiquidity', 'removeLiquidityETH',
+                                              'removeLiquidityETHWithPermit', 'removeLiquidityNativeCurrency'}:
+                    await self.__decode_remove_liquidity_tx(account, transaction, contract_method_name,
+                                                            decoded_func_params)
+                elif contract_method_name in {'deposit', 'depositWithPermit', 'depositEth', 'depositETH'}:
+                    await self.__decode_deposit_tx(account, transaction, contract_method_name, decoded_func_params)
+                elif contract_method_name in {'withdraw', 'leave'}:
+                    await self.__decode_withdraw_tx(account, transaction, contract_method_name, decoded_func_params)
+                elif contract_method_name in {'redeem'}:
+                    await self.__decode_redeem_tx(account, transaction, contract_method_name, decoded_func_params)
+                else:
+                    # todo: handle (and don't ignore) 'stake' contract methods
+                    # 'claim' and 'collect' probably remain ignored for DPS.
+                    # 'approve', 'nominate', 'revoke_nomination' permanently ignore because not financially related.
+                    self.transactions[account][timestamp]['action'] = contract_method_name
+                    if contract_method_name not in {'enter', 'leave',
+                                                    'increaseAmountWithPermit',
+                                                    'approve', 'claim', 'collect',
+                                                    'stake', 'unstake', 'delegate',
+                                                    'nominator_bond_more', 'nominator_bond_less',
+                                                    'execute_delegation_request', 'cancel_delegation_request',
+                                                    'schedule_delegator_bond_less',
+                                                    'schedule_revoke_delegation',
+                                                    'delegator_bond_more', 'delegator_bond_less',
+                                                    'nominate', 'revoke_nomination', 'createProxyWithNonce',
+                                                    'exchangeOldForCanonical', 'createProfile',
+                                                    'deactivateProfile', 'transfer',
+                                                    'claimFlagship', 'buyVoyage', 'repairFlagships',
+                                                    'lockVoyageItems', 'claimRewards', 'setApprovalForAll',
+                                                    'lockToClaimRewards', 'claimLockedRewards', 'increaseLock',
+                                                    'standard_vote', 'flipCoin', 'listToken', 'delistToken',
+                                                    'transferFrom', 'safeTransferFrom', 'createWithPermit'}:
+                        self.logger.info(f'contract method {contract_method_name} not yet supported for '
+                                         f'contract {contract_address}.')
 
             # todo: handle staking rewards
             # todo: handle deposit/withdraw single-sided liquidity (like WMOVR pool on Solarbeam)
@@ -381,7 +382,7 @@ class MoonbeamScraper:
                     decoded_logs.append((evt_name, decoded_event_data, schema, token_address))
         return decoded_logs
 
-    async def __decode_token_swap_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def __decode_token_swap_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a token swap contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -412,23 +413,22 @@ class MoonbeamScraper:
         self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_info['symbol']
         if contract_method_name in {'swapExactTokensForTokens', 'swapExactTokensForETH',
                                     'swapExactTokensForTokensSupportingFeeOnTransferTokens',
-                                    'swapExactTokensForETHSupportingFeeOnTransferTokens'}:
+                                    'swapExactTokensForETHSupportingFeeOnTransferTokens',
+                                    'swapExactTokensForNativeCurrency'}:
             amount_in = decoded_func_params['amountIn']
             amount_out = decoded_func_params['amountOutMin']
-        elif contract_method_name in {"swapTokensForExactTokens", "swapTokensForExactETH"}:
+        elif contract_method_name in {'swapTokensForExactTokens', 'swapTokensForExactETH',
+                                      'swapTokensForExactNativeCurrency'}:
             amount_in = decoded_func_params['amountInMax']
             amount_out = decoded_func_params['amountOut']
-        elif contract_method_name in {"swapExactETHForTokens", "swapExactNativeCurrencyForTokens"}:
+        elif contract_method_name in {'swapExactETHForTokens', 'swapExactNativeCurrencyForTokens'}:
             amount_in = int(transaction['value'])
             amount_out = decoded_func_params['amountOutMin']
-        elif contract_method_name == "swapETHForExactTokens":
+        elif contract_method_name in {'swapETHForExactTokens', 'swapNativeCurrencyForExactTokens'}:
             amount_in = int(transaction['value'])
             amount_out = decoded_func_params['amountOut']
         elif contract_method_name == 'addLiquiditySingleNativeCurrency':
             amount_in = decoded_func_params['nativeCurrencySwapInMax']
-            amount_out = decoded_func_params['amountSwapOut']
-        elif contract_method_name == 'addLiquiditySingleToken':
-            amount_in = decoded_func_params['amountSwapInMax']
             amount_out = decoded_func_params['amountSwapOut']
         else:
             self.logger.error(f'contract method {contract_method_name} not recognized')
@@ -515,17 +515,17 @@ class MoonbeamScraper:
                 or (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" {contract_method_name}, expected log decoded input quantity"
-                                f" {exact_amount_in_float} to be within 20% of the tx input quantity"
+                                f" {exact_amount_in_float} to be within 20% of the requested tx input quantity"
                                 f" {requested_input_quantity_float} but it's not.")
         output_tolerance = requested_output_quantity_float * 0.2  # 20% each side
         if (exact_amount_out_float > requested_output_quantity_float + output_tolerance) \
                 or (exact_amount_out_float < requested_output_quantity_float - output_tolerance):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" {contract_method_name}, expected log decoded output quantity"
-                                f" {exact_amount_out_float} to be within 20% of the tx output quantity"
+                                f" {exact_amount_out_float} to be within 20% of the requested tx output quantity"
                                 f" {requested_output_quantity_float} but it's not.")
 
-    async def __decode_add_liquidity_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def __decode_add_liquidity_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a liquidity adding contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -572,6 +572,20 @@ class MoonbeamScraper:
             input_token_b = self.__get_custom_token_info('WMOVR')['address'].lower()
             amount_in_a = decoded_func_params['amountTokenDesired']
             amount_in_b = int(transaction['value'])
+        elif contract_method_name == 'addLiquiditySingleToken':
+            # This Zenlink method specifies overall input in `amountIn` but the other func params just specify the
+            # precursor token swap before minting LP. No LP expected output amount is specified in the contract call.
+            input_token_a = decoded_func_params['path'][0].lower()
+            input_token_b = decoded_func_params['path'][1].lower()
+            amount_in_a = decoded_func_params['amountIn']
+            amount_in_b = 0     # decoded_func_params['amountSwapOut'] holds the intermediate amount
+            amount_out = None
+        elif contract_method_name == 'addLiquiditySingleNativeCurrency':
+            # This Zenlink method's params in `decoded_func_params` only specify the swap, not the LP creation.
+            input_token_a = decoded_func_params['path'][0].lower()
+            input_token_b = decoded_func_params['path'][1].lower()
+            amount_in_a = None
+            amount_in_b = None
         else:
             self.logger.error(f'contract method {contract_method_name} not recognized')
 
@@ -579,14 +593,20 @@ class MoonbeamScraper:
         requested_input_b_quantity_float = None
         if input_token_a is not None:
             input_token_a_info = await self.__retrieve_and_cache_token_info_from_contract(input_token_a)
-            input_token_b_info = await self.__retrieve_and_cache_token_info_from_contract(input_token_b)
             self.transactions[account][timestamp]['input_a_token_name'] = input_token_a_info['name']
             self.transactions[account][timestamp]['input_a_token_symbol'] = input_token_a_info['symbol']
+            if 'amount_in_a' in locals() and amount_in_a is not None:
+                requested_input_a_quantity_float = amount_in_a / (10 ** int(input_token_a_info['decimals']))
+            else:
+                requested_input_a_quantity_float = None
+        if input_token_b is not None:
+            input_token_b_info = await self.__retrieve_and_cache_token_info_from_contract(input_token_b)
             self.transactions[account][timestamp]['input_b_token_name'] = input_token_b_info['name']
             self.transactions[account][timestamp]['input_b_token_symbol'] = input_token_b_info['symbol']
-
-            requested_input_a_quantity_float = amount_in_a / (10 ** int(input_token_a_info['decimals']))
-            requested_input_b_quantity_float = amount_in_b / (10 ** int(input_token_b_info['decimals']))
+            if 'amount_in_b' in locals() and amount_in_b is not None:
+                requested_input_b_quantity_float = amount_in_b / (10 ** int(input_token_b_info['decimals']))
+            else:
+                requested_input_b_quantity_float = None
 
         #  We only have an estimate based on the inputs so far. Use the trace logs to find
         #      the exact liquidity quantities
@@ -604,7 +624,10 @@ class MoonbeamScraper:
         exact_mint_input_b_quantity_int = 0
         exact_transfer_input_a_quantity_int = 0
         exact_transfer_input_b_quantity_int = 0
-        exact_output_quantity_int = 0
+        # for rare tx types ('addLiquiditySingleToken') there could be multiple transfers back to the
+        # originating account of intermediate tokens. But we won't know the token address of the output LP
+        # until the 'Mint' event occurs. Therefore just capture the transfer values per token.
+        exact_transfer_output_quantities_int = {}
         output_token_info = None
         for (evt_name, decoded_event_data, schema, token_address) in decoded_logs:
             decoded_event_params = json.loads(decoded_event_data)
@@ -624,9 +647,9 @@ class MoonbeamScraper:
                 if decoded_event_source_address == account:
                     # Depositing token A or B into the LP token contract
                     if token_address == input_token_a:
-                        exact_transfer_input_a_quantity_int = decoded_event_quantity_int
+                        exact_transfer_input_a_quantity_int += decoded_event_quantity_int
                     elif token_address == input_token_b:
-                        exact_transfer_input_b_quantity_int = decoded_event_quantity_int
+                        exact_transfer_input_b_quantity_int += decoded_event_quantity_int
                     else:
                         self.logger.warning(f"For transaction {tx_hash}, contract_method {contract_method_name}"
                                             f" transfer from decoded_event_source_address"
@@ -634,18 +657,22 @@ class MoonbeamScraper:
                                             f" doesn't match original input_token_a {input_token_a} or input_token_b"
                                             f" {input_token_b} from token path.")
                 elif decoded_event_destination_address == account:
-                    exact_output_quantity_int = decoded_event_quantity_int
+                    if token_address in exact_transfer_output_quantities_int:
+                        exact_transfer_output_quantities_int[token_address] += decoded_event_quantity_int
+                    else:
+                        exact_transfer_output_quantities_int[token_address] = decoded_event_quantity_int
                 else:
                     pass  # ignore all the other Transfer events
             elif evt_name == 'Deposit':
                 decoded_event_quantity_int = self.__extract_quantity_from_params(transaction, evt_name,
                                                                                  decoded_event_params)
-                if contract_method_name == "addLiquidityNativeCurrency":
+                if contract_method_name in {'addLiquidityNativeCurrency', 'addLiquidityETH',
+                                            'addLiquiditySingleNativeCurrency'}:
                     # Depositing token A or B into the LP token contract
                     if token_address == input_token_a:
-                        exact_transfer_input_a_quantity_int = decoded_event_quantity_int
+                        exact_transfer_input_a_quantity_int += decoded_event_quantity_int
                     elif token_address == input_token_b:
-                        exact_transfer_input_b_quantity_int = decoded_event_quantity_int
+                        exact_transfer_input_b_quantity_int += decoded_event_quantity_int
                     else:
                         self.logger.warning(f"For transaction {tx_hash}, contract_method {contract_method_name}"
                                             f" transfer from decoded_event_source_address"
@@ -657,33 +684,29 @@ class MoonbeamScraper:
             else:
                 continue
 
-        # There's at least one contract that reverses the order of the tokens when it uses them to mint LP tokens.
-        # Therefore, compare the Transfer log event quantity to the Mint event quantity to see if they're reversed.
-        # If A & B transferred are >1% different, but Mint B is within 1% of Transfer A AND Mint A is within 1% of
-        # Transfer B then they must be swapped.
-        # DEX fee usually 0.3%, so comparison tolerance of 1% is sufficiently wide for that.
-        input_tolerance_a_int = int(exact_transfer_input_a_quantity_int * 0.01)
-        input_tolerance_b_int = int(exact_transfer_input_b_quantity_int * 0.01)
-        if ((exact_transfer_input_a_quantity_int > exact_transfer_input_b_quantity_int + input_tolerance_b_int)
-            or (exact_transfer_input_a_quantity_int < exact_transfer_input_b_quantity_int - input_tolerance_b_int)) \
-                and (exact_mint_input_b_quantity_int > exact_transfer_input_a_quantity_int - input_tolerance_a_int) \
-                and (exact_mint_input_b_quantity_int < exact_transfer_input_a_quantity_int + input_tolerance_a_int) \
-                and (exact_mint_input_a_quantity_int > exact_transfer_input_b_quantity_int - input_tolerance_b_int) \
-                and (exact_mint_input_a_quantity_int < exact_transfer_input_b_quantity_int + input_tolerance_b_int):
-            # tokens A & B were flipped during the Mint event.
-            temp = exact_mint_input_a_quantity_int
-            exact_mint_input_a_quantity_int = exact_mint_input_b_quantity_int
-            exact_mint_input_b_quantity_int = temp
-
-        exact_amount_in_a_float = exact_mint_input_a_quantity_int / (10 ** int(input_token_a_info['decimals']))
-        exact_amount_in_b_float = exact_mint_input_b_quantity_int / (10 ** int(input_token_b_info['decimals']))
-        exact_amount_out_float = exact_output_quantity_int / (10 ** int(output_token_info['decimals']))
+        exact_amount_in_a_float = exact_transfer_input_a_quantity_int / (10 ** int(input_token_a_info['decimals']))
         self.transactions[account][timestamp]['input_a_quantity'] = exact_amount_in_a_float
+        if contract_method_name in {'addLiquiditySingleToken', 'addLiquiditySingleNativeCurrency'}:
+            # if an intermediate token swap occurred and then originating account provides this token for LP, it will
+            # appear as if the intermediate token was an original input to this transaction. That's not true for a
+            # 'SingleToken' LP transaction, so ignore token amounts from events.
+            exact_amount_in_b_float = 0
+        else:
+            exact_amount_in_b_float = exact_transfer_input_b_quantity_int / (10 ** int(input_token_b_info['decimals']))
         self.transactions[account][timestamp]['input_b_quantity'] = exact_amount_in_b_float
-        self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_float
-        if 'output_token_info' in locals():     # if 'output_token_info' has been defined/found
-            self.transactions[account][timestamp]['output_a_token_name'] = output_token_info['name']
-            self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_info['symbol']
+
+        if 'output_token_info' in locals() and output_token_info is not None:
+            # 'output_token_info' has been defined/found
+            if output_token in exact_transfer_output_quantities_int:
+                exact_amount_out_float = exact_transfer_output_quantities_int[output_token] \
+                                         / (10 ** int(output_token_info['decimals']))
+                self.transactions[account][timestamp]['output_a_quantity'] = exact_amount_out_float
+                self.transactions[account][timestamp]['output_a_token_name'] = output_token_info['name']
+                self.transactions[account][timestamp]['output_a_token_symbol'] = output_token_info['symbol']
+            else:
+                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address}, method"
+                                    f" '{contract_method_name}', the 'Mint' event token output address {output_token}"
+                                    f" doesn't match any token transfer back to the originating account {account}.")
 
         if input_token_a == '0xf37626e2284742305858052615e94b380b23b3b7' \
                 or input_token_a_info['name'] == 'TreasureMaps':
@@ -692,34 +715,36 @@ class MoonbeamScraper:
 
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
-        input_tolerance = exact_amount_in_a_float * 0.2  # 20% each side
-        if (exact_amount_in_a_float > requested_input_a_quantity_float + input_tolerance) \
-                or (exact_amount_in_a_float < requested_input_a_quantity_float - input_tolerance):
-            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
-                                f" '{contract_method_name}', expected log decoded LP input A quantity"
-                                f" {exact_amount_in_a_float} to be within 20% of the tx input quantity"
-                                f" {requested_input_a_quantity_float} but it's not.")
-        input_tolerance = exact_amount_in_b_float * 0.2  # 20% each side
-        if (exact_amount_in_b_float > requested_input_b_quantity_float + input_tolerance) \
-                or (exact_amount_in_b_float < requested_input_b_quantity_float - input_tolerance):
-            self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
-                                f" '{contract_method_name}', expected log decoded LP input B quantity"
-                                f" {exact_amount_in_b_float} to be within 20% of the tx input quantity"
-                                f" {requested_input_b_quantity_float} but it's not.")
-        if 'amount_out' in locals():    # if variable 'amount_out' has been defined
+        if 'requested_input_a_quantity_float' in locals() and requested_input_a_quantity_float is not None:
+            input_a_tolerance = exact_amount_in_a_float * 0.2  # 20% each side
+            if (exact_amount_in_a_float > requested_input_a_quantity_float + input_a_tolerance) \
+                    or (exact_amount_in_a_float < requested_input_a_quantity_float - input_a_tolerance):
+                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
+                                    f" '{contract_method_name}', expected log decoded LP input A quantity"
+                                    f" {exact_amount_in_a_float} to be within 20% of the requested tx input quantity"
+                                    f" {requested_input_a_quantity_float} but it's not.")
+        if 'requested_input_b_quantity_float' in locals() and requested_input_b_quantity_float is not None:
+            input_b_tolerance = exact_amount_in_b_float * 0.2  # 20% each side
+            if (exact_amount_in_b_float > requested_input_b_quantity_float + input_b_tolerance) \
+                    or (exact_amount_in_b_float < requested_input_b_quantity_float - input_b_tolerance):
+                self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
+                                    f" '{contract_method_name}', expected log decoded LP input B quantity"
+                                    f" {exact_amount_in_b_float} to be within 20% of the requested tx input quantity"
+                                    f" {requested_input_b_quantity_float} but it's not.")
+        if 'amount_out' in locals() and amount_out is not None:    # if variable 'amount_out' has been defined
             output_tolerance = exact_amount_out_float * 0.2  # 20% each side
             if (exact_amount_out_float > amount_out + output_tolerance) \
                     or (exact_amount_out_float < amount_out - output_tolerance):
                 self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                     f" '{contract_method_name}', expected log decoded LP output quantity"
-                                    f" {exact_amount_out_float} to be within 20% of the tx output quantity"
+                                    f" {exact_amount_out_float} to be within 20% of the requested tx output quantity"
                                     f" {amount_out} but it's not.")
         else:
             # There was no output info in the original request. Therefore, nothing to compare to.
             pass
 
-    async def __decode_remove_liquidity_transaction(self, account, transaction, contract_method_name,
-                                                    decoded_func_params):
+    async def __decode_remove_liquidity_tx(self, account, transaction, contract_method_name,
+                                           decoded_func_params):
         """Decode transaction receipts/logs from a liquidity removing contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -817,7 +842,7 @@ class MoonbeamScraper:
             elif evt_name == 'Withdrawal':
                 decoded_event_quantity_int = \
                     self.__extract_quantity_from_params(transaction, evt_name, decoded_event_params)
-                if contract_method_name == "removeLiquidityNativeCurrency":
+                if contract_method_name in {'removeLiquidityNativeCurrency', 'removeLiquidityETH'}:
                     # Receiving token A or B from breaking up LP
                     if token_address == output_token_a:
                         exact_transfer_output_a_quantity_int = decoded_event_quantity_int
@@ -869,24 +894,24 @@ class MoonbeamScraper:
                 or (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP input quantity"
-                                f" {exact_amount_in_float} to be within 20% of the tx input quantity"
+                                f" {exact_amount_in_float} to be within 20% of the requested tx input quantity"
                                 f" {requested_input_quantity_float} but it's not.")
         output_tolerance = exact_amount_out_a_float * 0.2  # 20% each side
         if (exact_amount_out_a_float > requested_output_a_quantity_float + output_tolerance) \
                 or (exact_amount_out_a_float < requested_output_a_quantity_float - output_tolerance):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP output A quantity"
-                                f" {exact_amount_out_a_float} to be within 20% of the tx output quantity"
+                                f" {exact_amount_out_a_float} to be within 20% of the requested tx output quantity"
                                 f" {requested_output_a_quantity_float} but it's not.")
         output_tolerance = exact_amount_out_b_float * 0.2  # 20% each side
         if (exact_amount_out_b_float > requested_output_b_quantity_float + output_tolerance) \
                 or (exact_amount_out_b_float < requested_output_b_quantity_float - output_tolerance):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP output B quantity"
-                                f" {exact_amount_out_b_float} to be within 20% of the tx output quantity"
+                                f" {exact_amount_out_b_float} to be within 20% of the requested tx output quantity"
                                 f" {requested_output_b_quantity_float} but it's not.")
 
-    async def __decode_deposit_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def __decode_deposit_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a deposit contract interaction
         Possible contracts using a 'deposit' method:
         * Deposit MOVR into WMOVR token contract to receive WMOVR
@@ -952,7 +977,7 @@ class MoonbeamScraper:
                     self.transactions[account][timestamp_key]['output_a_token_name'] = token_info['name']
                     self.transactions[account][timestamp_key]['output_a_token_symbol'] = token_info['symbol']
 
-    async def __decode_withdraw_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def __decode_withdraw_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a withdraw contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -1134,7 +1159,7 @@ class MoonbeamScraper:
         #         self.transactions[account][timestamp_key]['output_a_token_name'] = output_token_info['name']
         #         self.transactions[account][timestamp_key]['output_a_token_symbol'] = output_token_info['symbol']
 
-    async def __decode_redeem_transaction(self, account, transaction, contract_method_name, decoded_func_params):
+    async def __decode_redeem_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a redeem contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -1235,7 +1260,7 @@ class MoonbeamScraper:
                 # decoded_event_quantity_int = decoded_event_params[key]
                 keyword_found = True
                 continue
-        if not keyword_found:
+        if not keyword_found and verbose:
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
                                 f" '{method_name}', no param keyword found for quantity. This indicates subscrape"
                                 f" doesn't handle this particular contract implementation yet."
@@ -1275,7 +1300,7 @@ class MoonbeamScraper:
             # There's no "source" for the "Deposit" event
             decoded_event_source_address = transaction_source_address
             keyword_found = True
-        if not keyword_found:
+        if not keyword_found and verbose:
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
                                 f" '{method_name}', no param keyword found for source address. This indicates"
                                 f" subscrape doesn't handle this particular contract implementation yet."
@@ -1311,7 +1336,7 @@ class MoonbeamScraper:
                     decoded_event_destination_address = decoded_event_params[key].lower()
                     keyword_found = True
                     continue
-            if not keyword_found:
+            if not keyword_found and verbose:
                 self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} and method"
                                     f" '{method_name}', no param keyword found for destination address. This indicates"
                                     f" subscrape doesn't handle this particular contract implementation yet."
