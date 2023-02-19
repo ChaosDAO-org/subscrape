@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-import platform
 import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 import subscrape
@@ -15,11 +14,12 @@ async def main():
     Will call `scraper_factory()` to retrieve the proper scraper for a chain.
     If `_version` in the config does not match the current version, a warning is logged.
     """
-    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s (%(filename)s:%(lineno)s)')
 
     # httpx with asyncio can cause an "unclosed transport" error on Windows. A workaround is to set a different loop
     # policy. See https://github.com/encode/httpx/issues/914
-    if platform.system() == 'Windows':
+    # and https://github.com/encode/httpx/issues/914#issuecomment-622586610
+    if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     # load config

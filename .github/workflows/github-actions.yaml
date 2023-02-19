@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         # python-version: ["3.7", "3.8", "3.9", "3.10"]
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.10"]
 
     steps:
       - uses: actions/checkout@v3
@@ -21,7 +21,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest
-          if [ -f PipRequirements.txt ]; then pip install -Ur PipRequirements.txt; fi
+          pip install -Ur PipRequirements.txt
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names

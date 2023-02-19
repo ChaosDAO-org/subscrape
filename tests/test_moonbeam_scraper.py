@@ -68,7 +68,7 @@ async def test__no_entries_returned():
 @pytest.mark.asyncio
 async def test__decode_token_swap_tx_Solarbeam__swapExactTokensForTokens():
     # also testing: swap transaction on Solarbeam DEX. filter range on "timeStamp"
-    test_acct = "0xBa4123F4b2da090aeCef69Fd0946D42Ecd4C788E"
+    test_acct = "0xba4123f4b2da090aecef69fd0946d42ecd4c788e"
     config = {
         "moonriver": {
             "account_transactions": {
@@ -234,9 +234,6 @@ async def test__decode_token_swap_tx_Huckleberry__swapExactTokensForTokensSuppor
     logging.info(f"begin 'test__decode_token_swap_tx_Huckleberry__swapExactTokensForTokensSupportingFeeOnTransferTokens'"
                  f" scraping at {time.strftime('%X')}")
     items_scraped = await subscrape.scrape(config)
-    logging.info('Note: for this specific unit test, subscrape will emit a warning like "expected log decoded output'
-                 ' quantity 3.02e-06 to be within 20% of the requested tx output quantity 0.0 but its not."'
-                 ' Evidently the original contract call set amountOutMin=0 so this is expected behavior.')
     assert len(items_scraped) >= 1
     transactions = _get_archived_transactions_from_json(test_acct, 'moonriver')
     transaction_found = False

@@ -511,15 +511,17 @@ class MoonbeamScraper:
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
         input_tolerance = requested_input_quantity_float * 0.2  # 20% each side
-        if (exact_amount_in_float > requested_input_quantity_float + input_tolerance) \
-                or (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
+        if amount_in != 0 \
+            and ((exact_amount_in_float > requested_input_quantity_float + input_tolerance)
+                 or (exact_amount_in_float < requested_input_quantity_float - input_tolerance)):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" {contract_method_name}, expected log decoded input quantity"
                                 f" {exact_amount_in_float} to be within 20% of the requested tx input quantity"
                                 f" {requested_input_quantity_float} but it's not.")
         output_tolerance = requested_output_quantity_float * 0.2  # 20% each side
-        if (exact_amount_out_float > requested_output_quantity_float + output_tolerance) \
-                or (exact_amount_out_float < requested_output_quantity_float - output_tolerance):
+        if amount_out != 0 \
+            and ((exact_amount_out_float > requested_output_quantity_float + output_tolerance)
+                 or (exact_amount_out_float < requested_output_quantity_float - output_tolerance)):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" {contract_method_name}, expected log decoded output quantity"
                                 f" {exact_amount_out_float} to be within 20% of the requested tx output quantity"
@@ -715,7 +717,8 @@ class MoonbeamScraper:
 
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
-        if 'requested_input_a_quantity_float' in locals() and requested_input_a_quantity_float is not None:
+        if 'requested_input_a_quantity_float' in locals() and requested_input_a_quantity_float is not None \
+                and amount_in_a != 0:
             input_a_tolerance = exact_amount_in_a_float * 0.2  # 20% each side
             if (exact_amount_in_a_float > requested_input_a_quantity_float + input_a_tolerance) \
                     or (exact_amount_in_a_float < requested_input_a_quantity_float - input_a_tolerance):
@@ -723,7 +726,8 @@ class MoonbeamScraper:
                                     f" '{contract_method_name}', expected log decoded LP input A quantity"
                                     f" {exact_amount_in_a_float} to be within 20% of the requested tx input quantity"
                                     f" {requested_input_a_quantity_float} but it's not.")
-        if 'requested_input_b_quantity_float' in locals() and requested_input_b_quantity_float is not None:
+        if 'requested_input_b_quantity_float' in locals() and requested_input_b_quantity_float is not None \
+                and amount_in_b != 0:
             input_b_tolerance = exact_amount_in_b_float * 0.2  # 20% each side
             if (exact_amount_in_b_float > requested_input_b_quantity_float + input_b_tolerance) \
                     or (exact_amount_in_b_float < requested_input_b_quantity_float - input_b_tolerance):
@@ -731,7 +735,7 @@ class MoonbeamScraper:
                                     f" '{contract_method_name}', expected log decoded LP input B quantity"
                                     f" {exact_amount_in_b_float} to be within 20% of the requested tx input quantity"
                                     f" {requested_input_b_quantity_float} but it's not.")
-        if 'amount_out' in locals() and amount_out is not None:    # if variable 'amount_out' has been defined
+        if 'amount_out' in locals() and amount_out is not None and amount_out != 0:  # if 'amount_out' has been defined
             output_tolerance = exact_amount_out_float * 0.2  # 20% each side
             if (exact_amount_out_float > amount_out + output_tolerance) \
                     or (exact_amount_out_float < amount_out - output_tolerance):
@@ -890,22 +894,25 @@ class MoonbeamScraper:
         # validate that the exact amounts are somewhat similar to the contract input values
         #     (to make sure we're matching up the right values).
         input_tolerance = exact_amount_in_float * 0.2  # 20% each side
-        if (exact_amount_in_float > requested_input_quantity_float + input_tolerance) \
-                or (exact_amount_in_float < requested_input_quantity_float - input_tolerance):
+        if input_liquidity_amount != 0 \
+            and ((exact_amount_in_float > requested_input_quantity_float + input_tolerance)
+                 or (exact_amount_in_float < requested_input_quantity_float - input_tolerance)):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP input quantity"
                                 f" {exact_amount_in_float} to be within 20% of the requested tx input quantity"
                                 f" {requested_input_quantity_float} but it's not.")
         output_tolerance = exact_amount_out_a_float * 0.2  # 20% each side
-        if (exact_amount_out_a_float > requested_output_a_quantity_float + output_tolerance) \
-                or (exact_amount_out_a_float < requested_output_a_quantity_float - output_tolerance):
+        if amount_out_a != 0 \
+            and ((exact_amount_out_a_float > requested_output_a_quantity_float + output_tolerance)
+                 or (exact_amount_out_a_float < requested_output_a_quantity_float - output_tolerance)):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP output A quantity"
                                 f" {exact_amount_out_a_float} to be within 20% of the requested tx output quantity"
                                 f" {requested_output_a_quantity_float} but it's not.")
         output_tolerance = exact_amount_out_b_float * 0.2  # 20% each side
-        if (exact_amount_out_b_float > requested_output_b_quantity_float + output_tolerance) \
-                or (exact_amount_out_b_float < requested_output_b_quantity_float - output_tolerance):
+        if amount_out_b != 0 \
+            and ((exact_amount_out_b_float > requested_output_b_quantity_float + output_tolerance)
+                 or (exact_amount_out_b_float < requested_output_b_quantity_float - output_tolerance)):
             self.logger.warning(f"For transaction {tx_hash} with contract {contract_address} method"
                                 f" '{contract_method_name}', expected log decoded LP output B quantity"
                                 f" {exact_amount_out_b_float} to be within 20% of the requested tx output quantity"
