@@ -226,9 +226,22 @@ class MoonbeamScraper:
             :type transaction: dict
             """
             timestamp = int(transaction['timeStamp'])
+
+            # if there happen to be two transactions for the same acct in the same block (same timestamp) then we need
+            # to differentiate those records. Since blocks are ideally 12 sec (but could drop to 6s with asynchronous
+            # backing), simply adding a few seconds to the timestamp won't run into the next block and is therefore
+            # acceptable.
+            if timestamp in self.transactions[account]:
+                for i in range(1, 5):
+                    timestamp_x = timestamp + i
+                    if timestamp_x not in self.transactions[account]:
+                        timestamp = timestamp_x
+                        transaction['timeStamp'] = str(timestamp)
+                        break
+
             acct_tx = {'timeStamp': timestamp, 'utcdatetime': str(datetime.utcfromtimestamp(timestamp)),
-                       'hash': transaction['hash'], 'from': transaction['from'].lower(), 'to': transaction['to'].lower(),
-                       'valueInWei': transaction['value'],
+                       'hash': transaction['hash'], 'from': transaction['from'].lower(),
+                       'to': transaction['to'].lower(), 'valueInWei': transaction['value'],
                        'value': eth_utils.from_wei(int(transaction['value']), 'ether'), 'gas': transaction['gas'],
                        'gasPrice': transaction['gasPrice'], 'gasUsed': transaction['gasUsed']}
             self.transactions[account][timestamp] = acct_tx
@@ -291,8 +304,11 @@ class MoonbeamScraper:
                                               'addLiquiditySingleNativeCurrency'}:
                     await self.__decode_add_liquidity_tx(account, transaction, contract_method_name,
                                                          decoded_func_params)
-                elif contract_method_name in {'removeLiquidity', 'removeLiquidityETH',
-                                              'removeLiquidityETHWithPermit', 'removeLiquidityNativeCurrency'}:
+                elif contract_method_name in {'removeLiquidity', 'removeLiquidityWithPermit',
+                                              'removeLiquidityETH', 'removeLiquidityETHWithPermit',
+                                              'removeLiquidityETHSupportingFeeOnTransferTokens',
+                                              'removeLiquidityETHWithPermitSupportingFeeOnTransferTokens',
+                                              'removeLiquidityNativeCurrency'}:
                     await self.__decode_remove_liquidity_tx(account, transaction, contract_method_name,
                                                             decoded_func_params)
                 elif contract_method_name in {'deposit', 'depositWithPermit', 'depositEth', 'depositETH'}:
@@ -747,8 +763,7 @@ class MoonbeamScraper:
             # There was no output info in the original request. Therefore, nothing to compare to.
             pass
 
-    async def __decode_remove_liquidity_tx(self, account, transaction, contract_method_name,
-                                           decoded_func_params):
+    async def __decode_remove_liquidity_tx(self, account, transaction, contract_method_name, decoded_func_params):
         """Decode transaction receipts/logs from a liquidity removing contract interaction
 
         :param account: the 'owner' account that we're analyzing transactions for
@@ -764,13 +779,15 @@ class MoonbeamScraper:
         timestamp = int(transaction['timeStamp'])
         contract_address = transaction['to'].lower()
         self.transactions[account][timestamp]['action'] = 'remove liquidity'
-        if contract_method_name == 'removeLiquidity':
+        if contract_method_name in {'removeLiquidity', 'removeLiquidityWithPermit'}:
             output_token_a = decoded_func_params['tokenA'].lower()
             output_token_b = decoded_func_params['tokenB'].lower()
             input_liquidity_amount = decoded_func_params['liquidity']
             amount_out_a = decoded_func_params['amountAMin']
             amount_out_b = decoded_func_params['amountBMin']
-        elif contract_method_name in {'removeLiquidityETH', 'removeLiquidityETHWithPermit'}:
+        elif contract_method_name in {'removeLiquidityETH', 'removeLiquidityETHWithPermit',
+                                      'removeLiquidityETHSupportingFeeOnTransferTokens',
+                                      'removeLiquidityETHWithPermitSupportingFeeOnTransferTokens'}:
             output_token_a = decoded_func_params['token'].lower()
             output_token_b = self.__get_custom_token_info('WMOVR')['address'].lower()
             input_liquidity_amount = decoded_func_params['liquidity']
@@ -846,7 +863,10 @@ class MoonbeamScraper:
             elif evt_name == 'Withdrawal':
                 decoded_event_quantity_int = \
                     self.__extract_quantity_from_params(transaction, evt_name, decoded_event_params)
-                if contract_method_name in {'removeLiquidityNativeCurrency', 'removeLiquidityETH'}:
+                if contract_method_name in {'removeLiquidityNativeCurrency', 'removeLiquidityETH',
+                                            'removeLiquidityETHWithPermit',
+                                            'removeLiquidityETHSupportingFeeOnTransferTokens',
+                                            'removeLiquidityETHWithPermitSupportingFeeOnTransferTokens'}:
                     # Receiving token A or B from breaking up LP
                     if token_address == output_token_a:
                         exact_transfer_output_a_quantity_int = decoded_event_quantity_int
