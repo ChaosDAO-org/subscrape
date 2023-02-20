@@ -101,7 +101,7 @@ def convert_to_hex(arg, target_schema):
 
 
 @lru_cache(maxsize=None)
-def _get_contract(address, abi):
+def __get_contract(address, abi):
     """
     This helps speed up execution of decoding across a large dataset by caching the contract object
     It assumes that we are decoding a small set, on the order of thousands, of target smart contracts
@@ -132,7 +132,7 @@ def decode_tx(address, input_data, abi):
     """
     if abi is not None:
         try:
-            (contract, abi) = _get_contract(address, abi)
+            (contract, abi) = __get_contract(address, abi)
             func_obj, func_params = contract.decode_function_input(input_data)
             target_schema = [a['inputs'] for a in abi if 'name' in a and a['name'] == func_obj.fn_name][0]
             decoded_func_params = convert_to_hex(func_params, target_schema)

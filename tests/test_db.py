@@ -42,7 +42,7 @@ async def test_db():
         params={"param1": "value1"},
         finalized=True
     )
-    
+
     db.write_item(extrinsic)
     db.write_item(event)
     db.flush()

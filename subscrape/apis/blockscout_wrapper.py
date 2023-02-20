@@ -68,13 +68,17 @@ class BlockscoutWrapper:
         :param tx_filter: method that returns True if certain transactions should be filtered out of the results
         :type tx_filter: function
         """
-        done = False            # keep crunching until we are done
-        start_block = 0         # iterator for the page we want to query
-        previous_block = 0      # to check if the iterator actually moved forward
-        count = 0               # counter for how many items we queried already
+        done = False             # keep crunching until we are done
+        previous_block = 0       # to check if the iterator actually moved forward
+        last_block_received = 0  # to compare most recent block to end block requested
+        count = 0                # counter for how many items we queried already
+        if 'startblock' in params:
+            start_block = int(params['startblock'])
+        else:
+            start_block = 0
 
         while not done:
-            params["startblock"] = start_block
+            params["startblock"] = str(start_block)
             response_obj = self.__query(params)
 
             if response_obj["status"] == "0":
@@ -85,6 +89,7 @@ class BlockscoutWrapper:
 
             # process the elements
             for element in elements:
+                last_block_received = int(element['blockNumber'])
                 if tx_filter is not None and tx_filter(element):
                     continue
                 await element_processor(element)
@@ -93,8 +98,9 @@ class BlockscoutWrapper:
             count += len(elements)
             self.logger.info(count)
 
-            start_block = element["blockNumber"]
-            if start_block == previous_block:
+            start_block = int(element["blockNumber"])
+            end_block = int(params["endblock"])
+            if start_block == previous_block or last_block_received == end_block:
                 done = True
             previous_block = start_block
 

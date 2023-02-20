@@ -6,13 +6,12 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_list():
-    
     chain = "kusama"
     extrinsic_idx = "14238250-2"
-    
+
     config = {
         chain: {
-            "extrinsics-list":[
+            "extrinsics-list": [
                 extrinsic_idx
             ],
         }
@@ -33,14 +32,13 @@ async def test_fetch_extrinsics_list():
     assert extrinsic.extrinsic_hash == '0x408aacc9a42189836d615944a694f4f7e671a89f1a30bf0977a356cf3f6c301c'
     assert extrinsic.origin_public_key == "1eb38b0d5178bc680c10a204f81164946a25078c6d3b5f6813cef61c3aef4843"
     assert type(extrinsic.params) is list
-    
+
     db.close()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("auto_hydrate", [True, False])
 async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
-
     chain = "kusama"
 
     config = {
@@ -52,7 +50,7 @@ async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
             }
         }
     }
-    
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
@@ -74,7 +72,6 @@ async def test_fetch_and_hydrate_extrinsic(auto_hydrate):
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_module_call():
-        
     config = {
         "kusama": {
             "_auto_hydrate": False,
@@ -83,7 +80,7 @@ async def test_fetch_extrinsics_by_module_call():
             }
         }
     }
-    
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
@@ -99,22 +96,21 @@ async def test_fetch_extrinsics_by_module_call():
     assert len(extrinsics) == 1, "Expected 1 extrinsic"
     extrinsic = extrinsics[0]
     assert extrinsic.extrinsic_hash == '0x9f2a81d8d92884122d122d806276da7ff9b440a0a273bc3898cbd4072d5f62e1'
-    
+
     db.close()
 
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_module():
-    
     config = {
-        "kusama":{
+        "kusama": {
             "_auto_hydrate": False,
-            "extrinsics":{
+            "extrinsics": {
                 "bounties": None
             }
         }
     }
-    
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
@@ -142,7 +138,6 @@ async def test_fetch_extrinsics_by_module():
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_by_address():
-    
     chain = "kusama"
 
     config = {
@@ -154,7 +149,7 @@ async def test_fetch_extrinsics_by_address():
             }
         }
     }
-    
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")
@@ -173,7 +168,6 @@ async def test_fetch_extrinsics_by_address():
 
 @pytest.mark.asyncio
 async def test_fetch_extrinsics_repeatedly():
-    
     chain = "kusama"
 
     config = {
@@ -185,7 +179,7 @@ async def test_fetch_extrinsics_repeatedly():
             }
         }
     }
-    
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
     logging.info("wiping storage")

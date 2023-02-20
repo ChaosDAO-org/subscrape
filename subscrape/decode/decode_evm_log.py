@@ -20,7 +20,7 @@ from subscrape.decode.decode_evm_transaction import convert_to_hex
 
 
 @lru_cache(maxsize=None)
-def _get_topic2abi(abi):
+def __get_topic2abi(abi):
     """
     get a list of topics in the abi
 
@@ -36,7 +36,7 @@ def _get_topic2abi(abi):
 
 
 @lru_cache(maxsize=None)
-def _get_hex_topic(t):
+def __get_hex_topic(t):
     """
     convert a log topic to a hex string
 
@@ -62,7 +62,7 @@ def decode_log(data, topics, abi):
     """
     if abi is not None:
         try:
-            topic2abi = _get_topic2abi(abi)
+            topic2abi = __get_topic2abi(abi)
 
             log = {
                 'address': None,  # Web3.toChecksumAddress(address),
@@ -70,7 +70,7 @@ def decode_log(data, topics, abi):
                 'blockNumber': None,
                 'data': data,
                 'logIndex': None,
-                'topics': [_get_hex_topic(_) for _ in topics],
+                'topics': [__get_hex_topic(_) for _ in topics],
                 'transactionHash': None,  # HexBytes(transactionHash),
                 'transactionIndex': None
             }

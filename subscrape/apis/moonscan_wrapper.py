@@ -29,7 +29,7 @@ class MoonscanWrapper:
         self.min_wait_between_queries = 1 / self.max_calls_per_sec
         self.logger.info(f'Moonscan.io rate limit set to {self.max_calls_per_sec} API calls per second.'
                          f' Minimum wait time between queries is {self.min_wait_between_queries:.3f} seconds.')
-        if api_key is not None:
+        if api_key is None:
             api_key_sec_between_queries = 1 / MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY
             self.logger.info(f'Moonscan.io rate limit could be {MOONSCAN_MAX_CALLS_PER_SEC_WITH_AN_API_KEY} calls/sec'
                              f' ({api_key_sec_between_queries:.3f} sec between queries) if you had an API key.')
@@ -37,7 +37,7 @@ class MoonscanWrapper:
         self.semaphore = asyncio.Semaphore(math.ceil(self.max_calls_per_sec))
         self.lock = asyncio.Lock()
 
-    async def _query(self, params, client=None):
+    async def __query(self, params, client=None):
         """Rate limited call to fetch another page of data from the Moonscan.io block explorer website
 
         :param params: Moonscan.io API call params that filter which transactions are returned.
@@ -63,7 +63,7 @@ class MoonscanWrapper:
             self.time_of_last_request = time_now
             async with self.semaphore:
                 self.logger.debug(f"sending httpx request at {datetime.now().strftime('%H:%M:%S.%f')[:-3]} and"
-                                  f" {time_since_last_request:.3f} sec since the last query. {params['action']=}")
+                                  f" {time_since_last_request:.3f} sec since the last query. {params=}")
                 response = await client.get(self.endpoint, params=params, timeout=30.0)
             time_since_last_request = time.time() - self.time_of_last_request
             self.logger.debug(f"request took: {time_since_last_request:.3} seconds. {self.time_of_last_request=:.3f}")
@@ -87,9 +87,8 @@ class MoonscanWrapper:
                         should_request = False
                         if ('status' in response_json and response_json['status'] == "0") \
                                 or ('message' in response_json and response_json['message'] == "NOTOK"):
-                            self.logger.warning(f'Moonscan API query failed for {params=} because'
-                                                f' "{response_json["result"]}" at'
-                                                f' {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
+                            self.logger.warning(f'Moonscan API query failed with response "{response_json["result"]}"'
+                                                f' at {datetime.now().strftime("%H:%M:%S.%f")[:-3]} with {params=}')
                         else:
                             # We received a normal response.
                             # Check if we should sleep a little to avoid exceeding the rate limit
@@ -102,7 +101,7 @@ class MoonscanWrapper:
         response_json = json.loads(response.text)
         return response_json
 
-    async def _iterate_pages(self, element_processor, params={}, tx_filter=None):
+    async def __iterate_pages(self, element_processor, params={}, tx_filter=None):
         """Repeatedly fetch transactions from Moonscan.io matching a set of parameters, iterating one html page at a
         time. Perform post-processing of each transaction using the `element_processor` method provided.
         :param element_processor: method to process each transaction as it is received
@@ -112,14 +111,18 @@ class MoonscanWrapper:
         :param tx_filter: method that returns True if certain transactions should be filtered out of the results
         :type tx_filter: function
         """
-        done = False            # keep crunching until we are done
-        start_block = 0         # iterator for the page we want to query
-        previous_block = 0      # to check if the iterator actually moved forward
-        count = 0               # counter for how many items we queried already
+        done = False             # keep crunching until we are done
+        previous_block = 0       # to check if the iterator actually moved forward
+        last_block_received = 0  # to compare most recent block to end block requested
+        count = 0                # counter for how many items we queried already
+        if 'startblock' in params:
+            start_block = int(params['startblock'])
+        else:
+            start_block = 0
 
         while not done:
-            params["startblock"] = start_block
-            response_obj = await self._query(params)
+            params["startblock"] = str(start_block)
+            response_obj = await self.__query(params)
 
             if response_obj["status"] == "0":
                 self.logger.info(f"received empty result. message='{response_obj['message']}' and"
@@ -130,16 +133,18 @@ class MoonscanWrapper:
 
             # process the elements
             for element in elements:
+                last_block_received = int(element['blockNumber'])
                 if tx_filter is not None and tx_filter(element):
                     continue
                 await element_processor(element)
 
             # update counters and check if we should exit
             count += len(elements)
-            self.logger.info(count)
+            self.logger.debug(count)
 
-            start_block = element["blockNumber"]
-            if start_block == previous_block:
+            start_block = int(element["blockNumber"])
+            end_block = int(params["endblock"])
+            if start_block == previous_block or last_block_received == end_block:
                 done = True
             previous_block = start_block
 
@@ -157,12 +162,45 @@ class MoonscanWrapper:
         :param config: the `ScrapeConfig`
         :type config: ScrapeConfig
         """
-        params = {"module": "account", "action": "txlist", "address": address, "startblock": "1",
-                  "endblock": "99999999", "sort": "asc"}
-        if config and hasattr(config, 'filter'):
-            await self._iterate_pages(element_processor, params=params, tx_filter=config.filter)
+        start_block = 1
+        end_block = 99999999
+        if config.filter_conditions is not None:
+            for group in config.filter_conditions:
+                if 'blockNumber' in group:
+                    predicates = group['blockNumber']
+                    for predicate in predicates:
+                        if '==' in predicate:
+                            value = predicate['==']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value
+                            end_block = value
+                        elif '<' in predicate:
+                            value = predicate['<']
+                            if type(value) is not int:
+                                value = int(value)
+                            end_block = value - 1
+                        elif '<=' in predicate:
+                            value = predicate['<=']
+                            if type(value) is not int:
+                                value = int(value)
+                            end_block = value
+                        elif '>' in predicate:
+                            value = predicate['>']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value + 1
+                        elif '>=' in predicate:
+                            value = predicate['>=']
+                            if type(value) is not int:
+                                value = int(value)
+                            start_block = value
+        params = {"module": "account", "action": "txlist", "address": address,
+                  "startblock": str(start_block), "endblock": str(end_block), "sort": "asc"}
+        if config and config.filter is not None:
+            await self.__iterate_pages(element_processor, params=params, tx_filter=config.filter)
         else:
-            await self._iterate_pages(element_processor, params=params)
+            await self.__iterate_pages(element_processor, params=params)
 
     async def get_contract_abi(self, contract_address):
         """Get a contract's ABI (so that its transactions can be decoded).
@@ -173,7 +211,7 @@ class MoonscanWrapper:
         :rtype: str or None
         """
         params = {"module": "contract", "action": "getabi", "address": contract_address}
-        response_dict = await self._query(params)   # will add on the optional API key
+        response_dict = await self.__query(params)   # will add on the optional API key
         if response_dict['status'] == "0" or response_dict['message'] == "NOTOK":
             self.logger.info(f'ABI not retrievable for {contract_address} because "{response_dict["result"]}"'
                              f' at {datetime.now().strftime("%H:%M:%S.%f")[:-3]}')
@@ -191,6 +229,6 @@ class MoonscanWrapper:
         :rtype: dict or None
         """
         params = {"module": "proxy", "action": "eth_getTransactionReceipt", "txhash": tx_hash}
-        response_dict = await self._query(params)   # will add on the optional API key
+        response_dict = await self.__query(params)   # will add on the optional API key
         # response_dict['result'] should contain a long string representation of the tx receipt.
         return response_dict['result']
