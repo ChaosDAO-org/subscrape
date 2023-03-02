@@ -2,8 +2,8 @@ __author__ = 'Tommi Enenkel @alice_und_bob'
 
 import os
 import logging
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey, ForeignKeyConstraint
-from sqlalchemy.orm import Session, Query, relationship
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy.orm import Session, Query
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy_utils import database_exists, create_database
 
@@ -35,27 +35,17 @@ class Extrinsic(Base):
     finalized = Column(Boolean)
     tip = Column(Integer)
 
-    events = relationship("Event", back_populates="extrinsic")
-
 class Event(Base):
     __tablename__ = 'events'
     chain = Column(String(50), primary_key=True)
     id = Column(String(20), primary_key=True)
     block_number = Column(Integer, ForeignKey('blocks.block_number'))
     block_timestamp = Column(DateTime) # only present in the Subscan metadata
-    extrinsic_id = Column(String(20))
+    extrinsic_id = Column(Integer)
     module = Column(String(100))
     event = Column(String(100))
     params = Column(JSON)
     finalized = Column(Boolean)
-
-    __table_args__ = (
-        ForeignKeyConstraint([extrinsic_id, chain],
-                             [Extrinsic.id, Extrinsic.chain]),
-    )
-
-    extrinsic = relationship("Extrinsic", back_populates="events")
-
 
 class SubscrapeDB:
     """
