@@ -95,8 +95,8 @@ class SubscanWrapper:
             await self.lock.acquire()
             try:
                 if response.status_code == 429:
-                    self.logger.warning("API rate limit exceeded. Waiting 1 second and retrying...")
-                    await asyncio.sleep(1)
+                    self.logger.warning("API rate limit exceeded. Waiting 2 seconds and retrying...")
+                    await asyncio.sleep(2)
                 elif response.status_code != 200:
                     self.logger.info(f"Status Code: {response.status_code}")
                     self.logger.info(response.headers)
@@ -390,6 +390,9 @@ class SubscanWrapper:
         """
 
         items = []
+        
+        #deduplicate extrinsic indexes
+        extrinsic_indexes = list(set(extrinsic_indexes))
 
         self.logger.info("Building list of extrinsics to fetch...")
 
